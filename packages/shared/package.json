@@ -1,0 +1,22 @@
+{
+  "name": "@cicada/shared",
+  "version": "1.0.0",
+  "description": "Cicada 共享类型和工具",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251014.0",
+    "@types/node": "^24.9.1",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.9.3"
+  }
+}
