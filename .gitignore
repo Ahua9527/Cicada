@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.*
+!.env.example
+.dev.vars
+!.dev.vars.example
+.mcp.json
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build and coverage
+dist/
+coverage/
+.nyc_output/
+*.lcov
+*.tsbuildinfo
+.wrangler/
+apps/relay/.wrangler/
+apps/agent/swift/.build/
+apps/agent/swift/.swiftpm/
+apps/agent/native/notification-agent/.build/
+
+# macOS and editors
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
