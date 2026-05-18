@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+coverage/
+.wrangler/
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+.parcel-cache/
+
+# System files
+.DS_Store
+
+# Config files (保留原格式)
+wrangler.toml
+tsconfig.json

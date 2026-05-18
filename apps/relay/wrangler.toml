@@ -1,0 +1,25 @@
+name = "cicada-relay"
+main = "src/index.ts"
+compatibility_date = "2024-04-03"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Objects for session management
+[[durable_objects.bindings]]
+name = "CICADA_SESSIONS"
+class_name = "CicadaSessionManager"
+
+# Durable Objects migrations
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CicadaSessionManager"]
+
+# KV namespace for global state (可选)
+# [[kv_namespaces]]
+# binding = "CICADA_RELAY_GLOBAL"
+# id = "your-kv-namespace-id"
+# preview_id = "your-preview-kv-namespace-id"
+
+# R2 bucket for file storage (如果需要)
+# [[r2_buckets]]
+# binding = "CICADA_RELAY_STORAGE"
+# bucket_name = "your-bucket-name"

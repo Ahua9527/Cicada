@@ -1,0 +1,192 @@
+/**
+ * CicadaRelay Application
+ * Main application class with middleware pipeline and routing
+ */
+
+import type { Env, MiddlewareContext } from '../types';
+import { getLogger, type Logger } from '../infrastructure/logger';
+import { ErrorHandler } from '../utils/errors';
+import {
+  MiddlewarePipeline,
+  requestIdMiddleware,
+  loggingMiddleware,
+  securityHeadersMiddleware,
+  corsMiddleware,
+  rateLimitMiddleware,
+  requestSizeLimitMiddleware,
+  authMiddleware,
+} from '../infrastructure/middleware';
+import { Router } from './router';
+
+/**
+ * CicadaRelay App
+ */
+export class CicadaRelayApp {
+  private pipeline: MiddlewarePipeline;
+  private logger: Logger;
+  private errorHandler: ErrorHandler;
+  private router: Router;
+  private env?: Env;
+
+  constructor(env?: Env) {
+    this.env = env;
+    this.logger = getLogger({
+      minLevel: 'info',
+      enableConsole: true,
+      enableStructured: true,
+      env: env,
+    });
+
+    this.errorHandler = new ErrorHandler(this.logger as any);
+    this.router = new Router();
+    this.router.registerRoutes({
+      handleRoot: this.handleRoot.bind(this),
+      handleFavicon: this.handleFavicon.bind(this),
+    });
+    this.pipeline = this.createPipeline();
+  }
+
+  /**
+   * Create middleware pipeline
+   */
+  private createPipeline(): MiddlewarePipeline {
+    const enableCORS = this.env?.ENABLE_CORS === 'true';
+    const enableRateLimit = this.env?.RATE_LIMIT_ENABLED !== 'false';
+
+    const pipeline = new MiddlewarePipeline();
+
+    // Basic middleware
+    pipeline.use(requestIdMiddleware());
+    pipeline.use(loggingMiddleware());
+    pipeline.use(securityHeadersMiddleware());
+
+    // Request body size limit
+    pipeline.use(requestSizeLimitMiddleware({ maxSize: 10 * 1024 }));
+
+    // CORS middleware
+    if (enableCORS) {
+      const allowedOrigins = this.env?.ALLOWED_ORIGINS
+        ? this.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+        : ['http://localhost:3000', 'http://localhost:5173'];
+
+      pipeline.use(
+        corsMiddleware({
+          allowedOrigins,
+          allowedMethods: ['GET', 'POST', 'OPTIONS'],
+          allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+          enabled: true,
+        })
+      );
+    }
+
+    // Rate limiting
+    if (enableRateLimit) {
+      pipeline.use(
+        rateLimitMiddleware({
+          windowMs: 60 * 1000,
+          maxRequests: 100,
+        })
+      );
+    }
+
+    // Authentication and validation middleware
+    pipeline.use(authMiddleware());
+
+    // Router middleware
+    pipeline.use(this.router.createMiddleware() as any);
+
+    return pipeline;
+  }
+
+  /**
+   * Handle request
+   */
+  // eslint-disable-next-line no-undef
+  async handle(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    const requestId = this.generateRequestId();
+
+    const context: MiddlewareContext = {
+      request,
+      env,
+      requestId,
+      logger: this.logger as any,
+      timestamp: Date.now(),
+      url,
+      method: request.method,
+      headers: this.parseHeaders(request.headers),
+    };
+
+    try {
+      this.logger.info('Request received', {
+        requestId,
+        context: {
+          method: request.method,
+          url: request.url,
+          userAgent: request.headers.get('User-Agent'),
+          ip: request.headers.get('CF-Connecting-IP'),
+        },
+        tags: ['request', 'start'],
+      });
+
+      const response = await this.pipeline.execute(context as any);
+
+      // WebSocket 升级响应（101）不可变，跳过日志记录
+      if (response.status !== 101) {
+        this.logger.info('Request completed', {
+          requestId,
+          context: {
+            status: response.status,
+            duration: Date.now() - context.timestamp,
+          },
+          tags: ['request', 'end'],
+        });
+      }
+
+      return response;
+    } catch (error) {
+      this.logger.error('Request handling failed', {
+        requestId,
+        error: error as Error,
+        context: { method: request.method, url: request.url },
+        tags: ['request', 'error'],
+      });
+
+      const errorResponse = this.errorHandler.handleError(error, requestId);
+      return Response.json(errorResponse, { status: 500 });
+    }
+  }
+
+  private generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private async handleRoot(_context: MiddlewareContext): Promise<Response> {
+    return Response.json({
+      ok: true,
+      message: 'CicadaRelay API Server',
+      version: '1.0.0',
+      status: 'running',
+      endpoints: {
+        websocket: '/ws',
+        send_command: '/send',
+        status: '/status',
+        devices: '/devices',
+        health: '/health',
+      },
+      timestamp: Date.now(),
+    });
+  }
+
+  private async handleFavicon(_context: MiddlewareContext): Promise<Response> {
+    return new Response(null, { status: 204 });
+  }
+
+  private parseHeaders(headers: Headers): Record<string, string> {
+    const result: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      result[key.toLowerCase()] = value;
+    });
+    return result;
+  }
+}
