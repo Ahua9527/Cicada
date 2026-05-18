@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  relay:
+    name: Relay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:relay
+      - run: pnpm run lint:relay
+      - run: pnpm run test:relay
+      - run: pnpm run deploy:relay:dry-run
+
+  agent:
+    name: Agent
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
+      - run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
+      - run: pnpm run build:agent
