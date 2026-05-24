@@ -26,7 +26,7 @@ final class ConfigStoreTests: XCTestCase {
         XCTAssertEqual(loaded.deviceId, config.deviceId)
     }
 
-    func testConfigLoadRejectsObsoleteApiKeyField() throws {
+    func testConfigLoadIgnoresObsoleteApiKeyFieldAndSaveDropsIt() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("cicada-swift-tests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -49,7 +49,13 @@ final class ConfigStoreTests: XCTestCase {
         """
         try raw.write(toFile: configPath, atomically: true, encoding: .utf8)
 
-        XCTAssertThrowsError(try store.load())
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.relayURL, "https://example.com")
+        XCTAssertEqual(loaded.deviceId, "MAC_0123456789ABCDEF0123456789ABCDEF")
+
+        try store.save(loaded)
+        let saved = try String(contentsOfFile: configPath, encoding: .utf8)
+        XCTAssertFalse(saved.contains("apiKey"))
     }
 
     func testConfigValidationRejectsInvalidDeviceIdFormat() {
