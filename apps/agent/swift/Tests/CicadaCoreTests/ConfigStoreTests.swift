@@ -18,13 +18,38 @@ final class ConfigStoreTests: XCTestCase {
 
         var config = CicadaConfig.defaultConfig()
         config.relayURL = "https://example.com"
-        config.apiKey = "abc123456789"
 
         try store.save(config)
         let loaded = try store.load()
 
         XCTAssertEqual(loaded.relayURL, config.relayURL)
-        XCTAssertEqual(loaded.apiKey, config.apiKey)
+        XCTAssertEqual(loaded.deviceId, config.deviceId)
+    }
+
+    func testConfigLoadRejectsObsoleteApiKeyField() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("cicada-swift-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let configPath = tempDir.appendingPathComponent("config.json").path
+        let store = ConfigStore(path: configPath)
+        let raw = """
+        {
+          "relayURL": "https://example.com",
+          "deviceId": "MAC_0123456789ABCDEF0123456789ABCDEF",
+          "apiKey": "legacy-unused",
+          "autoConnect": true,
+          "showNotifications": true,
+          "enableAutoReconnect": true,
+          "reconnectInterval": 5000,
+          "maxReconnectAttempts": 10,
+          "heartbeatInterval": 30000,
+          "connectionTimeout": 10000
+        }
+        """
+        try raw.write(toFile: configPath, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try store.load())
     }
 
     func testConfigValidationRejectsInvalidDeviceIdFormat() {

@@ -84,7 +84,6 @@ public struct CommandExecutionResult: Codable, Equatable {
 public struct CicadaConfig: Codable {
     public var relayURL: String
     public var deviceId: String
-    public var apiKey: String
     public var autoConnect: Bool
     public var showNotifications: Bool
     public var enableAutoReconnect: Bool
@@ -96,7 +95,6 @@ public struct CicadaConfig: Codable {
     public init(
         relayURL: String,
         deviceId: String,
-        apiKey: String,
         autoConnect: Bool,
         showNotifications: Bool,
         enableAutoReconnect: Bool,
@@ -107,7 +105,6 @@ public struct CicadaConfig: Codable {
     ) {
         self.relayURL = relayURL
         self.deviceId = deviceId
-        self.apiKey = apiKey
         self.autoConnect = autoConnect
         self.showNotifications = showNotifications
         self.enableAutoReconnect = enableAutoReconnect
@@ -121,7 +118,6 @@ public struct CicadaConfig: Codable {
         CicadaConfig(
             relayURL: "https://example.com",
             deviceId: Self.generateDeviceId(),
-            apiKey: "replace-with-your-api-key",
             autoConnect: true,
             showNotifications: true,
             enableAutoReconnect: true,
@@ -147,9 +143,6 @@ public struct CicadaConfig: Codable {
         }
         guard normalizedDeviceId.range(of: #"^MAC_[A-Fa-f0-9]{32}$"#, options: .regularExpression) != nil else {
             throw CicadaError.validation("deviceId 必须匹配 MAC_[32位十六进制]")
-        }
-        guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw CicadaError.validation("apiKey 不能为空")
         }
         guard reconnectInterval > 0 else {
             throw CicadaError.validation("reconnectInterval 必须大于 0")

@@ -21,6 +21,10 @@ public final class ConfigStore {
             throw CicadaError.io("配置文件不存在: \(path)")
         }
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           object.keys.contains("apiKey") {
+            throw CicadaError.validation("不支持的配置项: apiKey")
+        }
         let config = try JSONDecoder().decode(CicadaConfig.self, from: data)
         try config.validate()
         return config
@@ -58,8 +62,6 @@ public final class ConfigStore {
             config.relayURL = value
         case "deviceId":
             config.deviceId = value
-        case "apiKey":
-            config.apiKey = value
         case "autoConnect":
             config.autoConnect = try parseBool(value, key: key)
         case "showNotifications":
@@ -87,8 +89,6 @@ public final class ConfigStore {
             return config.relayURL
         case "deviceId":
             return config.deviceId
-        case "apiKey":
-            return config.apiKey
         case "autoConnect":
             return String(config.autoConnect)
         case "showNotifications":
