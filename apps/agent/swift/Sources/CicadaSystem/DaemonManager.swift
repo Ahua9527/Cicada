@@ -25,7 +25,7 @@ public final class DaemonManager {
 
     public func install(sourceBinaryPath: String? = nil) throws {
         guard fm.fileExists(atPath: RuntimePaths.configPath) else {
-            throw CicadaError.io("缺少配置文件: \(RuntimePaths.configPath)。请先执行 cicada config init")
+            throw CicadaError.io("缺少配置文件: \(RuntimePaths.configPath)。请先执行 cicada setup --relay-url <url>")
         }
 
         let source = resolveSourceBinaryPath(sourceBinaryPath)
