@@ -23,6 +23,7 @@ jobs:
       - run: pnpm run build:relay
       - run: pnpm run lint:relay
       - run: pnpm run test:relay
+      - run: pnpm --filter @cicada/relay exec jest --coverage --silent
       - run: pnpm run deploy:relay:dry-run
 
   agent:
