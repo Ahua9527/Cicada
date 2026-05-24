@@ -200,13 +200,17 @@ describe('Shortcuts-only relay transport', () => {
     );
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(agent.send).toHaveBeenCalledWith(expect.stringContaining('"type":"shortcut_command"'));
+    const [sentCommand] = agent.send.mock.calls
+      .map(([raw]) => JSON.parse(raw as string))
+      .filter(message => message.type === 'shortcut_command');
+    const internalRequestId = sentCommand.data.requestId;
+    expect(internalRequestId).not.toBe('req-1');
     agent.emit('message', {
       data: JSON.stringify({
         type: 'shortcut_result',
-        id: 'req-1',
+        id: internalRequestId,
         data: {
-          requestId: 'req-1',
+          requestId: internalRequestId,
           command: 'ping',
           ok: true,
           success: true,
@@ -223,6 +227,161 @@ describe('Shortcuts-only relay transport', () => {
       command: 'ping',
       success: true,
       message: 'pong',
+    });
+  });
+
+  it('keeps concurrent Shortcuts commands independent when clients reuse request_id', async () => {
+    const rooms = new Map<string, SessionManagerDO>();
+    const registryRef: { current?: SessionManagerDO } = {};
+    const env = createEnv(() => registryRef.current!, rooms);
+    const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), env);
+    registryRef.current = registry;
+    const session = new SessionManagerDO(createMockState('session-live-1'), env);
+    rooms.set('session-live-1', session);
+    const agent = createMockSocket();
+
+    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, {
+      deviceId,
+      agentIdentityPublicKey: 'agent-public-key',
+    });
+
+    agent.emit('message', {
+      data: JSON.stringify({
+        type: 'shortcut_grant_update',
+        from: 'agent',
+        data: {
+          state: 'active',
+          grant: {
+            grantId: 'grant-1',
+            deviceId,
+            name: 'iPhone Shortcut',
+            tokenHash,
+            tokenPreview: 'cicada_sc_te...oken',
+            allowedCommands: ['ping', 'status'],
+            expiresAt: Date.now() + 60_000,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        },
+      }),
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const app = new CicadaRelayApp(env);
+    const postShortcut = (command: string) =>
+      app.handle(
+        new Request('http://localhost/v1/shortcuts/command', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            device_id: deviceId,
+            command,
+            request_id: 'req-shared',
+          }),
+        }),
+        env,
+        { waitUntil: jest.fn(), passThroughOnException: jest.fn() } as any
+      );
+
+    const firstRequest = postShortcut('ping');
+    const secondRequest = postShortcut('status');
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const sentCommands = agent.send.mock.calls
+      .map(([raw]) => JSON.parse(raw as string))
+      .filter(message => message.type === 'shortcut_command');
+    expect(sentCommands).toHaveLength(2);
+    const firstInternalId = sentCommands[0].data.requestId;
+    const secondInternalId = sentCommands[1].data.requestId;
+    expect(firstInternalId).not.toBe('req-shared');
+    expect(secondInternalId).not.toBe('req-shared');
+    expect(firstInternalId).not.toBe(secondInternalId);
+
+    agent.emit('message', {
+      data: JSON.stringify({
+        type: 'shortcut_result',
+        id: secondInternalId,
+        data: {
+          requestId: secondInternalId,
+          command: 'status',
+          ok: true,
+          success: true,
+          message: 'ready',
+        },
+      }),
+    });
+    agent.emit('message', {
+      data: JSON.stringify({
+        type: 'shortcut_result',
+        id: firstInternalId,
+        data: {
+          requestId: firstInternalId,
+          command: 'ping',
+          ok: true,
+          success: true,
+          message: 'pong',
+        },
+      }),
+    });
+
+    const firstResponse = await firstRequest;
+    const secondResponse = await secondRequest;
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(await firstResponse.json()).toMatchObject({
+      ok: true,
+      request_id: 'req-shared',
+      command: 'ping',
+      message: 'pong',
+    });
+    expect(await secondResponse.json()).toMatchObject({
+      ok: true,
+      request_id: 'req-shared',
+      command: 'status',
+      message: 'ready',
+    });
+  });
+
+  it('rejects malformed public Shortcuts JSON as an invalid shortcut command', async () => {
+    const env = createEnv();
+    const app = new CicadaRelayApp(env);
+    const response = await app.handle(
+      new Request('http://localhost/v1/shortcuts/command', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: '{',
+      }),
+      env,
+      { waitUntil: jest.fn(), passThroughOnException: jest.fn() } as any
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      code: 'invalid_shortcut_command',
+    });
+  });
+
+  it('rejects malformed internal shortcut dispatch JSON as an invalid shortcut command', async () => {
+    const session = new SessionManagerDO(createMockState('session-live-1'), {} as Env);
+    const response = await session.fetch(
+      new Request('http://session/shortcut/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      code: 'invalid_shortcut_command',
     });
   });
 

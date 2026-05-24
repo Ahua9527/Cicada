@@ -21,10 +21,6 @@ public final class ConfigStore {
             throw CicadaError.io("配置文件不存在: \(path)")
         }
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           object.keys.contains("apiKey") {
-            throw CicadaError.validation("不支持的配置项: apiKey")
-        }
         let config = try JSONDecoder().decode(CicadaConfig.self, from: data)
         try config.validate()
         return config
