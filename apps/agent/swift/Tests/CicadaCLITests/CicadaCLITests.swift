@@ -153,6 +153,33 @@ final class CicadaCLITests: XCTestCase {
         XCTAssertTrue(result.stdout.contains("cicada start"))
     }
 
+    func testSetupWithRelayURLMigratesLegacyApiKeyConfig() throws {
+        let fixture = CLIFixture()
+        let raw = """
+        {
+          "relayURL": "https://old-relay.example.com",
+          "deviceId": "MAC_0123456789ABCDEF0123456789ABCDEF",
+          "apiKey": "legacy-unused",
+          "autoConnect": true,
+          "showNotifications": true,
+          "enableAutoReconnect": true,
+          "reconnectInterval": 5000,
+          "maxReconnectAttempts": 10,
+          "heartbeatInterval": 30000,
+          "connectionTimeout": 10000
+        }
+        """
+        try raw.write(toFile: fixture.configStore.configPath(), atomically: true, encoding: .utf8)
+
+        let result = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
+
+        XCTAssertEqual(result.exitCode, 0)
+        let config = try fixture.configStore.load()
+        XCTAssertEqual(config.relayURL, "https://relay.example.com")
+        let saved = try String(contentsOfFile: fixture.configStore.configPath(), encoding: .utf8)
+        XCTAssertFalse(saved.contains("apiKey"))
+    }
+
     func testStartInstallsMissingServices() {
         let fixture = CLIFixture()
         _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])

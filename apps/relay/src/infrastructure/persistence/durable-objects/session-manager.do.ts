@@ -55,6 +55,8 @@ type ShortcutGrantRecord = {
 type PendingShortcutCommand = {
   resolve: (response: Response) => void;
   timer: Timer;
+  clientRequestId: string;
+  command: string;
 };
 
 export interface SessionManagerOptions {
@@ -674,23 +676,23 @@ export class SessionManagerDO {
 
   private handleShortcutResult(message: RelayTransportMessage): void {
     const data = 'data' in message && typeof message.data === 'object' ? message.data : {};
-    const requestId = typeof data?.requestId === 'string' ? data.requestId : message.id;
-    if (!requestId) {
+    const dispatchId = typeof data?.requestId === 'string' ? data.requestId : message.id;
+    if (!dispatchId) {
       return;
     }
 
-    const pending = this.pendingShortcutCommands.get(requestId);
+    const pending = this.pendingShortcutCommands.get(dispatchId);
     if (!pending) {
       return;
     }
     clearTimeout(pending.timer);
-    this.pendingShortcutCommands.delete(requestId);
+    this.pendingShortcutCommands.delete(dispatchId);
 
     const ok = data?.ok !== false;
     const body = {
       ok,
-      request_id: requestId,
-      command: typeof data?.command === 'string' ? data.command : '',
+      request_id: pending.clientRequestId,
+      command: typeof data?.command === 'string' ? data.command : pending.command,
       success: data?.success === true,
       message: typeof data?.message === 'string' ? data.message : undefined,
       data: typeof data?.resultData === 'object' ? data.resultData : data?.data,
@@ -703,10 +705,16 @@ export class SessionManagerDO {
   }
 
   private rejectPendingShortcutCommands(code: string, error: string): void {
-    for (const [requestId, pending] of this.pendingShortcutCommands.entries()) {
+    for (const pending of this.pendingShortcutCommands.values()) {
       clearTimeout(pending.timer);
       pending.resolve(
-        this.shortcutError(code, error, this.shortcutFailureStatus(code), requestId, '')
+        this.shortcutError(
+          code,
+          error,
+          this.shortcutFailureStatus(code),
+          pending.clientRequestId,
+          pending.command
+        )
       );
     }
     this.pendingShortcutCommands.clear();
@@ -976,64 +984,83 @@ export class SessionManagerDO {
       return this.methodNotAllowed(['POST']);
     }
 
-    const payload = (await request.json()) as {
-      requestId?: string;
-      deviceId?: string;
-      grantId?: string;
-      command?: string;
-    };
-    const requestId = typeof payload.requestId === 'string' ? payload.requestId : '';
+    const payload = await this.readJsonObject(request);
+    if (!payload) {
+      return this.shortcutError(
+        'invalid_shortcut_command',
+        'Shortcut command dispatch body must be a valid JSON object.',
+        400
+      );
+    }
+    const clientRequestId = typeof payload.requestId === 'string' ? payload.requestId : '';
+    const targetDeviceId = typeof payload.deviceId === 'string' ? payload.deviceId : '';
     const command = typeof payload.command === 'string' ? payload.command : '';
     const grantId = typeof payload.grantId === 'string' ? payload.grantId : '';
-    if (!requestId || !command || !grantId) {
+    if (!clientRequestId || !command || !grantId) {
       return this.shortcutError(
         'invalid_shortcut_command',
         'Shortcut command dispatch is missing required fields.',
         400,
-        requestId,
+        clientRequestId,
         command
       );
     }
 
-    if (payload.deviceId && this.relayRoomInfo?.deviceId && payload.deviceId !== this.relayRoomInfo.deviceId) {
+    if (
+      targetDeviceId &&
+      this.relayRoomInfo?.deviceId &&
+      targetDeviceId !== this.relayRoomInfo.deviceId
+    ) {
       return this.shortcutError(
         'agent_unavailable',
         'Shortcut command target does not match this agent room.',
         503,
-        requestId,
+        clientRequestId,
         command
       );
     }
 
     const agent = this.relaySockets.get('agent');
     if (!agent) {
-      return this.shortcutError('agent_unavailable', 'Agent is not online.', 503, requestId, command);
+      return this.shortcutError(
+        'agent_unavailable',
+        'Agent is not online.',
+        503,
+        clientRequestId,
+        command
+      );
     }
 
+    const dispatchId = this.createShortcutDispatchId();
     return await new Promise<Response>(resolve => {
       const timer = setTimeout(() => {
-        this.pendingShortcutCommands.delete(requestId);
+        this.pendingShortcutCommands.delete(dispatchId);
         resolve(
           this.shortcutError(
             'command_timeout',
             'Agent did not return a shortcut result before timeout.',
             504,
-            requestId,
+            clientRequestId,
             command
           )
         );
-    }, this.options.shortcutCommandTimeoutMs);
+      }, this.options.shortcutCommandTimeoutMs);
       (timer as { unref?: () => void }).unref?.();
-      this.pendingShortcutCommands.set(requestId, { resolve, timer });
+      this.pendingShortcutCommands.set(dispatchId, {
+        resolve,
+        timer,
+        clientRequestId,
+        command,
+      });
 
       try {
         agent.send(
           JSON.stringify({
             type: 'shortcut_command',
-            id: requestId,
+            id: dispatchId,
             sent_at: Date.now(),
             data: {
-              requestId,
+              requestId: dispatchId,
               grantId,
               command,
             },
@@ -1041,13 +1068,13 @@ export class SessionManagerDO {
         );
       } catch {
         clearTimeout(timer);
-        this.pendingShortcutCommands.delete(requestId);
+        this.pendingShortcutCommands.delete(dispatchId);
         resolve(
           this.shortcutError(
             'agent_unavailable',
             'Failed to send shortcut command to agent.',
             503,
-            requestId,
+            clientRequestId,
             command
           )
         );
@@ -1308,11 +1335,14 @@ export class SessionManagerDO {
       return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
     }
 
-    const payload = (await request.json()) as {
-      device_id?: string;
-      command?: string;
-      request_id?: string;
-    };
+    const payload = await this.readJsonObject(request);
+    if (!payload) {
+      return this.shortcutError(
+        'invalid_shortcut_command',
+        'Shortcut command body must be a valid JSON object.',
+        400
+      );
+    }
     const deviceId = typeof payload.device_id === 'string' ? payload.device_id.trim() : '';
     const command = typeof payload.command === 'string' ? payload.command.trim() : '';
     const requestId =
@@ -1465,6 +1495,26 @@ export class SessionManagerDO {
         this.usedRegistrationNonces.delete(nonce);
       }
     }
+  }
+
+  private async readJsonObject(request: Request): Promise<Record<string, unknown> | undefined> {
+    try {
+      const payload = await request.json();
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return undefined;
+      }
+      return payload as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private createShortcutDispatchId(): string {
+    let dispatchId = '';
+    do {
+      dispatchId = `shortcut-${this.createRandomToken(12)}`;
+    } while (this.pendingShortcutCommands.has(dispatchId));
+    return dispatchId;
   }
 
   private createRandomToken(length: number): string {
