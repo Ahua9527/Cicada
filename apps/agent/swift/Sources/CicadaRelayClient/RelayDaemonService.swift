@@ -43,15 +43,20 @@ private struct DaemonRuntimeSnapshot: Codable {
     let connectionState: String
     let updatedAt: Int64
     let effectiveConfig: DaemonRuntimeEffectiveConfig
+    let nativeCapabilities: NativeCapabilitySnapshot?
 }
 
 public final class RelayDaemonService: NSObject {
     private let config: CicadaConfig
     private let commandGateway: any CommandExecuting
     private let notifier: any NotifierSending
+    private let identityStore: RelayIdentityStore
+    private let shortcutGrantStore: ShortcutGrantStore
 
     private var session: URLSession?
     private var task: URLSessionWebSocketTask?
+    private var identity: RelayIdentity?
+    private var liveSessionId: String?
     private var pingTimer: DispatchSourceTimer?
     private var healthTimer: DispatchSourceTimer?
     private var reconnectWorkItem: DispatchWorkItem?
@@ -59,11 +64,22 @@ public final class RelayDaemonService: NSObject {
     private var lastPongAt = Date.distantPast
     private var isStopping = false
     public private(set) var connectionState: RelayConnectionState = .stopped
+#if DEBUG
+    private var debugOutgoingMessagesStorage: [String] = []
+#endif
 
-    public init(config: CicadaConfig, commandGateway: any CommandExecuting, notifier: any NotifierSending) {
+    public init(
+        config: CicadaConfig,
+        commandGateway: any CommandExecuting,
+        notifier: any NotifierSending,
+        identityStore: RelayIdentityStore = RelayIdentityStore(),
+        shortcutGrantStore: ShortcutGrantStore = ShortcutGrantStore()
+    ) {
         self.config = config
         self.commandGateway = commandGateway
         self.notifier = notifier
+        self.identityStore = identityStore
+        self.shortcutGrantStore = shortcutGrantStore
         super.init()
     }
 
@@ -96,11 +112,57 @@ public final class RelayDaemonService: NSObject {
         transition(to: .stopped, reason: "service_stopped")
     }
 
+    public func createShortcutGrant(
+        name: String,
+        commands: [String],
+        ttlMs: Int64 = ShortcutGrantStore.defaultTtlMs
+    ) throws -> ShortcutGrantCreateResult {
+        let result = try shortcutGrantStore.create(
+            deviceId: config.deviceId,
+            name: name,
+            commands: commands,
+            ttlMs: ttlMs
+        )
+        sendShortcutGrantUpdate(state: "active", grant: result.grant)
+        return result
+    }
+
+    public func listShortcutGrants() throws -> [ShortcutGrant] {
+        try shortcutGrantStore.list()
+    }
+
+    public func revokeShortcutGrant(grantId: String) throws -> ShortcutGrant {
+        let grant = try shortcutGrantStore.revoke(grantId: grantId)
+        sendShortcutGrantUpdate(state: "revoked", grant: grant)
+        return grant
+    }
+
+    public func executeLocalCommand(_ command: String) -> CommandExecutionResult {
+        handleCommand(command, commandId: "daemon-control")
+    }
+
     private func connect() {
         guard !isStopping else { return }
         guard task == nil else { return }
 
-        guard let url = RelayURLBuilder.buildWebSocketURL(config: config) else {
+        let identity: RelayIdentity
+        do {
+            identity = try identityStore.loadOrCreate(identityId: config.deviceId)
+            self.identity = identity
+        } catch {
+            Logger.error("RelayDaemon", "identity load failed", data: ["error": String(describing: error)])
+            scheduleReconnect(reason: "identity_load_failed")
+            return
+        }
+
+        let liveSessionId = "live-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
+        self.liveSessionId = liveSessionId
+
+        guard let request = RelayURLBuilder.buildAgentWebSocketRequest(
+            config: config,
+            liveSessionId: liveSessionId,
+            identity: identity
+        ) else {
             Logger.error("RelayDaemon", "invalid relayURL", data: ["relayURL": config.relayURL])
             scheduleReconnect(reason: "invalid_relay_url")
             return
@@ -116,7 +178,7 @@ public final class RelayDaemonService: NSObject {
         let session = URLSession(configuration: sessionConfig, delegate: self, delegateQueue: nil)
         self.session = session
 
-        let task = session.webSocketTask(with: url)
+        let task = session.webSocketTask(with: request)
         self.task = task
         task.resume()
 
@@ -158,10 +220,54 @@ public final class RelayDaemonService: NSObject {
             return
         }
 
-        guard let command = RelayMessageParser.extractCommand(from: raw) else {
+        if isShortcutGrantUpdateAck(raw) {
             return
         }
 
+        if processShortcutCommand(raw) {
+            return
+        }
+    }
+
+    private func processShortcutCommand(_ raw: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["type"] as? String == "shortcut_command",
+              let dataObject = object["data"] as? [String: Any] else {
+            return false
+        }
+
+        let requestId = dataObject["requestId"] as? String ?? object["id"] as? String ?? ""
+        let grantId = dataObject["grantId"] as? String ?? ""
+        let command = dataObject["command"] as? String ?? ""
+        let authorization = shortcutGrantStore.authorize(grantId: grantId, command: command)
+        guard authorization.allowed else {
+            sendShortcutResult(
+                requestId: requestId,
+                command: command,
+                ok: false,
+                success: false,
+                message: authorization.error ?? "Shortcut grant rejected.",
+                code: authorization.code,
+                error: authorization.error
+            )
+            return true
+        }
+
+        let result = handleCommand(command, commandId: requestId.isEmpty ? "shortcut" : requestId)
+        sendShortcutResult(
+            requestId: requestId,
+            command: command,
+            ok: true,
+            success: result.success,
+            message: result.message,
+            data: result.data
+        )
+        return true
+    }
+
+    @discardableResult
+    private func handleCommand(_ command: String, commandId: String) -> CommandExecutionResult {
         let result = commandGateway.execute(command: command)
         if config.showNotifications {
             let level: NotificationLevel = result.success ? .success : .error
@@ -176,6 +282,48 @@ public final class RelayDaemonService: NSObject {
         }
 
         appendDaemonLog(command: command, result: result)
+        return result
+    }
+
+    private func sendShortcutResult(
+        requestId: String,
+        command: String,
+        ok: Bool,
+        success: Bool,
+        message: String,
+        data: [String: String]? = nil,
+        code: String? = nil,
+        error: String? = nil
+    ) {
+        var payloadData: [String: Any] = [
+            "requestId": requestId,
+            "command": command,
+            "ok": ok,
+            "success": success,
+            "message": message,
+        ]
+        if let data {
+            payloadData["data"] = data
+        }
+        if let code {
+            payloadData["code"] = code
+        }
+        if let error {
+            payloadData["error"] = error
+        }
+        let payload: [String: Any] = [
+            "type": "shortcut_result",
+            "id": requestId,
+            "from": "agent",
+            "sent_at": Int64(Date().timeIntervalSince1970 * 1000),
+            "data": payloadData,
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let serialized = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: serialized, encoding: .utf8) else {
+            return
+        }
+        sendRelayText(text)
     }
 
     private func isPongMessage(_ raw: String) -> Bool {
@@ -186,6 +334,23 @@ public final class RelayDaemonService: NSObject {
         }
 
         return type == "pong"
+    }
+
+    private func isShortcutGrantUpdateAck(_ raw: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = object["type"] as? String else {
+            return raw.contains("\"type\":\"shortcut_grant_update_ack\"")
+                || raw.contains("\"type\": \"shortcut_grant_update_ack\"")
+        }
+
+        guard type == "shortcut_grant_update_ack" else {
+            return false
+        }
+        if object["ok"] as? Bool == false {
+            Logger.warn("RelayDaemon", "shortcut grant update rejected", data: ["code": object["code"] as? String ?? "unknown"])
+        }
+        return true
     }
 
     private func appendDaemonLog(command: String, result: CommandExecutionResult) {
@@ -211,6 +376,7 @@ public final class RelayDaemonService: NSObject {
         startPingLoop()
         startHealthLoop()
         transition(to: .connected, reason: "connected")
+        publishActiveShortcutGrants()
         Logger.info("RelayDaemon", "connected", data: ["deviceId": config.deviceId])
         if config.showNotifications {
             _ = notifier.notifyQuick(
@@ -220,6 +386,15 @@ public final class RelayDaemonService: NSObject {
                 message: config.deviceId,
                 durationMs: 2500
             )
+        }
+    }
+
+    private func publishActiveShortcutGrants() {
+        guard let grants = try? shortcutGrantStore.activeGrants() else {
+            return
+        }
+        for grant in grants {
+            sendShortcutGrantUpdate(state: "active", grant: grant)
         }
     }
 
@@ -308,10 +483,52 @@ public final class RelayDaemonService: NSObject {
             return
         }
 
+        sendRelayText(text)
+    }
+
+    private func sendShortcutGrantUpdate(state: String, grant: ShortcutGrant) {
+        var grantObject: [String: Any] = [
+            "grantId": grant.grantId,
+            "deviceId": grant.deviceId,
+            "name": grant.name,
+            "tokenHash": grant.tokenHash,
+            "tokenPreview": grant.tokenPreview,
+            "allowedCommands": grant.allowedCommands,
+            "expiresAt": grant.expiresAt,
+            "createdAt": grant.createdAt,
+            "updatedAt": grant.updatedAt,
+        ]
+        if let revokedAt = grant.revokedAt {
+            grantObject["revokedAt"] = revokedAt
+        }
+        let payload: [String: Any] = [
+            "type": "shortcut_grant_update",
+            "from": "agent",
+            "sent_at": Int64(Date().timeIntervalSince1970 * 1000),
+            "data": [
+                "state": state,
+                "grant": grantObject,
+            ],
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8) else {
+            return
+        }
+        sendRelayText(text)
+    }
+
+    private func sendRelayText(_ text: String) {
+#if DEBUG
+        if task == nil {
+            debugOutgoingMessagesStorage.append(text)
+            return
+        }
+#endif
         task?.send(.string(text)) { [weak self] error in
             if let error {
-                Logger.warn("RelayDaemon", "ping send failed", data: ["error": error.localizedDescription])
-                self?.handleDisconnected(reason: "ping_send_failed")
+                Logger.warn("RelayDaemon", "websocket send failed", data: ["error": error.localizedDescription])
+                self?.handleDisconnected(reason: "send_failed")
             }
         }
     }
@@ -356,7 +573,8 @@ public final class RelayDaemonService: NSObject {
                 maxReconnectAttempts: config.maxReconnectAttempts,
                 heartbeatInterval: config.heartbeatInterval,
                 connectionTimeout: config.connectionTimeout
-            )
+            ),
+            nativeCapabilities: (commandGateway as? MacOSCommandGateway)?.nativeCapabilitySnapshot()
         )
 
         do {
@@ -375,6 +593,10 @@ public final class RelayDaemonService: NSObject {
 #if DEBUG
     func debugHandleRawMessage(_ raw: String) {
         processRawMessage(raw)
+    }
+
+    func debugOutgoingMessages() -> [String] {
+        debugOutgoingMessagesStorage
     }
 
     func debugSetLastPong(_ date: Date) {
@@ -407,6 +629,10 @@ extension RelayDaemonService: URLSessionWebSocketDelegate {
         reason: Data?
     ) {
         Logger.warn("RelayDaemon", "websocket closed", data: ["code": String(closeCode.rawValue)])
-        handleDisconnected(reason: "websocket_closed_\(closeCode.rawValue)")
+        let rawCode = closeCode.rawValue
+        let reasonPrefix = RelayCloseCodes.isRetryableAgentAbsence(rawCode)
+            ? "agent_retryable_absence"
+            : "websocket_closed"
+        handleDisconnected(reason: "\(reasonPrefix)_\(rawCode)")
     }
 }
