@@ -2,8 +2,40 @@ import Foundation
 import CicadaCore
 
 public enum RelayURLBuilder {
-    public static func buildWebSocketURL(config: CicadaConfig, timestamp: Int64 = Int64(Date().timeIntervalSince1970)) -> URL? {
-        guard var components = URLComponents(string: config.relayURL) else {
+    public static func buildAgentWebSocketURL(config: CicadaConfig, liveSessionId: String) -> URL? {
+        buildRelayURL(relayURL: config.relayURL, target: liveSessionId)
+    }
+
+    public static func buildAgentWebSocketRequest(
+        config: CicadaConfig,
+        liveSessionId: String,
+        identity: RelayIdentity
+    ) -> URLRequest? {
+        guard let url = buildAgentWebSocketURL(config: config, liveSessionId: liveSessionId) else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.setValue(config.deviceId, forHTTPHeaderField: "x-device-id")
+        request.setValue(identity.signingPublicKeyBase64, forHTTPHeaderField: "x-agent-identity-public-key")
+        let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let transcript = RelayTranscript.agentRegistration(
+            deviceId: config.deviceId,
+            sessionId: liveSessionId,
+            agentIdentityPublicKey: identity.signingPublicKeyBase64,
+            timestamp: timestamp,
+            nonce: nonce
+        )
+        if let signature = try? identity.signBase64(transcript) {
+            request.setValue(String(timestamp), forHTTPHeaderField: "x-agent-registration-timestamp")
+            request.setValue(nonce, forHTTPHeaderField: "x-agent-registration-nonce")
+            request.setValue(signature, forHTTPHeaderField: "x-agent-registration-signature")
+        }
+        return request
+    }
+
+    private static func buildRelayURL(relayURL: String, target: String) -> URL? {
+        guard var components = URLComponents(string: relayURL) else {
             return nil
         }
 
@@ -19,42 +51,10 @@ public enum RelayURLBuilder {
         }
 
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        components.path = basePath.isEmpty ? "/ws" : "/\(basePath)/ws"
-        components.queryItems = [
-            URLQueryItem(name: "device_id", value: config.deviceId),
-            URLQueryItem(name: "api_key", value: config.apiKey),
-            URLQueryItem(name: "ts", value: String(timestamp)),
-        ]
+        let encodedTarget = target.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target
+        components.path = basePath.isEmpty ? "/relay/\(encodedTarget)" : "/\(basePath)/relay/\(encodedTarget)"
+        components.queryItems = nil
 
         return components.url
-    }
-}
-
-public enum RelayMessageParser {
-    public static func extractCommand(from raw: String) -> String? {
-        guard let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = object["type"] as? String else {
-            return nil
-        }
-
-        guard type == "command" || type == "cmd" else {
-            return nil
-        }
-
-        if let dataObject = object["data"] as? [String: Any] {
-            if let cmd = dataObject["cmd"] as? String {
-                return cmd
-            }
-            if let command = dataObject["command"] as? String {
-                return command
-            }
-        }
-
-        if let cmd = object["cmd"] as? String {
-            return cmd
-        }
-
-        return object["command"] as? String
     }
 }

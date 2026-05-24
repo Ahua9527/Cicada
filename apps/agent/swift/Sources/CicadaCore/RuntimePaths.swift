@@ -8,7 +8,10 @@ public enum RuntimePaths {
     public static let daemonDir = cicadaHome + "/daemon"
 
     public static let configPath = cicadaHome + "/config.json"
+    public static let agentIdentityPath = cicadaHome + "/agent.identity.json"
+    public static let shortcutGrantPath = cicadaHome + "/shortcut-grants.json"
     public static let notifierSocketPath = runDir + "/notifier.sock"
+    public static let daemonSocketPath = runDir + "/daemon.sock"
     public static let notifierBinaryPath = binDir + "/cicada-notifier"
     public static let daemonBinaryPath = binDir + "/cicada-agent"
 

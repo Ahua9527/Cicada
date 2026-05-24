@@ -3,11 +3,10 @@ import XCTest
 @testable import CicadaRelayClient
 
 final class RelayURLBuilderTests: XCTestCase {
-    func testBuildWebSocketURLFromHttps() {
+    func testBuildAgentWebSocketURLFromHttps() {
         let config = CicadaConfig(
             relayURL: "https://relay.example.com",
             deviceId: "MAC_0123456789ABCDEF0123456789ABCDEF",
-            apiKey: "k1",
             autoConnect: true,
             showNotifications: true,
             enableAutoReconnect: true,
@@ -17,30 +16,43 @@ final class RelayURLBuilderTests: XCTestCase {
             connectionTimeout: 10000
         )
 
-        let url = RelayURLBuilder.buildWebSocketURL(config: config, timestamp: 123)
+        let url = RelayURLBuilder.buildAgentWebSocketURL(config: config, liveSessionId: "live-session-1")
         XCTAssertEqual(
             url?.absoluteString,
-            "wss://relay.example.com/ws?device_id=MAC_0123456789ABCDEF0123456789ABCDEF&api_key=k1&ts=123"
+            "wss://relay.example.com/relay/live-session-1"
         )
     }
 
-    func testExtractCommandFromLegacyMessageShape() {
-        let message = "{\"type\":\"command\",\"data\":{\"cmd\":\"ping\"}}"
-        XCTAssertEqual(RelayMessageParser.extractCommand(from: message), "ping")
-    }
+    func testBuildAgentWebSocketRequestDoesNotSetRelayRole() throws {
+        let config = CicadaConfig(
+            relayURL: "https://relay.example.com",
+            deviceId: "MAC_0123456789ABCDEF0123456789ABCDEF",
+            autoConnect: true,
+            showNotifications: true,
+            enableAutoReconnect: true,
+            reconnectInterval: 5000,
+            maxReconnectAttempts: 10,
+            heartbeatInterval: 30000,
+            connectionTimeout: 10000
+        )
+        let identity = RelayIdentity.generate(identityId: config.deviceId)
 
-    func testExtractCommandFromCanonicalMessageShape() {
-        let message = "{\"type\":\"command\",\"data\":{\"command\":\"ping\"}}"
-        XCTAssertEqual(RelayMessageParser.extractCommand(from: message), "ping")
-    }
+        let request = try XCTUnwrap(
+            RelayURLBuilder.buildAgentWebSocketRequest(
+                config: config,
+                liveSessionId: "live-session-1",
+                identity: identity
+            )
+        )
 
-    func testExtractCommandFromFlatMessageShape() {
-        let message = "{\"type\":\"cmd\",\"cmd\":\"status\"}"
-        XCTAssertEqual(RelayMessageParser.extractCommand(from: message), "status")
-    }
-
-    func testExtractCommandFromFlatCanonicalMessageShape() {
-        let message = "{\"type\":\"command\",\"command\":\"status\"}"
-        XCTAssertEqual(RelayMessageParser.extractCommand(from: message), "status")
+        XCTAssertNil(request.value(forHTTPHeaderField: "x-role"))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-device-id"), config.deviceId)
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "x-agent-identity-public-key"),
+            identity.signingPublicKeyBase64
+        )
+        XCTAssertNotNil(request.value(forHTTPHeaderField: "x-agent-registration-timestamp"))
+        XCTAssertNotNil(request.value(forHTTPHeaderField: "x-agent-registration-nonce"))
+        XCTAssertNotNil(request.value(forHTTPHeaderField: "x-agent-registration-signature"))
     }
 }
