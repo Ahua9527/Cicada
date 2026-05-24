@@ -14,12 +14,17 @@ public enum RuntimePaths {
     public static let daemonSocketPath = runDir + "/daemon.sock"
     public static let notifierBinaryPath = binDir + "/cicada-notifier"
     public static let daemonBinaryPath = binDir + "/cicada-agent"
+    public static let sleepHoldStagingBinaryPath = binDir + "/cicada-sleephold"
+    public static let sleepHoldSocketPath = runDir + "/sleephold.sock"
+    public static let sleepHoldBinaryPath = "/usr/local/sbin/cicada-sleephold"
 
     public static let daemonLabel = "com.cicada.agent"
     public static let notifierLabel = "com.cicada.notifier"
+    public static let sleepHoldLabel = "com.cicada.sleephold"
 
     public static let daemonPlistPath = home + "/Library/LaunchAgents/com.cicada.agent.plist"
     public static let notifierPlistPath = home + "/Library/LaunchAgents/com.cicada.notifier.plist"
+    public static let sleepHoldPlistPath = "/Library/LaunchDaemons/com.cicada.sleephold.plist"
 
     public static let daemonStdoutPath = cicadaHome + "/daemon.stdout.log"
     public static let daemonStderrPath = cicadaHome + "/daemon.stderr.log"
@@ -27,4 +32,6 @@ public enum RuntimePaths {
     public static let daemonStatePath = cicadaHome + "/daemon.state.json"
     public static let notifierStdoutPath = cicadaHome + "/notifier.stdout.log"
     public static let notifierStderrPath = cicadaHome + "/notifier.stderr.log"
+    public static let sleepHoldStdoutPath = cicadaHome + "/sleephold.stdout.log"
+    public static let sleepHoldStderrPath = cicadaHome + "/sleephold.stderr.log"
 }
