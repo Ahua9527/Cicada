@@ -3,10 +3,16 @@ import Foundation
 import IOKit.pwr_mgt
 import IOKit.ps
 
-final class NativePowerController {
+final class NativePowerController: NativePowerControlling {
     private let lock = NSLock()
     private var assertionID: IOPMAssertionID = 0
     private var assertionActive = false
+
+    var noSleepAssertionActive: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return assertionActive
+    }
 
     func sleepNow() -> Result<Void, NativeCommandError> {
         let connect = IOPMFindPowerManagement(mach_port_t(MACH_PORT_NULL))
@@ -32,10 +38,14 @@ final class NativePowerController {
         }
 
         var createdID = IOPMAssertionID(0)
-        let result = IOPMAssertionCreateWithName(
+        let result = IOPMAssertionCreateWithDescription(
             kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
-            IOPMAssertionLevel(kIOPMAssertionLevelOn),
             "Cicada Prevent Sleep" as CFString,
+            "Cicada remote command requested no-sleep mode" as CFString,
+            "Cicada is keeping this Mac awake" as CFString,
+            nil,
+            0,
+            nil,
             &createdID
         )
         guard result == kIOReturnSuccess else {

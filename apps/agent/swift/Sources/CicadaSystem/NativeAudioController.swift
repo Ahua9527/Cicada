@@ -1,7 +1,7 @@
 import CoreAudio
 import Foundation
 
-final class NativeAudioController {
+final class NativeAudioController: NativeAudioControlling {
     func toggleSystemMute() -> Result<Bool, NativeCommandError> {
         let deviceResult = defaultOutputDevice()
         guard case let .success(deviceID) = deviceResult else {

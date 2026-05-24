@@ -2,16 +2,39 @@ import Foundation
 import CicadaCore
 
 public final class MacOSCommandGateway {
-    private let runner: ProcessRunner
-    private let audioController: NativeAudioController
-    private let powerController: NativePowerController
-    private let processName: String
+    private let lockController: any NativeLockControlling
+    private let bluetoothController: any NativeBluetoothControlling
+    private let audioController: any NativeAudioControlling
+    private let powerController: any NativePowerControlling
+    private let displayController: any NativeDisplayControlling
+    private let sleepHoldLeaseController: any SleepHoldLeasing
 
-    public init(runner: ProcessRunner = ProcessRunner()) {
-        self.runner = runner
-        self.audioController = NativeAudioController()
-        self.powerController = NativePowerController()
-        self.processName = ProcessInfo.processInfo.processName
+    public convenience init() {
+        let powerController = NativePowerController()
+        self.init(
+            lockController: NativeLockController(),
+            bluetoothController: NativeBluetoothController(),
+            audioController: NativeAudioController(),
+            powerController: powerController,
+            displayController: NativeDisplayController(),
+            sleepHoldLeaseController: SleepHoldLeaseController()
+        )
+    }
+
+    init(
+        lockController: any NativeLockControlling,
+        bluetoothController: any NativeBluetoothControlling,
+        audioController: any NativeAudioControlling,
+        powerController: any NativePowerControlling,
+        displayController: any NativeDisplayControlling,
+        sleepHoldLeaseController: any SleepHoldLeasing
+    ) {
+        self.lockController = lockController
+        self.bluetoothController = bluetoothController
+        self.audioController = audioController
+        self.powerController = powerController
+        self.displayController = displayController
+        self.sleepHoldLeaseController = sleepHoldLeaseController
     }
 
     public func execute(command rawCommand: String) -> CommandExecutionResult {
@@ -42,36 +65,30 @@ public final class MacOSCommandGateway {
     }
 
     private func lockScreen() -> CommandExecutionResult {
-        let commandPath = "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession"
-        let result = runner.run(commandPath, args: ["-suspend"])
-        if result.code != 0 {
-            return CommandExecutionResult(success: false, message: result.stderr.isEmpty ? "锁屏命令执行失败" : result.stderr)
+        switch lockController.lockScreen() {
+        case .success:
+            return CommandExecutionResult(success: true, message: "锁屏命令已执行")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
         }
-        return CommandExecutionResult(success: true, message: "锁屏命令已执行")
     }
 
     private func toggleBluetooth() -> CommandExecutionResult {
-        guard runner.commandExists("blueutil") else {
-            return CommandExecutionResult(success: false, message: "缺少 blueutil，无法执行蓝牙切换")
+        let current = bluetoothController.powerState()
+        guard case let .success(isEnabled) = current else {
+            if case let .failure(error) = current {
+                return CommandExecutionResult(success: false, message: error.message)
+            }
+            return CommandExecutionResult(success: false, message: "读取蓝牙状态失败")
         }
 
-        let current = runner.run("/usr/local/bin/blueutil", args: ["-p"], timeoutMs: 5_000)
-        let currentFallback = current.code == 127 ? runner.run("/opt/homebrew/bin/blueutil", args: ["-p"], timeoutMs: 5_000) : current
-        let readResult = currentFallback
-        if readResult.code != 0 {
-            return CommandExecutionResult(success: false, message: readResult.stderr.isEmpty ? "读取蓝牙状态失败" : readResult.stderr)
+        let target = !isEnabled
+        switch bluetoothController.setPowerState(target) {
+        case .success:
+            return CommandExecutionResult(success: true, message: "蓝牙已\(target ? "开启" : "关闭")")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
         }
-
-        let isEnabled = readResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1"
-        let target = isEnabled ? "0" : "1"
-
-        let toggle = runner.run("/usr/local/bin/blueutil", args: ["--power", target], timeoutMs: 5_000)
-        let toggleFallback = toggle.code == 127 ? runner.run("/opt/homebrew/bin/blueutil", args: ["--power", target], timeoutMs: 5_000) : toggle
-        if toggleFallback.code != 0 {
-            return CommandExecutionResult(success: false, message: toggleFallback.stderr.isEmpty ? "蓝牙切换失败" : toggleFallback.stderr)
-        }
-
-        return CommandExecutionResult(success: true, message: "蓝牙已\(target == "1" ? "开启" : "关闭")")
     }
 
     private func toggleMute() -> CommandExecutionResult {
@@ -80,18 +97,8 @@ public final class MacOSCommandGateway {
         case let .success(isMuted):
             return CommandExecutionResult(success: true, message: isMuted ? "静音已开启" : "静音已关闭")
         case let .failure(error):
-            Logger.warn("MacOSCommandGateway", "native volume_mute failed, fallback to osascript", data: ["error": error.message])
-            return toggleMuteByAppleScript()
+            return CommandExecutionResult(success: false, message: error.message)
         }
-    }
-
-    private func toggleMuteByAppleScript() -> CommandExecutionResult {
-        let script = "set volume output muted not (output muted of (get volume settings))"
-        let result = runner.run("/usr/bin/osascript", args: ["-e", script], timeoutMs: 5_000)
-        if result.code != 0 {
-            return CommandExecutionResult(success: false, message: result.stderr.isEmpty ? "静音切换失败" : result.stderr)
-        }
-        return CommandExecutionResult(success: true, message: "静音状态已切换（脚本回退）")
     }
 
     private func sleep() -> CommandExecutionResult {
@@ -100,85 +107,69 @@ public final class MacOSCommandGateway {
         case .success:
             return CommandExecutionResult(success: true, message: "系统休眠命令已执行")
         case let .failure(error):
-            Logger.warn("MacOSCommandGateway", "native sleep failed, fallback to pmset", data: ["error": error.message])
-            return sleepViaPmset()
+            return CommandExecutionResult(success: false, message: error.message)
         }
-    }
-
-    private func sleepViaPmset() -> CommandExecutionResult {
-        let result = runner.run("/usr/bin/pmset", args: ["sleepnow"], timeoutMs: 5_000)
-        if result.code != 0 {
-            return CommandExecutionResult(success: false, message: result.stderr.isEmpty ? "系统休眠失败" : result.stderr)
-        }
-        return CommandExecutionResult(success: true, message: "系统休眠命令已执行（pmset 回退）")
     }
 
     private func sleepDisplays() -> CommandExecutionResult {
-        let result = runner.run("/usr/bin/pmset", args: ["displaysleepnow"], timeoutMs: 5_000)
-        if result.code != 0 {
-            return CommandExecutionResult(success: false, message: result.stderr.isEmpty ? "显示器休眠失败" : result.stderr)
+        switch displayController.sleepDisplays() {
+        case .success:
+            return CommandExecutionResult(success: true, message: "显示器休眠命令已执行")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
         }
-        return CommandExecutionResult(success: true, message: "显示器休眠命令已执行")
     }
 
     private func startCaffeinate() -> CommandExecutionResult {
-        if runsInDaemon {
-            let native = powerController.startNoSleepAssertion()
-            switch native {
-            case let .success(state):
-                if state == "already_running" {
-                    return CommandExecutionResult(success: true, message: "防休眠已在运行")
-                }
-                return CommandExecutionResult(success: true, message: "防休眠已启动（原生）")
+        switch powerController.startNoSleepAssertion() {
+        case let .success(state):
+            let nativeMessage = state == "already_running" ? "防休眠已在运行" : "防休眠已启动"
+            switch sleepHoldLeaseController.start() {
+            case .success:
+                return CommandExecutionResult(
+                    success: true,
+                    message: "\(nativeMessage)，合盖防睡眠已启动",
+                    data: ["sleep_hold": "active"]
+                )
             case let .failure(error):
-                Logger.warn("MacOSCommandGateway", "native caffeinate failed, fallback to process", data: ["error": error.message])
-                return startCaffeinateByProcess()
+                return CommandExecutionResult(
+                    success: true,
+                    message: "\(nativeMessage)，合盖防睡眠未启用: \(error.message)",
+                    data: [
+                        "sleep_hold": "unavailable",
+                        "sleep_hold_error": error.message,
+                    ]
+                )
             }
-        }
-
-        return startCaffeinateByProcess()
-    }
-
-    private func startCaffeinateByProcess() -> CommandExecutionResult {
-        if runner.isProcessRunning("caffeinate") {
-            return CommandExecutionResult(success: true, message: "防休眠已在运行")
-        }
-        let detached = runner.runDetached("/usr/bin/caffeinate", args: ["-dmi"])
-        switch detached {
-        case .success:
-            return CommandExecutionResult(success: true, message: "防休眠已启动（进程模式）")
         case let .failure(error):
-            return CommandExecutionResult(success: false, message: error.description)
+            return CommandExecutionResult(success: false, message: error.message)
         }
     }
 
     private func stopCaffeinate() -> CommandExecutionResult {
-        if runsInDaemon {
-            let native = powerController.stopNoSleepAssertion()
-            switch native {
-            case let .success(state):
-                if state == "not_running" {
-                    return stopCaffeinateByProcess()
-                }
-                return CommandExecutionResult(success: true, message: "防休眠已停止（原生）")
+        switch powerController.stopNoSleepAssertion() {
+        case let .success(state):
+            let nativeMessage = state == "not_running" ? "防休眠未运行" : "防休眠已停止"
+            switch sleepHoldLeaseController.stop() {
+            case .success:
+                return CommandExecutionResult(
+                    success: true,
+                    message: "\(nativeMessage)，合盖防睡眠已停止",
+                    data: ["sleep_hold": "stopped"]
+                )
             case let .failure(error):
-                Logger.warn("MacOSCommandGateway", "native decaffeinate failed, fallback to process", data: ["error": error.message])
-                return stopCaffeinateByProcess()
+                return CommandExecutionResult(
+                    success: true,
+                    message: "\(nativeMessage)，合盖防睡眠停止失败: \(error.message)",
+                    data: [
+                        "sleep_hold": "error",
+                        "sleep_hold_error": error.message,
+                    ]
+                )
             }
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
         }
-
-        return stopCaffeinateByProcess()
-    }
-
-    private func stopCaffeinateByProcess() -> CommandExecutionResult {
-        if !runner.isProcessRunning("caffeinate") {
-            return CommandExecutionResult(success: true, message: "防休眠未运行")
-        }
-        let result = runner.run("/usr/bin/killall", args: ["caffeinate"], timeoutMs: 5_000)
-        if result.code != 0 {
-            return CommandExecutionResult(success: false, message: result.stderr.isEmpty ? "停止防休眠失败" : result.stderr)
-        }
-        return CommandExecutionResult(success: true, message: "防休眠已停止（进程模式）")
     }
 
     private func systemStatus() -> CommandExecutionResult {
@@ -203,31 +194,15 @@ public final class MacOSCommandGateway {
             return native
         }
 
-        let result = runner.run("/usr/bin/pmset", args: ["-g", "batt"], timeoutMs: 3_000)
-        guard result.code == 0 else {
-            return "未知"
-        }
-
-        let source = result.stdout.contains("'AC Power'") ? "接通电源" : "电池供电"
-        if let match = result.stdout.range(of: #"\d+%"#, options: .regularExpression) {
-            return "\(result.stdout[match])（\(source)）"
-        }
-
-        return source
+        return "未知"
     }
 
     private func bluetoothInfo() -> String {
-        guard runner.commandExists("blueutil") else {
+        guard case let .success(isEnabled) = bluetoothController.powerState() else {
             return "未知"
         }
 
-        let primary = runner.run("/usr/local/bin/blueutil", args: ["-p"], timeoutMs: 3_000)
-        let result = primary.code == 127 ? runner.run("/opt/homebrew/bin/blueutil", args: ["-p"], timeoutMs: 3_000) : primary
-        guard result.code == 0 else {
-            return "未知"
-        }
-
-        return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1" ? "开启" : "关闭"
+        return isEnabled ? "开启" : "关闭"
     }
 
     private func formatDuration(_ uptimeSeconds: TimeInterval) -> String {
@@ -249,7 +224,19 @@ public final class MacOSCommandGateway {
         return "\(seconds)秒"
     }
 
-    private var runsInDaemon: Bool {
-        processName.contains("cicada-agent")
+    public func nativeCapabilitySnapshot() -> NativeCapabilitySnapshot {
+        let bluetooth: String
+        switch bluetoothController.powerState() {
+        case let .success(isEnabled):
+            bluetooth = isEnabled ? "on" : "off"
+        case let .failure(error):
+            bluetooth = "unavailable: \(error.message)"
+        }
+        return NativeCapabilitySnapshot(
+            bluetooth: bluetooth,
+            accessibilityTrusted: lockController.isAccessibilityTrusted(),
+            noSleepAssertionActive: powerController.noSleepAssertionActive,
+            sleepHoldActive: sleepHoldLeaseController.isActive
+        )
     }
 }
