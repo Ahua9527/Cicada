@@ -12,7 +12,8 @@ swift build -c release
 mkdir -p "$HOME/.cicada/bin"
 cp -f "$ROOT_DIR/swift/.build/release/cicada" "$HOME/.cicada/bin/cicada"
 cp -f "$ROOT_DIR/swift/.build/release/cicada-agent" "$HOME/.cicada/bin/cicada-agent"
-chmod +x "$HOME/.cicada/bin/cicada" "$HOME/.cicada/bin/cicada-agent"
+cp -f "$ROOT_DIR/swift/.build/release/cicada-sleephold" "$HOME/.cicada/bin/cicada-sleephold"
+chmod +x "$HOME/.cicada/bin/cicada" "$HOME/.cicada/bin/cicada-agent" "$HOME/.cicada/bin/cicada-sleephold"
 
 echo "[build] swift runtime binaries installed to ~/.cicada/bin"
 
