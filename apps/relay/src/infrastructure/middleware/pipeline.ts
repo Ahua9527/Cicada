@@ -62,7 +62,7 @@ export class MiddlewarePipeline {
     } catch (error) {
       // WebSocket 升级后的错误通常表示连接已成功建立
       // 记录警告但不返回错误响应（可能连接已经升级）
-      if (context.url.pathname === '/ws') {
+      if (context.url.pathname.startsWith('/relay/')) {
         context.logger.warn('WebSocket pipeline error (connection may be established)', {
           requestId: context.requestId,
           error: error as Error,

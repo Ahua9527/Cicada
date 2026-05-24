@@ -14,9 +14,9 @@ import {
   corsMiddleware,
   rateLimitMiddleware,
   requestSizeLimitMiddleware,
-  authMiddleware,
 } from '../infrastructure/middleware';
 import { Router } from './router';
+import { API_CONSTANTS } from '../config/constants';
 
 /**
  * CicadaRelay App
@@ -73,7 +73,16 @@ export class CicadaRelayApp {
         corsMiddleware({
           allowedOrigins,
           allowedMethods: ['GET', 'POST', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+          allowedHeaders: [
+            'Content-Type',
+            'Authorization',
+            'X-Request-ID',
+            'X-Device-ID',
+            'X-Agent-Identity-Public-Key',
+            'X-Agent-Registration-Timestamp',
+            'X-Agent-Registration-Nonce',
+            'X-Agent-Registration-Signature',
+          ],
           enabled: true,
         })
       );
@@ -88,9 +97,6 @@ export class CicadaRelayApp {
         })
       );
     }
-
-    // Authentication and validation middleware
-    pipeline.use(authMiddleware());
 
     // Router middleware
     pipeline.use(this.router.createMiddleware() as any);
@@ -122,7 +128,7 @@ export class CicadaRelayApp {
         requestId,
         context: {
           method: request.method,
-          url: request.url,
+          url: this.sanitizeUrl(request.url),
           userAgent: request.headers.get('User-Agent'),
           ip: request.headers.get('CF-Connecting-IP'),
         },
@@ -148,7 +154,7 @@ export class CicadaRelayApp {
       this.logger.error('Request handling failed', {
         requestId,
         error: error as Error,
-        context: { method: request.method, url: request.url },
+        context: { method: request.method, url: this.sanitizeUrl(request.url) },
         tags: ['request', 'error'],
       });
 
@@ -165,11 +171,11 @@ export class CicadaRelayApp {
     return Response.json({
       ok: true,
       message: 'CicadaRelay API Server',
-      version: '1.0.0',
+      version: API_CONSTANTS.VERSION,
       status: 'running',
       endpoints: {
-        websocket: '/ws',
-        send_command: '/send',
+        agent_websocket: '/relay/:liveSession',
+        shortcuts_command: '/v1/shortcuts/command',
         status: '/status',
         devices: '/devices',
         health: '/health',
@@ -188,5 +194,19 @@ export class CicadaRelayApp {
       result[key.toLowerCase()] = value;
     });
     return result;
+  }
+
+  private sanitizeUrl(rawUrl: string): string {
+    const url = new URL(rawUrl);
+    if (url.pathname.startsWith('/relay/')) {
+      const [, relay, ...rest] = url.pathname.split('/');
+      url.pathname = `/${relay}/[session]${rest.length > 1 ? `/${rest.slice(1).join('/')}` : ''}`;
+    }
+    for (const key of ['api_key', 'nonce', 'signature', 'token', 'code']) {
+      if (url.searchParams.has(key)) {
+        url.searchParams.set(key, '[FILTERED]');
+      }
+    }
+    return url.toString();
   }
 }

@@ -3,7 +3,13 @@
  * Manages WebSocket sessions using Cloudflare Durable Objects
  */
 
-import { WSMessage, SessionInfo, Timer } from '../../../types';
+import {
+  WSMessage,
+  SessionInfo,
+  Timer,
+  RelayTransportMessage,
+  RELAY_CLOSE_CODES,
+} from '../../../types';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 
 type PendingConnection = {
@@ -12,17 +18,65 @@ type PendingConnection = {
   ip?: string;
 };
 
+type DeviceRegistryRecord = {
+  deviceId: string;
+  connected: boolean;
+  liveSessionId?: string;
+  agentIdentityPublicKey?: string;
+  shortcutGrants?: ShortcutGrantRecord[];
+  connectedAt?: number;
+  lastPing?: number;
+  lastSeen: number;
+  uptime?: number;
+  sessionId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+};
+
+type RelayRoomInfo = {
+  sessionId: string;
+  deviceId?: string;
+  agentIdentityPublicKey?: string;
+};
+
+type ShortcutGrantRecord = {
+  grantId: string;
+  deviceId: string;
+  name: string;
+  tokenHash: string;
+  tokenPreview: string;
+  allowedCommands: string[];
+  expiresAt: number;
+  revokedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type PendingShortcutCommand = {
+  resolve: (response: Response) => void;
+  timer: Timer;
+};
+
 export interface SessionManagerOptions {
   sessionTimeout?: number;
   cleanupInterval?: number;
   maxConcurrentSessions?: number;
   nonceCacheSize?: number;
   nonceRetentionSize?: number;
+  agentAbsenceGraceMs?: number;
+  shortcutCommandTimeoutMs?: number;
 }
 
 export class SessionManagerDO {
   private sessions: Map<string, WebSocket> = new Map();
   private sessionInfo: Map<string, SessionInfo> = new Map();
+  private registryDevices: Map<string, DeviceRegistryRecord> = new Map();
+  private relaySockets: Map<'agent', WebSocket> = new Map();
+  private relayRoomInfo: RelayRoomInfo | null = null;
+  private agentAbsenceTimer: Timer | null = null;
+  private agentAbsentSince: number | null = null;
+  private pendingShortcutCommands: Map<string, PendingShortcutCommand> = new Map();
+  private usedRegistrationNonces: Map<string, number> = new Map();
   private nonces: Set<string> = new Set();
   private pendingConnections: Map<string, PendingConnection> = new Map();
   private options: Required<SessionManagerOptions>;
@@ -41,6 +95,9 @@ export class SessionManagerDO {
         options.maxConcurrentSessions ?? SESSION_CONSTANTS.MAX_CONCURRENT_SESSIONS,
       nonceCacheSize: options.nonceCacheSize ?? SECURITY_CONSTANTS.NONCE.CACHE_SIZE,
       nonceRetentionSize: options.nonceRetentionSize ?? SECURITY_CONSTANTS.NONCE.RETENTION_SIZE,
+      agentAbsenceGraceMs: options.agentAbsenceGraceMs ?? SESSION_CONSTANTS.AGENT_ABSENCE_GRACE_MS,
+      shortcutCommandTimeoutMs:
+        options.shortcutCommandTimeoutMs ?? SESSION_CONSTANTS.SHORTCUT_COMMAND_TIMEOUT_MS,
     };
 
     this.state.blockConcurrencyWhile(async () => {
@@ -74,6 +131,18 @@ export class SessionManagerDO {
       if (noncesData) {
         noncesData.forEach(nonce => this.nonces.add(nonce));
       }
+
+      const registryData = await this.state.storage.get<DeviceRegistryRecord[]>(
+        SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY
+      );
+      if (registryData) {
+        registryData.forEach(record => {
+          if (record?.deviceId) {
+            this.registryDevices.set(record.deviceId, record);
+          }
+        });
+      }
+
     } catch (error) {
       console.error('Failed to load session data:', error);
     }
@@ -92,6 +161,13 @@ export class SessionManagerDO {
     } catch (error) {
       console.error('Failed to save session data:', error);
     }
+  }
+
+  private async saveRegistryDevices(): Promise<void> {
+    await this.state.storage.put(
+      SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY,
+      Array.from(this.registryDevices.values())
+    );
   }
 
   /**
@@ -117,6 +193,30 @@ export class SessionManagerDO {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
+  }
+
+  private clearAgentAbsenceTimer(): void {
+    if (this.agentAbsenceTimer) {
+      clearTimeout(this.agentAbsenceTimer);
+      this.agentAbsenceTimer = null;
+    }
+    this.agentAbsentSince = null;
+  }
+
+  private scheduleAgentAbsenceTimeout(deviceId: string, sessionId: string): void {
+    this.clearAgentAbsenceTimer();
+    this.agentAbsentSince = Date.now();
+    this.agentAbsenceTimer = setTimeout(() => {
+      if (this.relaySockets.has('agent')) {
+        this.clearAgentAbsenceTimer();
+        return;
+      }
+
+      this.agentAbsenceTimer = null;
+      this.agentAbsentSince = null;
+      this.state.waitUntil(this.syncRelayRegistryAgentOffline(deviceId, sessionId));
+    }, this.options.agentAbsenceGraceMs);
+    (this.agentAbsenceTimer as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -164,33 +264,103 @@ export class SessionManagerDO {
 
     await this.saveSessions();
 
-    console.log(
-      `Device ${deviceId} connected, current: ${this.sessions.size}/${this.options.maxConcurrentSessions}`
-    );
-
     // Setup WebSocket event handlers
     ws.addEventListener('message', event => {
       this.handleIncomingMessage(deviceId, event);
     });
 
     ws.addEventListener('close', () => {
+      if (this.sessions.get(deviceId) !== ws) {
+        return;
+      }
+
       this.sessions.delete(deviceId);
       const info = this.sessionInfo.get(deviceId);
+      let updatedInfo = info;
       if (info) {
         const nowTimestamp = Date.now();
-        this.sessionInfo.set(deviceId, {
+        updatedInfo = {
           ...info,
           isActive: false,
           lastActivity: nowTimestamp,
-        });
+        };
+        this.sessionInfo.set(deviceId, updatedInfo);
       }
       this.pendingConnections.delete(deviceId);
       void this.saveSessions();
-      console.log(`Device ${deviceId} disconnected`);
     });
 
     ws.addEventListener('error', error => {
       console.error(`Device ${deviceId} WebSocket error:`, error);
+    });
+
+    return { success: true };
+  }
+
+  async addRelaySocket(
+    sessionId: string,
+    ws: WebSocket,
+    metadata: {
+      deviceId?: string;
+      agentIdentityPublicKey?: string;
+      registrationTimestamp?: number;
+      registrationNonce?: string;
+      registrationSignature?: string;
+    } = {}
+  ): Promise<{ success: boolean; error?: string }> {
+    const now = Date.now();
+    if (metadata.deviceId && metadata.agentIdentityPublicKey) {
+      const registration = await this.syncRelayRegistryAgentOnline({
+        deviceId: metadata.deviceId,
+        sessionId,
+        agentIdentityPublicKey: metadata.agentIdentityPublicKey,
+        registrationTimestamp: metadata.registrationTimestamp,
+        registrationNonce: metadata.registrationNonce,
+        registrationSignature: metadata.registrationSignature,
+        lastSeen: now,
+      });
+      if (!registration.ok) {
+        return {
+          success: false,
+          error: registration.error ?? registration.code ?? 'Agent registration rejected',
+        };
+      }
+    }
+
+    const existing = this.relaySockets.get('agent');
+    if (existing && existing !== ws) {
+      existing.close(RELAY_CLOSE_CODES.AGENT_REPLACED, 'Previous agent connection replaced');
+    }
+
+    this.clearAgentAbsenceTimer();
+
+    this.relaySockets.set('agent', ws);
+    this.relayRoomInfo = {
+      ...(this.relayRoomInfo ?? { sessionId }),
+      sessionId,
+      ...(metadata.deviceId ? { deviceId: metadata.deviceId } : {}),
+      ...(metadata.agentIdentityPublicKey
+        ? { agentIdentityPublicKey: metadata.agentIdentityPublicKey }
+        : {}),
+    };
+
+    ws.addEventListener('message', event => {
+      this.handleRelayMessage(ws, event);
+    });
+
+    ws.addEventListener('close', () => {
+      if (this.relaySockets.get('agent') !== ws) {
+        return;
+      }
+      this.relaySockets.delete('agent');
+      if (this.relayRoomInfo?.deviceId) {
+        this.rejectPendingShortcutCommands('agent_unavailable', 'Agent disconnected.');
+        this.scheduleAgentAbsenceTimeout(this.relayRoomInfo.deviceId, sessionId);
+      }
+    });
+
+    ws.addEventListener('error', error => {
+      console.error('Relay agent WebSocket error:', error);
     });
 
     return { success: true };
@@ -241,7 +411,8 @@ export class SessionManagerDO {
   }
 
   /**
-   * Check if nonce is used (prevent replay attacks)
+   * Check whether the local nonce cache has seen this value.
+   * Command auth does not currently call this cache.
    */
   isNonceUsed(nonce: string): boolean {
     return this.nonces.has(nonce);
@@ -316,7 +487,6 @@ export class SessionManagerDO {
         this.sessions.delete(deviceId);
         this.sessionInfo.delete(deviceId);
         cleanedCount++;
-        console.log(`Cleanup inactive device: ${deviceId}`);
       }
     }
 
@@ -337,7 +507,6 @@ export class SessionManagerDO {
       this.sessions.delete(deviceId);
       this.sessionInfo.delete(deviceId);
       await this.saveSessions();
-      console.log(`Force disconnect device: ${deviceId}`);
       return true;
     }
     return false;
@@ -354,7 +523,6 @@ export class SessionManagerDO {
     this.sessions.clear();
     this.sessionInfo.clear();
     await this.saveSessions();
-    console.log(`Force disconnect all devices, total: ${count}`);
     return count;
   }
 
@@ -420,6 +588,281 @@ export class SessionManagerDO {
     return fallback ?? this.state.id.name ?? this.state.id.toString();
   }
 
+  private parseOptionalNumber(value: string | null): number | undefined {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  private handleRelayMessage(ws: WebSocket, event: MessageEvent): void {
+    if (typeof event.data !== 'string') {
+      return;
+    }
+
+    let message: RelayTransportMessage | null = null;
+    try {
+      message = JSON.parse(event.data) as RelayTransportMessage;
+    } catch {
+      this.sendRelayError(ws, 'invalid_json', 'Relay transport messages must be JSON.');
+      return;
+    }
+
+    if (message.type === 'ping') {
+      ws.send(
+        JSON.stringify({
+          type: 'pong',
+          id: message.id,
+          sent_at: Date.now(),
+        })
+      );
+      return;
+    }
+
+    if (message.type === 'shortcut_grant_update') {
+      this.state.waitUntil(this.applyShortcutGrantUpdate(message, ws));
+      return;
+    }
+
+    if (message.type === 'shortcut_result') {
+      this.handleShortcutResult(message);
+      return;
+    }
+  }
+
+  private sendRelayError(ws: WebSocket, code: string, error: string): void {
+    ws.send(
+      JSON.stringify({
+        type: 'error',
+        code,
+        error,
+        sent_at: Date.now(),
+      })
+    );
+  }
+
+  private async applyShortcutGrantUpdate(message: RelayTransportMessage, ws: WebSocket): Promise<void> {
+    if (!this.relayRoomInfo?.deviceId) {
+      this.sendShortcutGrantUpdateAck(ws, {
+        ok: false,
+        code: 'agent_room_unavailable',
+        error: 'Agent room metadata is unavailable.',
+      });
+      return;
+    }
+
+    const data = 'data' in message && typeof message.data === 'object' ? message.data : {};
+    const state = data?.state === 'active' || data?.state === 'revoked' ? data.state : undefined;
+    const grant = typeof data?.grant === 'object' ? (data.grant as Partial<ShortcutGrantRecord>) : undefined;
+    if (!state || !grant?.grantId) {
+      this.sendShortcutGrantUpdateAck(ws, {
+        ok: false,
+        code: 'invalid_shortcut_grant_update',
+        error: 'Shortcut grant update is missing required fields.',
+      });
+      return;
+    }
+
+    const result = await this.syncRelayRegistryShortcutGrantUpdate({
+      deviceId: this.relayRoomInfo.deviceId,
+      sessionId: this.relayRoomInfo.sessionId,
+      state,
+      grant,
+      lastSeen: Date.now(),
+    });
+
+    this.sendShortcutGrantUpdateAck(ws, result);
+  }
+
+  private handleShortcutResult(message: RelayTransportMessage): void {
+    const data = 'data' in message && typeof message.data === 'object' ? message.data : {};
+    const requestId = typeof data?.requestId === 'string' ? data.requestId : message.id;
+    if (!requestId) {
+      return;
+    }
+
+    const pending = this.pendingShortcutCommands.get(requestId);
+    if (!pending) {
+      return;
+    }
+    clearTimeout(pending.timer);
+    this.pendingShortcutCommands.delete(requestId);
+
+    const ok = data?.ok !== false;
+    const body = {
+      ok,
+      request_id: requestId,
+      command: typeof data?.command === 'string' ? data.command : '',
+      success: data?.success === true,
+      message: typeof data?.message === 'string' ? data.message : undefined,
+      data: typeof data?.resultData === 'object' ? data.resultData : data?.data,
+      code: typeof data?.code === 'string' ? data.code : undefined,
+      error: typeof data?.error === 'string' ? data.error : undefined,
+      timestamp: Date.now(),
+    };
+    const status = ok ? 200 : this.shortcutFailureStatus(body.code);
+    pending.resolve(this.jsonResponse(body, { status }));
+  }
+
+  private rejectPendingShortcutCommands(code: string, error: string): void {
+    for (const [requestId, pending] of this.pendingShortcutCommands.entries()) {
+      clearTimeout(pending.timer);
+      pending.resolve(
+        this.shortcutError(code, error, this.shortcutFailureStatus(code), requestId, '')
+      );
+    }
+    this.pendingShortcutCommands.clear();
+  }
+
+  private sendShortcutGrantUpdateAck(
+    ws: WebSocket,
+    payload: {
+      ok: boolean;
+      grantId?: string;
+      state?: 'active' | 'revoked';
+      code?: string;
+      error?: string;
+    }
+  ): void {
+    ws.send(
+      JSON.stringify({
+        type: 'shortcut_grant_update_ack',
+        ok: payload.ok,
+        grantId: payload.grantId,
+        state: payload.state,
+        code: payload.code,
+        error: payload.error,
+        sent_at: Date.now(),
+      })
+    );
+  }
+
+  private async syncRelayRegistryAgentOnline(payload: {
+    deviceId: string;
+    sessionId: string;
+    agentIdentityPublicKey: string;
+    registrationTimestamp?: number;
+    registrationNonce?: string;
+    registrationSignature?: string;
+    lastSeen: number;
+  }): Promise<{ ok: boolean; error?: string; code?: string }> {
+    if (this.getDeviceId() === SESSION_CONSTANTS.REGISTRY_DO_NAME) {
+      return { ok: true };
+    }
+    if (
+      typeof this.env?.CICADA_SESSIONS?.idFromName !== 'function' ||
+      typeof this.env?.CICADA_SESSIONS?.get !== 'function'
+    ) {
+      return { ok: true };
+    }
+
+    try {
+      const registry = this.env.CICADA_SESSIONS.get(
+        this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
+      );
+      const response = await registry.fetch(
+        new Request('http://registry/registry/agent-online', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      );
+      const body = (await response.json()) as { ok?: boolean; error?: string; code?: string };
+      if (!response.ok || body.ok === false) {
+        return {
+          ok: false,
+          error: body.error,
+          code: body.code,
+        };
+      }
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Failed to sync agent registry',
+        code: 'agent_registry_sync_failed',
+      };
+    }
+  }
+
+  private async syncRelayRegistryShortcutGrantUpdate(payload: {
+    deviceId: string;
+    sessionId: string;
+    state: 'active' | 'revoked';
+    grant: Partial<ShortcutGrantRecord>;
+    lastSeen: number;
+  }): Promise<{
+    ok: boolean;
+    grantId?: string;
+    state?: 'active' | 'revoked';
+    error?: string;
+    code?: string;
+  }> {
+    if (this.getDeviceId() === SESSION_CONSTANTS.REGISTRY_DO_NAME) {
+      return { ok: true, grantId: payload.grant.grantId, state: payload.state };
+    }
+    if (
+      typeof this.env?.CICADA_SESSIONS?.idFromName !== 'function' ||
+      typeof this.env?.CICADA_SESSIONS?.get !== 'function'
+    ) {
+      return { ok: true, grantId: payload.grant.grantId, state: payload.state };
+    }
+
+    try {
+      const registry = this.env.CICADA_SESSIONS.get(
+        this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
+      );
+      const response = await registry.fetch(
+        new Request('http://registry/registry/shortcut-grant-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      );
+      const body = (await response.json()) as {
+        ok?: boolean;
+        grantId?: string;
+        state?: 'active' | 'revoked';
+        error?: string;
+        code?: string;
+      };
+      if (!response.ok || body.ok === false) {
+        return { ok: false, error: body.error, code: body.code };
+      }
+      return {
+        ok: true,
+        grantId: body.grantId ?? payload.grant.grantId,
+        state: body.state ?? payload.state,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Failed to sync shortcut grant update',
+        code: 'shortcut_grant_update_sync_failed',
+      };
+    }
+  }
+
+  private async syncRelayRegistryAgentOffline(deviceId: string, sessionId: string): Promise<void> {
+    if (this.getDeviceId() === SESSION_CONSTANTS.REGISTRY_DO_NAME) {
+      return;
+    }
+    if (
+      typeof this.env?.CICADA_SESSIONS?.idFromName !== 'function' ||
+      typeof this.env?.CICADA_SESSIONS?.get !== 'function'
+    ) {
+      return;
+    }
+    const registry = this.env.CICADA_SESSIONS.get(
+      this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
+    );
+    await registry.fetch(
+      new Request('http://registry/registry/agent-offline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId, sessionId }),
+      })
+    );
+  }
+
   private handleIncomingMessage(deviceId: string, event: MessageEvent): void {
     const info = this.sessionInfo.get(deviceId);
     if (!info) {
@@ -428,12 +871,24 @@ export class SessionManagerDO {
 
     const now = Date.now();
     let lastPing = info.lastPing ?? now;
+    let shouldReplyPong = false;
+    let replyId: string | undefined;
+    let receivedTimestamp: number | undefined;
 
     if (typeof event.data === 'string') {
       try {
-        const payload = JSON.parse(event.data) as WSMessage;
+        const payload = JSON.parse(event.data) as Partial<WSMessage> & {
+          id?: string;
+          timestamp?: number;
+          ts?: number;
+        };
         if (payload.type === 'pong' || payload.type === 'ping') {
           lastPing = now;
+        }
+        if (payload.type === 'ping') {
+          shouldReplyPong = true;
+          replyId = payload.id;
+          receivedTimestamp = payload.timestamp ?? payload.ts;
         }
       } catch {
         lastPing = now;
@@ -442,17 +897,52 @@ export class SessionManagerDO {
       lastPing = now;
     }
 
-    this.sessionInfo.set(deviceId, {
+    const updatedInfo = {
       ...info,
       lastActivity: now,
       lastPing,
-    });
+    };
+
+    this.sessionInfo.set(deviceId, updatedInfo);
 
     this.state.waitUntil(this.saveSessions());
+
+    if (shouldReplyPong) {
+      const ws = this.sessions.get(deviceId);
+      if (!ws) {
+        return;
+      }
+
+      const pong: WSMessage = {
+        type: 'pong',
+        id: replyId,
+        timestamp: now,
+        data: {
+          deviceId,
+          receivedTimestamp,
+        },
+      };
+      ws.send(JSON.stringify(pong));
+    }
   }
 
   private jsonResponse<T>(body: T, init?: ResponseInit): Response {
     return Response.json(body, init);
+  }
+
+  private shortcutFailureStatus(code?: string): number {
+    switch (code) {
+      case 'grant_expired':
+      case 'grant_revoked':
+      case 'command_not_allowed':
+        return 403;
+      case 'agent_unavailable':
+        return 503;
+      case 'command_timeout':
+        return 504;
+      default:
+        return 400;
+    }
   }
 
   private methodNotAllowed(allowed: string[]): Response {
@@ -481,365 +971,664 @@ export class SessionManagerDO {
     }
   }
 
-  private async handleConnect(request: Request, deviceId: string): Promise<Response> {
+  private async handleRoomShortcutCommand(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
       return this.methodNotAllowed(['POST']);
     }
 
-    try {
-      const payload = (await request.json()) as {
-        deviceId?: string;
-        timestamp?: number;
-        userAgent?: string;
-        ipAddress?: string;
-      };
+    const payload = (await request.json()) as {
+      requestId?: string;
+      deviceId?: string;
+      grantId?: string;
+      command?: string;
+    };
+    const requestId = typeof payload.requestId === 'string' ? payload.requestId : '';
+    const command = typeof payload.command === 'string' ? payload.command : '';
+    const grantId = typeof payload.grantId === 'string' ? payload.grantId : '';
+    if (!requestId || !command || !grantId) {
+      return this.shortcutError(
+        'invalid_shortcut_command',
+        'Shortcut command dispatch is missing required fields.',
+        400,
+        requestId,
+        command
+      );
+    }
 
-      const resolvedDeviceId = payload.deviceId ?? deviceId;
-      if (!resolvedDeviceId) {
-        return this.jsonResponse(
-          {
-            success: false,
-            error: 'Missing device identifier',
-          },
-          { status: 400 }
+    if (payload.deviceId && this.relayRoomInfo?.deviceId && payload.deviceId !== this.relayRoomInfo.deviceId) {
+      return this.shortcutError(
+        'agent_unavailable',
+        'Shortcut command target does not match this agent room.',
+        503,
+        requestId,
+        command
+      );
+    }
+
+    const agent = this.relaySockets.get('agent');
+    if (!agent) {
+      return this.shortcutError('agent_unavailable', 'Agent is not online.', 503, requestId, command);
+    }
+
+    return await new Promise<Response>(resolve => {
+      const timer = setTimeout(() => {
+        this.pendingShortcutCommands.delete(requestId);
+        resolve(
+          this.shortcutError(
+            'command_timeout',
+            'Agent did not return a shortcut result before timeout.',
+            504,
+            requestId,
+            command
+          )
+        );
+    }, this.options.shortcutCommandTimeoutMs);
+      (timer as { unref?: () => void }).unref?.();
+      this.pendingShortcutCommands.set(requestId, { resolve, timer });
+
+      try {
+        agent.send(
+          JSON.stringify({
+            type: 'shortcut_command',
+            id: requestId,
+            sent_at: Date.now(),
+            data: {
+              requestId,
+              grantId,
+              command,
+            },
+          })
+        );
+      } catch {
+        clearTimeout(timer);
+        this.pendingShortcutCommands.delete(requestId);
+        resolve(
+          this.shortcutError(
+            'agent_unavailable',
+            'Failed to send shortcut command to agent.',
+            503,
+            requestId,
+            command
+          )
         );
       }
+    });
+  }
 
+  private async handleRegistryAgentOnline(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return this.methodNotAllowed(['POST']);
+    }
+
+    const payload = (await request.json()) as {
+      deviceId?: string;
+      sessionId?: string;
+      agentIdentityPublicKey?: string;
+      registrationTimestamp?: number;
+      registrationNonce?: string;
+      registrationSignature?: string;
+      lastSeen?: number;
+    };
+
+    if (!payload.deviceId || !payload.sessionId || !payload.agentIdentityPublicKey) {
+      return this.jsonResponse(
+        {
+          ok: false,
+          error: 'Agent online registration requires deviceId, sessionId, and identity key.',
+          code: 'invalid_agent_registration',
+        },
+        { status: 400 }
+      );
+    }
+
+    const existing = this.registryDevices.get(payload.deviceId);
+    if (existing?.agentIdentityPublicKey && existing.agentIdentityPublicKey !== payload.agentIdentityPublicKey) {
+      return this.jsonResponse(
+        {
+          ok: false,
+          error: 'Agent identity key does not match first-seen binding.',
+          code: 'agent_identity_mismatch',
+        },
+        { status: 403 }
+      );
+    }
+
+    const now = Date.now();
+    if (existing?.agentIdentityPublicKey) {
       if (
-        this.sessions.size >= this.options.maxConcurrentSessions &&
-        !this.sessions.has(resolvedDeviceId)
+        !payload.registrationTimestamp ||
+        !payload.registrationNonce ||
+        !payload.registrationSignature
       ) {
         return this.jsonResponse(
           {
-            success: false,
-            error: 'Maximum concurrent sessions reached',
+            ok: false,
+            error: 'Agent registration signature is required after first-seen binding.',
+            code: 'agent_registration_signature_required',
           },
-          { status: 429 }
+          { status: 401 }
         );
       }
-
-      const now = Date.now();
-      const ipFromHeaders = request.headers.get('CF-Connecting-IP') ?? undefined;
-      const userAgentFromHeaders = request.headers.get('User-Agent') ?? undefined;
-
-      const existing = this.sessionInfo.get(resolvedDeviceId);
-      const normalized = existing
-        ? this.normalizeSessionInfo(resolvedDeviceId, existing)
-        : this.createSessionInfo(resolvedDeviceId);
-
-      const metadata = {
-        ...(normalized.metadata ?? {}),
-        ...(payload.ipAddress ? { ipAddress: payload.ipAddress } : {}),
-        ...(ipFromHeaders ? { ipAddress: ipFromHeaders } : {}),
-        ...(payload.userAgent ? { userAgent: payload.userAgent } : {}),
-        ...(userAgentFromHeaders ? { userAgent: userAgentFromHeaders } : {}),
-      };
-
-      this.sessionInfo.set(resolvedDeviceId, {
-        ...normalized,
-        deviceId: resolvedDeviceId,
-        isActive: normalized.isActive ?? false,
-        lastActivity: now,
-        lastPing: normalized.lastPing ?? now,
-        metadata: Object.keys(metadata).length > 0 ? metadata : normalized.metadata,
+      if (
+        Math.abs(now - Number(payload.registrationTimestamp)) >
+        SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+      ) {
+        return this.jsonResponse(
+          {
+            ok: false,
+            error: 'Agent registration request expired.',
+            code: 'agent_registration_expired',
+          },
+          { status: 401 }
+        );
+      }
+      this.pruneUsedRegistrationNonces(now);
+      const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
+      if (this.usedRegistrationNonces.has(nonceKey)) {
+        return this.jsonResponse(
+          {
+            ok: false,
+            error: 'Agent registration request was already used.',
+            code: 'agent_registration_replayed',
+          },
+          { status: 409 }
+        );
+      }
+      const transcript = this.buildAgentRegistrationTranscript({
+        deviceId: payload.deviceId,
+        sessionId: payload.sessionId,
+        agentIdentityPublicKey: payload.agentIdentityPublicKey,
+        timestamp: Number(payload.registrationTimestamp),
+        nonce: payload.registrationNonce,
       });
-
-      this.pendingConnections.set(resolvedDeviceId, {
-        timestamp: payload.timestamp ?? now,
-        userAgent: payload.userAgent ?? userAgentFromHeaders,
-        ip: payload.ipAddress ?? ipFromHeaders,
-      });
-
-      await this.saveSessions();
-
-      return this.jsonResponse({ success: true });
-    } catch (error) {
-      console.error('Failed to process connect request:', error);
-      return this.jsonResponse(
-        {
-          success: false,
-          error: 'Invalid connect payload',
-        },
-        { status: 400 }
+      const signatureValid = await this.verifyEd25519Signature(
+        existing.agentIdentityPublicKey,
+        transcript,
+        payload.registrationSignature
       );
+      if (!signatureValid) {
+        return this.jsonResponse(
+          {
+            ok: false,
+            error: 'Agent registration signature is invalid.',
+            code: 'invalid_agent_registration_signature',
+          },
+          { status: 403 }
+        );
+      }
+      this.usedRegistrationNonces.set(nonceKey, now + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW);
     }
+
+    const record: DeviceRegistryRecord = {
+      ...(existing ?? {
+        deviceId: payload.deviceId,
+        lastSeen: payload.lastSeen ?? now,
+        connected: false,
+      }),
+      deviceId: payload.deviceId,
+      connected: true,
+      liveSessionId: payload.sessionId,
+      sessionId: payload.sessionId,
+      agentIdentityPublicKey: payload.agentIdentityPublicKey,
+      connectedAt: existing?.connectedAt ?? now,
+      lastPing: now,
+      lastSeen: payload.lastSeen ?? now,
+    };
+
+    this.registryDevices.set(payload.deviceId, record);
+    await this.saveRegistryDevices();
+
+    return this.jsonResponse({
+      ok: true,
+      success: true,
+      device: record,
+    });
   }
 
-  private async handleSend(request: Request, deviceId: string): Promise<Response> {
+  private async handleRegistryAgentOffline(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
       return this.methodNotAllowed(['POST']);
     }
 
-    try {
-      const targetDeviceId = request.headers.get('X-Device-ID') ?? deviceId;
-      if (!targetDeviceId) {
-        return this.jsonResponse(
-          {
-            success: false,
-            error: 'Missing device identifier',
-          },
-          { status: 400 }
-        );
-      }
-
-      const message = (await request.json()) as WSMessage;
-      const result = await this.sendMessage(targetDeviceId, message);
-
-      if (!result.success) {
-        return this.jsonResponse(
-          {
-            success: false,
-            error: result.error,
-          },
-          { status: 400 }
-        );
-      }
-
-      return this.jsonResponse({
-        success: true,
-        commandId: (message as unknown as Record<string, unknown>).id as string | undefined,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      return this.jsonResponse(
-        {
-          success: false,
-          error: 'Failed to send message',
-        },
-        { status: 500 }
-      );
+    const payload = (await request.json()) as { deviceId?: string; sessionId?: string };
+    if (!payload.deviceId) {
+      return this.jsonResponse({ ok: false, error: 'Missing deviceId' }, { status: 400 });
     }
+
+    const record = this.registryDevices.get(payload.deviceId);
+    if (record && (!payload.sessionId || record.liveSessionId === payload.sessionId)) {
+      this.registryDevices.set(payload.deviceId, {
+        ...record,
+        connected: false,
+        lastSeen: Date.now(),
+      });
+      await this.saveRegistryDevices();
+    }
+
+    return this.jsonResponse({ ok: true, success: true });
   }
 
-  private async handleStatus(request: Request, deviceId: string): Promise<Response> {
-    if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+  private async handleRegistryShortcutGrantUpdate(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return this.methodNotAllowed(['POST']);
     }
 
-    const resolvedDeviceId = request.headers.get('X-Device-ID') ?? deviceId;
-    if (!resolvedDeviceId) {
+    const payload = (await request.json()) as {
+      deviceId?: string;
+      sessionId?: string;
+      state?: 'active' | 'revoked';
+      grant?: Partial<ShortcutGrantRecord>;
+      lastSeen?: number;
+    };
+
+    if (!payload.deviceId || !payload.sessionId || !payload.grant?.grantId) {
       return this.jsonResponse(
         {
-          success: false,
-          error: 'Missing device identifier',
+          ok: false,
+          error: 'Shortcut grant update is missing required fields.',
+          code: 'invalid_shortcut_grant_update',
         },
         { status: 400 }
       );
     }
 
-    const info = this.sessionInfo.get(resolvedDeviceId);
-    const connected = this.sessions.has(resolvedDeviceId);
     const now = Date.now();
-
-    return this.jsonResponse({
-      deviceId: resolvedDeviceId,
-      connected,
-      sessionInfo: info ?? null,
-      lastActivity: info?.lastActivity ?? null,
-      lastPing: info?.lastPing ?? null,
-      connectedAt: info?.connectedAt ?? null,
-      uptime: info?.connectedAt ? now - info.connectedAt : null,
-    });
-  }
-
-  private async handleInfo(request: Request, deviceId: string): Promise<Response> {
-    if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
-    }
-
-    const resolvedDeviceId = request.headers.get('X-Device-ID') ?? deviceId;
-    const info = this.sessionInfo.get(resolvedDeviceId);
-    const connected = this.sessions.has(resolvedDeviceId);
-
-    return this.jsonResponse({
-      success: true,
-      deviceId: resolvedDeviceId,
-      connected,
-      sessionInfo: info ?? null,
-    });
-  }
-
-  private async handleDisconnect(request: Request, deviceId: string): Promise<Response> {
-    if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
-    }
-
-    try {
-      const payload = (await request.json()) as { device_id?: string };
-      const resolvedDeviceId = payload.device_id ?? deviceId;
-
-      if (!resolvedDeviceId) {
-        return this.jsonResponse(
-          {
-            success: false,
-            error: 'Missing device identifier',
-          },
-          { status: 400 }
-        );
-      }
-
-      const disconnected = await this.disconnectDevice(resolvedDeviceId);
-      return this.jsonResponse({
-        success: disconnected,
-        error: disconnected ? undefined : 'Device not found or already disconnected',
-      });
-    } catch (error) {
-      console.error('Failed to disconnect:', error);
+    const record = this.registryDevices.get(payload.deviceId);
+    if (!record?.connected || record.liveSessionId !== payload.sessionId) {
       return this.jsonResponse(
         {
-          success: false,
-          error: 'Failed to disconnect',
+          ok: false,
+          error: 'Shortcut grant target is not online.',
+          code: 'device_unavailable',
         },
-        { status: 500 }
+        { status: 404 }
       );
     }
-  }
 
-  private async handleStats(_request: Request): Promise<Response> {
-    const stats = this.getSessionStats();
-    return this.jsonResponse({
-      success: true,
-      stats,
-    });
-  }
-
-  private handleDevices(request: Request): Response {
-    if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+    const grants = record.shortcutGrants ?? [];
+    if (payload.state === 'revoked') {
+      const updated = grants.map(grant =>
+        grant.grantId === payload.grant?.grantId
+          ? { ...grant, revokedAt: payload.grant?.revokedAt ?? now, updatedAt: now }
+          : grant
+      );
+      this.registryDevices.set(payload.deviceId, {
+        ...record,
+        shortcutGrants: updated,
+        lastPing: now,
+        lastSeen: payload.lastSeen ?? now,
+      });
+      await this.saveRegistryDevices();
+      return this.jsonResponse({
+        ok: true,
+        success: true,
+        grantId: payload.grant.grantId,
+        state: 'revoked',
+      });
     }
 
-    return this.jsonResponse({
-      success: true,
-      devices: this.getConnectedDevices(),
-      sessions: this.getAllSessionInfo(),
-    });
-  }
-
-  private async handleCleanup(request: Request): Promise<Response> {
-    if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
-    }
-
-    const result = await this.cleanupInactiveSessions();
-    return this.jsonResponse({
-      success: true,
-      ...result,
-    });
-  }
-
-  private async handleWebSocket(request: Request, deviceId: string): Promise<Response> {
-    console.log('[DO] handleWebSocket called for device:', deviceId);
-    console.log('[DO] Request headers:', Object.fromEntries(request.headers.entries()));
-
-    // Try multiple ways to extract WebSocket
-    let webSocket = (request as any).webSocket;
-    console.log('[DO] WebSocket via .webSocket:', !!webSocket);
-
-    if (!webSocket) {
-      // Check if it's in the request object with different casing
-      webSocket = (request as any).websocket || (request as any).WebSocket;
-      console.log('[DO] WebSocket via alt properties:', !!webSocket);
-    }
-
-    if (!webSocket) {
-      console.log('[DO ERROR] No WebSocket in request');
-      console.log('[DO] Request keys:', Object.keys(request as any));
+    const grant = this.normalizeShortcutGrant(payload.deviceId, payload.grant);
+    if (!grant) {
       return this.jsonResponse(
         {
-          success: false,
-          error: 'Expected WebSocket request',
+          ok: false,
+          error: 'Shortcut grant update contains invalid grant metadata.',
+          code: 'invalid_shortcut_grant_update',
         },
         { status: 400 }
       );
     }
 
-    const resolvedDeviceId = deviceId;
+    const nextGrants = grants
+      .filter(existing => existing.grantId !== grant.grantId)
+      .concat(grant);
+    this.registryDevices.set(payload.deviceId, {
+      ...record,
+      shortcutGrants: nextGrants,
+      lastPing: now,
+      lastSeen: payload.lastSeen ?? now,
+    });
+    await this.saveRegistryDevices();
 
-    try {
-      console.log('[DO] Accepting WebSocket');
-      webSocket.accept();
-      console.log('[DO] WebSocket accepted');
+    return this.jsonResponse({
+      ok: true,
+      success: true,
+      grantId: grant.grantId,
+      state: 'active',
+    });
+  }
 
-      console.log('[DO] Adding session');
-      const result = await this.addSession(resolvedDeviceId, webSocket);
-      console.log('[DO] Session add result:', result);
-      if (!result.success) {
-        webSocket.close(1013, result.error ?? 'Session limit reached');
-        return this.jsonResponse(
-          {
-            success: false,
-            error: result.error ?? 'Failed to register session',
-          },
-          { status: 429 }
-        );
-      }
+  private async handleShortcutCommand(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return this.methodNotAllowed(['POST']);
+    }
 
-      const ip = request.headers.get('CF-Connecting-IP') ?? undefined;
-      const userAgent = request.headers.get('User-Agent') ?? undefined;
-      const metadataUpdates = {
-        ...(ip ? { ipAddress: ip } : {}),
-        ...(userAgent ? { userAgent } : {}),
-      };
+    const token = this.extractShortcutToken(request);
+    if (!token) {
+      return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
+    }
 
-      if (Object.keys(metadataUpdates).length > 0) {
-        const info = this.sessionInfo.get(resolvedDeviceId);
-        if (info) {
-          this.sessionInfo.set(resolvedDeviceId, {
-            ...info,
-            metadata: {
-              ...(info.metadata ?? {}),
-              ...metadataUpdates,
-            },
-          });
-          this.state.waitUntil(this.saveSessions());
-        }
-      }
+    const payload = (await request.json()) as {
+      device_id?: string;
+      command?: string;
+      request_id?: string;
+    };
+    const deviceId = typeof payload.device_id === 'string' ? payload.device_id.trim() : '';
+    const command = typeof payload.command === 'string' ? payload.command.trim() : '';
+    const requestId =
+      typeof payload.request_id === 'string' && payload.request_id.trim()
+        ? payload.request_id.trim()
+        : `shortcut-${this.createRandomToken(12)}`;
 
-      console.log('[DO] Returning WebSocket response');
-      return this.createWebSocketResponse(webSocket);
-    } catch (error) {
-      console.error('[DO ERROR] Failed to establish WebSocket session:', error);
-      try {
-        webSocket.close(1011, 'Internal error');
-      } catch {
-        // ignore
-      }
-      return this.jsonResponse(
-        {
-          success: false,
-          error: 'WebSocket setup failed',
-        },
-        { status: 500 }
+    if (!deviceId || !command) {
+      return this.shortcutError(
+        'invalid_shortcut_command',
+        'Shortcut command requires device_id and command.',
+        400,
+        requestId,
+        command
       );
     }
+
+    const tokenHash = await this.hashShortcutToken(token);
+    const record = this.registryDevices.get(deviceId);
+    const grant = record?.shortcutGrants?.find(candidate => candidate.tokenHash === tokenHash);
+    if (!record || !grant) {
+      return this.shortcutError('invalid_token', 'Shortcut token is invalid.', 401, requestId, command);
+    }
+    if (grant.revokedAt) {
+      return this.shortcutError('grant_revoked', 'Shortcut grant has been revoked.', 403, requestId, command);
+    }
+    if (Date.now() >= grant.expiresAt) {
+      return this.shortcutError('grant_expired', 'Shortcut grant has expired.', 403, requestId, command);
+    }
+    if (!grant.allowedCommands.includes(command)) {
+      return this.shortcutError(
+        'command_not_allowed',
+        'Shortcut grant does not allow this command.',
+        403,
+        requestId,
+        command
+      );
+    }
+    if (!record.connected || !record.liveSessionId) {
+      return this.shortcutError('agent_unavailable', 'Agent is not online.', 503, requestId, command);
+    }
+    if (
+      typeof this.env?.CICADA_SESSIONS?.idFromName !== 'function' ||
+      typeof this.env?.CICADA_SESSIONS?.get !== 'function'
+    ) {
+      return this.shortcutError('agent_unavailable', 'Agent routing is unavailable.', 503, requestId, command);
+    }
+
+    const sessionRoom = this.env.CICADA_SESSIONS.get(
+      this.env.CICADA_SESSIONS.idFromName(record.liveSessionId)
+    );
+    const response = await sessionRoom.fetch(
+      new Request('http://session/shortcut/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          deviceId,
+          grantId: grant.grantId,
+          command,
+        }),
+      })
+    );
+    return new Response(response.body as any, {
+      status: response.status,
+      headers: response.headers as any,
+    });
+  }
+
+  private normalizeShortcutGrant(
+    deviceId: string,
+    value?: Partial<ShortcutGrantRecord>
+  ): ShortcutGrantRecord | undefined {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+    const grantId = typeof value.grantId === 'string' ? value.grantId.trim() : '';
+    const name = typeof value.name === 'string' ? value.name.trim() : '';
+    const tokenHash = typeof value.tokenHash === 'string' ? value.tokenHash.trim() : '';
+    const tokenPreview = typeof value.tokenPreview === 'string' ? value.tokenPreview.trim() : '';
+    const allowedCommands = this.normalizeShortcutCommands(value.allowedCommands);
+    const expiresAt = typeof value.expiresAt === 'number' ? value.expiresAt : 0;
+    const createdAt = typeof value.createdAt === 'number' ? value.createdAt : Date.now();
+    const updatedAt = typeof value.updatedAt === 'number' ? value.updatedAt : Date.now();
+    if (!grantId || !name || !tokenHash || !tokenPreview || allowedCommands.length === 0 || expiresAt <= Date.now()) {
+      return undefined;
+    }
+    return {
+      grantId,
+      deviceId,
+      name,
+      tokenHash,
+      tokenPreview,
+      allowedCommands,
+      expiresAt,
+      revokedAt: typeof value.revokedAt === 'number' ? value.revokedAt : undefined,
+      createdAt,
+      updatedAt,
+    };
+  }
+
+  private normalizeShortcutCommands(value?: string[]): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return Array.from(
+      new Set(
+        value
+          .filter(command => typeof command === 'string')
+          .map(command => command.trim())
+          .filter(Boolean)
+      )
+    );
+  }
+
+  private extractShortcutToken(request: Request): string | undefined {
+    const auth = request.headers.get('Authorization') ?? request.headers.get('authorization') ?? '';
+    const match = auth.match(/^Bearer\s+(cicada_sc_[A-Za-z0-9_-]+)$/);
+    return match?.[1];
+  }
+
+  private async hashShortcutToken(token: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+    return this.base64UrlEncode(new Uint8Array(digest));
+  }
+
+  private shortcutError(
+    code: string,
+    error: string,
+    status: number,
+    requestId = '',
+    command = ''
+  ): Response {
+    return this.jsonResponse(
+      {
+        ok: false,
+        request_id: requestId,
+        command,
+        code,
+        error,
+        timestamp: Date.now(),
+      },
+      { status }
+    );
+  }
+
+  private pruneUsedRegistrationNonces(now: number): void {
+    for (const [nonce, expiresAt] of this.usedRegistrationNonces.entries()) {
+      if (now >= expiresAt) {
+        this.usedRegistrationNonces.delete(nonce);
+      }
+    }
+  }
+
+  private createRandomToken(length: number): string {
+    const bytes = new Uint8Array(length);
+    crypto.getRandomValues(bytes);
+    return this.base64UrlEncode(bytes);
+  }
+
+  private base64UrlEncode(bytes: Uint8Array): string {
+    const binary = Array.from(bytes)
+      .map(byte => String.fromCharCode(byte))
+      .join('');
+    const base64 = globalThis.btoa(binary);
+    return base64.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+  }
+
+  private buildAgentRegistrationTranscript(payload: {
+    deviceId: string;
+    sessionId: string;
+    agentIdentityPublicKey: string;
+    timestamp: number;
+    nonce: string;
+  }): Uint8Array {
+    return this.buildLengthPrefixedTranscript([
+      'cicada-agent-registration-v1',
+      payload.deviceId,
+      payload.sessionId,
+      payload.agentIdentityPublicKey,
+      String(payload.timestamp),
+      payload.nonce,
+    ]);
+  }
+
+  private buildLengthPrefixedTranscript(fields: string[]): Uint8Array {
+    const encoder = new TextEncoder();
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+    for (const field of fields) {
+      const data = encoder.encode(field);
+      const length = new Uint8Array(4);
+      new DataView(length.buffer).setUint32(0, data.byteLength, false);
+      chunks.push(length, data);
+      totalLength += length.byteLength + data.byteLength;
+    }
+
+    const transcript = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      transcript.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return transcript;
+  }
+
+  private async verifyEd25519Signature(
+    publicKeyBase64: string,
+    transcript: Uint8Array,
+    signatureBase64: string
+  ): Promise<boolean> {
+    try {
+      const key = await crypto.subtle.importKey(
+        'raw',
+        this.base64Decode(publicKeyBase64),
+        { name: 'Ed25519' } as AlgorithmIdentifier,
+        false,
+        ['verify']
+      );
+      return await crypto.subtle.verify(
+        { name: 'Ed25519' } as AlgorithmIdentifier,
+        key,
+        this.base64Decode(signatureBase64),
+        this.toArrayBuffer(transcript)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+    const copy = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(copy).set(bytes);
+    return copy;
+  }
+
+  private base64Decode(value: string): ArrayBuffer {
+    const binary = globalThis.atob(value);
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    const copy = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(copy).set(bytes);
+    return copy;
+  }
+
+  private handleRegistryDevices(request: Request): Response {
+    if (request.method !== 'GET') {
+      return this.methodNotAllowed(['GET']);
+    }
+
+    const now = Date.now();
+    const devices = Array.from(this.registryDevices.values())
+      .sort((left, right) => right.lastSeen - left.lastSeen)
+      .map(device => ({
+        deviceId: device.deviceId,
+        connected: device.connected,
+        connectedAt: device.connectedAt,
+        lastPing: device.lastPing ?? device.lastSeen,
+        uptime: device.connected && device.connectedAt ? now - device.connectedAt : undefined,
+        ipAddress: device.ipAddress,
+        userAgent: device.userAgent,
+      }));
+    return this.jsonResponse({
+      success: true,
+      devices,
+      total: devices.length,
+      active: devices.filter(device => device.connected).length,
+    });
+  }
+
+  private handleRegistryStatus(request: Request): Response {
+    if (request.method !== 'GET') {
+      return this.methodNotAllowed(['GET']);
+    }
+
+    const devices = Array.from(this.registryDevices.values());
+    const activeDevices = devices.filter(device => device.connected).length;
+    return this.jsonResponse({
+      success: true,
+      totalDevices: devices.length,
+      activeDevices,
+      totalSessions: devices.length,
+      activeConnections: activeDevices,
+    });
   }
 
   private handleOptions(): Response {
     return new Response(null, { status: 204 });
   }
 
-  private async handleWebSocketUpgrade(request: Request, deviceId: string): Promise<Response> {
-    console.log('[DO] handleWebSocketUpgrade called for device:', deviceId);
-
+  private async handleWebSocketUpgrade(request: Request): Promise<Response> {
     try {
       // Create WebSocketPair in Durable Object
       // eslint-disable-next-line no-undef
       const pair = new WebSocketPair();
       const [client, server] = [pair[0], pair[1]];
 
-      console.log('[DO] WebSocketPair created');
-
       // Accept the WebSocket connection
       server.accept();
-      console.log('[DO] WebSocket accepted');
 
-      // Add session
-      const result = await this.addSession(deviceId, server);
-      console.log('[DO] addSession result:', result);
+      const sessionId = request.headers.get('X-Session-ID') ?? this.getDeviceId();
+      const result = await this.addRelaySocket(sessionId, server, {
+        deviceId: request.headers.get('X-Device-ID') ?? undefined,
+        agentIdentityPublicKey: request.headers.get('X-Agent-Identity-Public-Key') ?? undefined,
+        registrationTimestamp: this.parseOptionalNumber(
+          request.headers.get('X-Agent-Registration-Timestamp')
+        ),
+        registrationNonce: request.headers.get('X-Agent-Registration-Nonce') ?? undefined,
+        registrationSignature: request.headers.get('X-Agent-Registration-Signature') ?? undefined,
+      });
 
       if (!result.success) {
-        server.close(1013, result.error ?? 'Session limit reached');
+        const closeCode =
+          result.error === 'Agent session not available'
+            ? RELAY_CLOSE_CODES.AGENT_UNAVAILABLE
+            : 1013;
+        server.close(closeCode, result.error ?? 'Session limit reached');
         return this.jsonResponse(
           {
             success: false,
@@ -850,7 +1639,6 @@ export class SessionManagerDO {
       }
 
       // Return the client WebSocket to the original requester
-      console.log('[DO] Returning WebSocket upgrade response');
       return this.createWebSocketResponse(client);
     } catch (error) {
       console.error('[DO ERROR] WebSocket upgrade failed:', error);
@@ -867,14 +1655,6 @@ export class SessionManagerDO {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const deviceId = this.getDeviceId(request.headers.get('X-Device-ID'));
-
-    console.log('[DO] fetch called:', {
-      method: request.method,
-      pathname: url.pathname,
-      upgrade: request.headers.get('Upgrade'),
-      deviceId,
-    });
 
     if (request.method === 'OPTIONS') {
       return this.handleOptions();
@@ -882,32 +1662,36 @@ export class SessionManagerDO {
 
     // Check if this is a WebSocket upgrade request
     const upgrade = request.headers.get('Upgrade');
-    console.log('[DO] Upgrade header value:', upgrade);
     if (upgrade && upgrade.toLowerCase().includes('websocket')) {
-      console.log('[DO] WebSocket upgrade detected');
-      return await this.handleWebSocketUpgrade(request, deviceId);
+      if (!url.pathname.startsWith('/relay/')) {
+        return this.jsonResponse(
+          {
+            success: false,
+            error: 'Not found',
+            path: url.pathname,
+          },
+          { status: 404 }
+        );
+      }
+      return await this.handleWebSocketUpgrade(request);
     }
 
     try {
       switch (url.pathname) {
-        case '/connect':
-          return await this.handleConnect(request, deviceId);
-        case '/send':
-          return await this.handleSend(request, deviceId);
-        case '/status':
-          return await this.handleStatus(request, deviceId);
-        case '/info':
-          return await this.handleInfo(request, deviceId);
-        case '/disconnect':
-          return await this.handleDisconnect(request, deviceId);
-        case '/stats':
-          return await this.handleStats(request);
-        case '/devices':
-          return this.handleDevices(request);
-        case '/cleanup':
-          return await this.handleCleanup(request);
-        case '/websocket':
-          return await this.handleWebSocket(request, deviceId);
+        case '/shortcut/command':
+          return await this.handleRoomShortcutCommand(request);
+        case '/registry/agent-online':
+          return await this.handleRegistryAgentOnline(request);
+        case '/registry/agent-offline':
+          return await this.handleRegistryAgentOffline(request);
+        case '/registry/shortcut-grant-update':
+          return await this.handleRegistryShortcutGrantUpdate(request);
+        case '/registry/devices':
+          return this.handleRegistryDevices(request);
+        case '/registry/status':
+          return this.handleRegistryStatus(request);
+        case '/v1/shortcuts/command':
+          return await this.handleShortcutCommand(request);
         default:
           return this.jsonResponse(
             {

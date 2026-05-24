@@ -4,5 +4,4 @@
  */
 
 export { SessionController } from './session.controller';
-export { CommandController } from './command.controller';
 export { DeviceController } from './device.controller';

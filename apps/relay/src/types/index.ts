@@ -13,9 +13,6 @@ export * from './models';
 // API相关类型
 export * from './api';
 
-// 加密相关类型
-export * from './crypto';
-
 // 会话相关类型
 export * from './session';
 
@@ -45,9 +42,6 @@ export type {
   DeviceListResponse,
 } from './api';
 
-// 从 crypto.ts 导出加密类型
-export type { ValidationResult } from './crypto';
-
 // 从 session.ts 导出会话类型
 export type { EnhancedSessionInfo } from './session';
 
@@ -69,3 +63,12 @@ export type {
 } from './models';
 
 export type { DeviceId, SessionId, Timestamp, JsonValue, JsonObject, JsonArray } from './common';
+
+export type {
+  RelayTransportMessage,
+  RelayControlMessage,
+  ShortcutGrantRecord,
+  ShortcutCommandRequest,
+  ShortcutCommandResponse,
+} from '@cicada/shared';
+export { RELAY_CLOSE_CODES } from '@cicada/shared';

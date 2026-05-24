@@ -144,6 +144,17 @@ export class SensitiveDataFilter {
     'secret',
     'key',
     'nonce',
+    'signature',
+    'ciphertext',
+    'pairing',
+    'pairingCode',
+    'pairing_code',
+    'payload',
+    'shortcut',
+    'shortcutToken',
+    'tokenHash',
+    'grantToken',
+    'cicada_sc',
   ];
 
   /**

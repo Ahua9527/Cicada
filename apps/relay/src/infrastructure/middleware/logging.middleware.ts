@@ -20,12 +20,26 @@ export function requestIdMiddleware(): Middleware {
 
     context.logger.info(`Request started: ${context.method} ${context.url.pathname}`, {
       requestId: context.requestId,
-      context: { method: context.method, url: context.url.toString() },
+      context: { method: context.method, url: sanitizeUrl(context.url).toString() },
       tags: ['request', 'start'],
     });
 
     return next();
   };
+}
+
+function sanitizeUrl(url: URL): URL {
+  const safeUrl = new URL(url.toString());
+  if (safeUrl.pathname.startsWith('/relay/')) {
+    const [, relay, ...rest] = safeUrl.pathname.split('/');
+    safeUrl.pathname = `/${relay}/[session]${rest.length > 1 ? `/${rest.slice(1).join('/')}` : ''}`;
+  }
+  for (const key of ['api_key', 'nonce', 'signature', 'token', 'code']) {
+    if (safeUrl.searchParams.has(key)) {
+      safeUrl.searchParams.set(key, '[FILTERED]');
+    }
+  }
+  return safeUrl;
 }
 
 /**

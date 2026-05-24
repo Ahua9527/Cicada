@@ -7,7 +7,6 @@ import {
   requestIdMiddleware,
   corsMiddleware,
   securityHeadersMiddleware,
-  authMiddleware,
   createDefaultPipeline,
 } from '../../../src/infrastructure/middleware';
 import { MiddlewareContext } from '../../../src/infrastructure/middleware/types';
@@ -185,40 +184,6 @@ describe('Middleware', () => {
 
       expect(nextCalled).toBe(true);
       expect(result).toHaveProperty('continue');
-    });
-  });
-
-  describe('authMiddleware', () => {
-    it('should pass through valid request', async () => {
-      const middleware = authMiddleware();
-      const request = new Request('http://localhost/test', {
-        method: 'POST',
-        body: JSON.stringify({
-          device_id: 'MAC_1234567890ABCDEF1234567890ABCDEF',
-          cmd: 'ping',
-          ts: Math.floor(Date.now() / 1000),
-          api_key: 'secret',
-        }),
-      });
-      const logger = new Logger({ enableConsole: false });
-      const url = new URL('http://localhost/test');
-
-      const ctx: MiddlewareContext = {
-        request,
-        env: { API_KEY: 'secret', CICADA_SESSIONS: {} as any },
-        requestId: 'test-id',
-        logger,
-        timestamp: Date.now(),
-        url,
-        method: 'GET',
-        headers: {},
-      };
-
-      const result = await middleware(ctx, async () => {
-        return { continue: true };
-      });
-
-      expect((result as any).continue).toBe(true);
     });
   });
 

@@ -32,7 +32,6 @@ export interface AppConfig {
 
   // 安全配置
   security: {
-    apiKey: string;
     timestampValidity: number;
     clockSkewTolerance: number;
     nonceMaxLength: number;
@@ -109,7 +108,6 @@ const DEFAULT_CONFIG: AppConfig = {
   },
 
   security: {
-    apiKey: '',
     timestampValidity: SECURITY_CONSTANTS.TIMESTAMP_VALIDITY,
     clockSkewTolerance: SECURITY_CONSTANTS.CLOCK_SKEW_TOLERANCE,
     nonceMaxLength: SECURITY_CONSTANTS.NONCE.MAX_LENGTH,
@@ -172,11 +170,6 @@ const DEFAULT_CONFIG: AppConfig = {
  * 配置验证函数
  */
 function validateConfig(config: AppConfig): void {
-  // 验证必需的 API Key
-  if (!config.security.apiKey || config.security.apiKey.length < 16) {
-    throw new Error('API_KEY must be at least 16 characters long');
-  }
-
   // 验证数值范围
   if (config.session.timeout < 1000 || config.session.timeout > 3600000) {
     throw new Error('Session timeout must be between 1 second and 1 hour');
@@ -227,7 +220,6 @@ export function createConfig(env: Env): AppConfig {
     // 安全配置
     security: {
       ...DEFAULT_CONFIG.security,
-      apiKey: env.API_KEY ?? DEFAULT_CONFIG.security.apiKey,
     },
 
     // 会话配置
@@ -350,17 +342,8 @@ export class ConfigManager {
   /**
    * 获取配置摘要（隐藏敏感信息）
    */
-  public getSummary(): Omit<AppConfig, 'security'> & {
-    security: Omit<AppConfig['security'], 'apiKey'> & { apiKeyConfigured: boolean };
-  } {
-    const { apiKey, ...securityRest } = this.config.security;
-    return {
-      ...this.config,
-      security: {
-        ...securityRest,
-        apiKeyConfigured: Boolean(apiKey),
-      },
-    };
+  public getSummary(): AppConfig {
+    return this.config;
   }
 }
 

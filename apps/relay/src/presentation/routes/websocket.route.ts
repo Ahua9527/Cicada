@@ -11,12 +11,8 @@ import { SessionController } from '../controllers';
  */
 export async function handleWebSocketRoute(context: MiddlewareContext): Promise<Response> {
   try {
-    console.log('[DEBUG] WebSocket route handler called');
-    const result = await SessionController.handleWebSocketConnection(context);
-    console.log('[DEBUG] WebSocket route handler completed', { status: result.status });
-    return result;
+    return await SessionController.handleWebSocketConnection(context);
   } catch (error) {
-    console.error('[ERROR] WebSocket route handler failed:', error);
     context.logger.error('WebSocket route failed', {
       requestId: context.requestId,
       error: error as Error,
@@ -32,4 +28,8 @@ export async function handleWebSocketRoute(context: MiddlewareContext): Promise<
       { status: 500 }
     );
   }
+}
+
+export async function handleShortcutCommandRoute(context: MiddlewareContext): Promise<Response> {
+  return SessionController.sendShortcutCommand(context);
 }

@@ -1,51 +1,37 @@
-import type { CommandType } from './command.types';
 import type { DeviceId, JsonObject, JsonValue, Timestamp } from './common.types';
 
 export type WebSocketMessageData = JsonValue | JsonObject;
 
 export type WebSocketMessageType =
-  | 'command'
-  | 'response'
   | 'heartbeat'
   | 'error'
   | 'pong'
   | 'ping';
 
-export interface WebSocketMessage {
+export interface BaseWebSocketMessage {
   type: WebSocketMessageType;
-  id: string;
-  cmd: string;
-  ts: Timestamp;
+  id?: string;
   timestamp: Timestamp;
-  data?: WebSocketMessageData;
-  api_key?: string;
+  ts?: Timestamp;
+  data?: unknown;
 }
 
-export interface CommandMessage extends WebSocketMessage {
-  type: 'command';
-  data: {
-    command: CommandType;
-    parameters?: JsonValue;
-    signature: string;
-    nonce: string;
-  };
-}
-
-export interface ResponseMessage extends WebSocketMessage {
-  type: 'response';
-  data: {
-    commandId: string;
-    result: JsonValue;
-  };
-}
-
-export interface HeartbeatMessage extends WebSocketMessage {
+export interface HeartbeatMessage extends BaseWebSocketMessage {
   type: 'heartbeat' | 'ping' | 'pong';
   data?: {
     deviceId: DeviceId;
     latency?: number;
+    receivedTimestamp?: Timestamp;
   };
 }
+
+export interface ErrorMessage extends BaseWebSocketMessage {
+  type: 'error';
+  error: string;
+  code?: string;
+}
+
+export type WebSocketMessage = HeartbeatMessage | ErrorMessage;
 
 export type WSMessage = WebSocketMessage;
 
@@ -59,4 +45,3 @@ export class WebSocketError extends Error {
     this.name = 'WebSocketError';
   }
 }
-

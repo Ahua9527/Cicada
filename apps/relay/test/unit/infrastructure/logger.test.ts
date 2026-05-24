@@ -172,6 +172,12 @@ describe('Logger Module', () => {
         username: 'user',
         password: 'secret123',
         api_key: 'key123',
+        nonce: 'nonce123',
+        pairingCode: 'AB23CD45',
+        authorization: 'Bearer cicada_sc_secret',
+        shortcutToken: 'cicada_sc_secret',
+        tokenHash: 'hash123',
+        payload: { ciphertext: 'secret-ciphertext' },
         email: 'user@example.com',
       };
 
@@ -180,6 +186,12 @@ describe('Logger Module', () => {
       expect(filtered.username).toBe('user');
       expect(filtered.password).toBe('[FILTERED]');
       expect(filtered.api_key).toBe('[FILTERED]');
+      expect(filtered.nonce).toBe('[FILTERED]');
+      expect(filtered.pairingCode).toBe('[FILTERED]');
+      expect(filtered.authorization).toBe('[FILTERED]');
+      expect(filtered.shortcutToken).toBe('[FILTERED]');
+      expect(filtered.tokenHash).toBe('[FILTERED]');
+      expect(filtered.payload).toBe('[FILTERED]');
       expect(filtered.email).toBe('user@example.com');
     });
 

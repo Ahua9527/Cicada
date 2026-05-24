@@ -592,7 +592,7 @@ export class SystemDiagnostic {
     console.log('\n[配置] 配置验证');
 
     // 环境变量检查
-    const requiredEnvVars = ['CICADA_RELAY_URL', 'API_KEY'];
+    const requiredEnvVars = ['CICADA_RELAY_URL'];
 
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
     let configStatus: DiagnosticResult['status'] = 'healthy';

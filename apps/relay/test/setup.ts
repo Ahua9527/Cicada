@@ -4,7 +4,6 @@
 
 // 设置测试环境变量
 process.env.NODE_ENV = 'test';
-process.env.API_KEY = 'test-api-key-for-testing-only';
 
 // 模拟 Web Crypto API
 Object.defineProperty(global, 'crypto', {
@@ -94,7 +93,6 @@ class MockDurableObjectService {
 
 // 创建模拟的环境变量
 const mockEnv = {
-  API_KEY: 'test-api-key-for-testing-only',
   NODE_ENV: 'test',
   CICADA_SESSIONS: new MockDurableObjectNamespace(),
 };
@@ -148,15 +146,3 @@ beforeEach(() => {
   jest.spyOn(Date.prototype, 'getTime').mockReturnValue(mockDate.getTime());
   jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
 });
-
-// 创建有效请求的辅助函数（使用 API Key 认证）
-(global as any).createValidRequest = async (overrides: Partial<any> = {}) => {
-  const defaultRequest = {
-    device_id: 'MAC_1234567890ABCDEF1234567890ABCDEF',
-    cmd: 'lock',
-    ts: Math.floor(Date.now() / 1000),
-    api_key: 'test-api-key-for-testing-only',
-  };
-
-  return { ...defaultRequest, ...overrides };
-};

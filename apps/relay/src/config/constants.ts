@@ -7,14 +7,11 @@
 // API相关常量
 export const API_CONSTANTS = {
   // 版本信息
-  VERSION: '2.0.0',
+  VERSION: '1.0.0',
   API_VERSION: 'v2',
 
   // 路径常量
   PATHS: {
-    WEBSOCKET: '/ws',
-    COMMAND: '/send',
-    BATCH_COMMAND: '/batch/send',
     STATUS: '/status',
     HEALTH: '/health',
     DEVICES: '/devices',
@@ -97,6 +94,10 @@ export const SESSION_CONSTANTS = {
   CLEANUP_INTERVAL: 60 * 1000, // 1分钟
   MAX_CONCURRENT_SESSIONS: 1000,
   HEARTBEAT_INTERVAL: 30 * 1000, // 30秒
+  REGISTRY_DO_NAME: '__cicada_device_registry__',
+  AGENT_REGISTRATION_SKEW: 90 * 1000,
+  AGENT_ABSENCE_GRACE_MS: 45 * 1000,
+  SHORTCUT_COMMAND_TIMEOUT_MS: 20 * 1000,
 
   // 消息配置
   MESSAGE_HISTORY_SIZE: 100,
@@ -109,6 +110,8 @@ export const SESSION_CONSTANTS = {
     SESSIONS: 'sessions',
     METADATA: 'metadata',
     NONCES: 'nonces',
+    DEVICE_REGISTRY: 'device_registry',
+    SHORTCUT_GRANTS: 'shortcut_grants',
     MESSAGES: 'messages',
     STATS: 'stats',
     CONFIG: 'config',
