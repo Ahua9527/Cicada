@@ -28,12 +28,6 @@ export const SUPPORTED_COMMANDS: ReadonlySet<CommandType | string> = new Set([
 ]);
 
 /**
- * 时间戳容差（毫秒）
- * 允许客户端时间与服务器时间有 5 分钟的偏差
- */
-const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
-
-/**
  * Device ID 格式验证正则表达式
  * 统一为 MAC_[32位十六进制]
  */
@@ -45,11 +39,10 @@ const DEVICE_ID_PATTERN = /^MAC_[A-F0-9]{32}$/i;
  * 职责：
  * - ✅ 验证请求格式（必填字段、字段类型）
  * - ✅ 验证命令是否在契约中（SUPPORTED_COMMANDS）
- * - ✅ 验证时间戳的合理性（防止重放攻击）
  * - ✅ 验证 device_id 格式
  * - ❌ 不验证业务逻辑（如设备状态、权限等）
  *
- * 这是契约层验证器，用于 CicadaRelay 网关层的快速失败。
+ * 这是 Shortcuts gateway 明文命令载荷的契约层验证器。
  * Cicada 执行层会进行额外的防御性验证。
  */
 export class CommandValidator extends BaseValidator<CommandRequest> {
@@ -75,10 +68,7 @@ export class CommandValidator extends BaseValidator<CommandRequest> {
     this.validateFieldTypes(payload);
 
     // 验证命令在契约中
-    this.validateCommand(payload.cmd);
-
-    // 验证时间戳合理性
-    this.validateTimestamp(payload.ts);
+    this.validateCommand(payload.command);
 
     // 验证可选参数
     if (payload.params !== undefined) {
@@ -94,9 +84,7 @@ export class CommandValidator extends BaseValidator<CommandRequest> {
   private validateRequiredFields(payload: CommandRequest): void {
     const requiredFields: Array<keyof CommandRequest> = [
       'device_id',
-      'cmd',
-      'ts',
-      'api_key',
+      'command',
     ];
 
     for (const field of requiredFields) {
@@ -123,24 +111,17 @@ export class CommandValidator extends BaseValidator<CommandRequest> {
       }
     }
 
-    // 验证 cmd 类型
-    if (payload.cmd !== undefined && payload.cmd !== null) {
-      if (typeof payload.cmd !== 'string') {
-        this.addError(`Field 'cmd' must be a string, got ${typeof payload.cmd}`);
+    // 验证 command 类型
+    if (payload.command !== undefined && payload.command !== null) {
+      if (typeof payload.command !== 'string') {
+        this.addError(`Field 'command' must be a string, got ${typeof payload.command}`);
       }
     }
 
-    // 验证 ts 类型
-    if (payload.ts !== undefined && payload.ts !== null) {
-      if (typeof payload.ts !== 'number') {
-        this.addError(`Field 'ts' must be a number, got ${typeof payload.ts}`);
-      }
-    }
-
-    // 验证 api_key 类型
-    if (payload.api_key !== undefined && payload.api_key !== null) {
-      if (typeof payload.api_key !== 'string') {
-        this.addError(`Field 'api_key' must be a string, got ${typeof payload.api_key}`);
+    // 验证 request_id 类型（可选）
+    if (payload.request_id !== undefined && payload.request_id !== null) {
+      if (typeof payload.request_id !== 'string') {
+        this.addError(`Field 'request_id' must be a string, got ${typeof payload.request_id}`);
       }
     }
 
@@ -151,12 +132,6 @@ export class CommandValidator extends BaseValidator<CommandRequest> {
       }
     }
 
-    // 验证 nonce 类型（可选）
-    if (payload.nonce !== undefined && payload.nonce !== null) {
-      if (typeof payload.nonce !== 'string') {
-        this.addError(`Field 'nonce' must be a string, got ${typeof payload.nonce}`);
-      }
-    }
   }
 
   /**
@@ -171,43 +146,6 @@ export class CommandValidator extends BaseValidator<CommandRequest> {
       const supportedList = Array.from(SUPPORTED_COMMANDS).join(', ');
       this.addError(
         `Unsupported command: '${cmd}'. Supported commands: ${supportedList}`
-      );
-    }
-  }
-
-  /**
-   * 验证时间戳的合理性
-   *
-   * 检查：
-   * 1. 时间戳是否为有效数字
-   * 2. 时间戳是否在合理范围内（防止重放攻击）
-   */
-  private validateTimestamp(ts: number | undefined): void {
-    if (ts === undefined || ts === null) {
-      return; // 已在 validateRequiredFields 中处理
-    }
-
-    if (!Number.isFinite(ts)) {
-      this.addError(`Field 'ts' must be a finite number`);
-      return;
-    }
-
-    if (ts <= 0) {
-      this.addError(`Field 'ts' must be a positive timestamp`);
-      return;
-    }
-
-    // 自动检测时间戳格式（秒或毫秒）
-    // 如果时间戳小于 10000000000（2286-11-20），则认为是秒级时间戳
-    const tsMs = ts < 10000000000 ? ts * 1000 : ts;
-    const now = Date.now();
-    const diff = Math.abs(now - tsMs);
-
-    if (diff > TIMESTAMP_TOLERANCE_MS) {
-      const toleranceMinutes = TIMESTAMP_TOLERANCE_MS / 60000;
-      this.addError(
-        `Timestamp is too far from current time (tolerance: ${toleranceMinutes} minutes). ` +
-        `Received: ${new Date(tsMs).toISOString()}, Server: ${new Date(now).toISOString()}`
       );
     }
   }

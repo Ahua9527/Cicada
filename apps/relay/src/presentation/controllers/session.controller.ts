@@ -4,7 +4,7 @@
  */
 
 import type { MiddlewareContext } from '../../types';
-import { validateWebSocketConnection } from '../../utils/crypto';
+import { SESSION_CONSTANTS } from '../../config/constants';
 
 /**
  * Session Controller
@@ -14,173 +14,140 @@ export class SessionController {
    * Handle WebSocket connection
    */
   static async handleWebSocketConnection(context: MiddlewareContext): Promise<Response> {
-    const { request, env, logger, requestId } = context;
+    const { request, logger, requestId } = context;
     const url = new URL(request.url);
 
-    console.log('[DEBUG] WebSocket handler started', { requestId });
-    logger.info('WebSocket handler started', {
+    if (url.pathname.startsWith('/relay/')) {
+      return this.handleRelayTransportConnection(context);
+    }
+
+    logger.warn('Unsupported WebSocket route', {
       requestId,
-      tags: ['websocket', 'debug'],
+      context: { pathname: url.pathname },
+      tags: ['websocket', 'routing'],
     });
+    return Response.json(
+      {
+        ok: false,
+        error: 'API endpoint not found',
+        path: url.pathname,
+      },
+      { status: 404 }
+    );
+  }
 
-    // Get connection parameters
-    const deviceId = url.searchParams.get('device_id');
-    const apiKey = url.searchParams.get('api_key');
-    const timestamp = url.searchParams.get('ts');
+  static async sendShortcutCommand(context: MiddlewareContext): Promise<Response> {
+    return this.forwardRegistryJSON(context, '/v1/shortcuts/command');
+  }
 
-    console.log('[DEBUG] Parameters extracted', { deviceId, timestamp });
+  private static async handleRelayTransportConnection(
+    context: MiddlewareContext
+  ): Promise<Response> {
+    const { request, env, logger, requestId } = context;
+    const url = new URL(request.url);
+    const target = decodeURIComponent(url.pathname.split('/').pop() ?? '');
 
-    // Validate parameters
-    if (!deviceId || !apiKey || !timestamp) {
+    if (!target) {
       return Response.json(
         {
           ok: false,
-          error: 'Missing connection parameters',
-          missing_params: ['device_id', 'api_key', 'ts'].filter(
-            param => !url.searchParams.get(param)
-          ),
+          error: 'Missing relay target',
+          code: 'invalid_relay_connection',
         },
         { status: 400 }
       );
     }
 
     try {
-      // Validate WebSocket connection
-      console.log('[DEBUG] Validating connection');
-      const ts = parseInt(timestamp);
-      const validation = validateWebSocketConnection(deviceId, apiKey, env.API_KEY, ts);
-      console.log('[DEBUG] Validation result:', validation.valid);
-
-      if (!validation.valid) {
-        console.log('[ERROR] Validation failed:', validation.error);
-        logger.warn('WebSocket connection validation failed', {
-          requestId,
-          context: {
-            deviceId,
-            error: validation.error,
-            details: validation.details,
-          },
-          tags: ['websocket', 'security', 'error'],
-        });
-
-        const statusCode = validation.error === 'INVALID_API_KEY' ? 401 : 400;
-        return Response.json(
-          {
-            ok: false,
-            error: validation.details?.message ?? validation.error,
-          },
-          { status: statusCode }
-        );
-      }
-
-      // Get device's Durable Object
-      console.log('[DEBUG] Getting Durable Object for device:', deviceId);
-      const sessionId = env.CICADA_SESSIONS.idFromName(deviceId);
-      console.log('[DEBUG] Session ID obtained');
-      const sessionManager = env.CICADA_SESSIONS.get(sessionId);
-      console.log('[DEBUG] Session manager obtained');
-
-      // Forward the WebSocket upgrade request directly to Durable Object
-      console.log('[DEBUG] Forwarding WebSocket upgrade to Durable Object');
-
-      // Create headers without duplicating Upgrade
+      const sessionId = target;
+      const sessionManager = env.CICADA_SESSIONS.get(env.CICADA_SESSIONS.idFromName(sessionId));
       const headers = new Headers(request.headers);
-      headers.set('X-Device-ID', deviceId);
-      headers.set('X-Timestamp', ts.toString());
+      headers.set('X-Session-ID', sessionId);
       headers.set('Upgrade', 'websocket');
       headers.set('Connection', 'Upgrade');
 
-      // Create a new request with all the necessary information
-      const doRequest = new Request(request, {
-        headers,
-      });
+      const deviceId = request.headers.get('x-device-id');
+      const publicKey = request.headers.get('x-agent-identity-public-key');
+      if (!deviceId || !publicKey) {
+        return Response.json(
+          {
+            ok: false,
+            error: 'Agent relay connection requires x-device-id and x-agent-identity-public-key',
+            code: 'missing_agent_identity',
+          },
+          { status: 400 }
+        );
+      }
+      headers.set('X-Device-ID', deviceId);
+      headers.set('X-Agent-Identity-Public-Key', publicKey);
+      for (const [source, targetHeader] of [
+        ['x-agent-registration-timestamp', 'X-Agent-Registration-Timestamp'],
+        ['x-agent-registration-nonce', 'X-Agent-Registration-Nonce'],
+        ['x-agent-registration-signature', 'X-Agent-Registration-Signature'],
+      ]) {
+        const value = request.headers.get(source);
+        if (value) {
+          headers.set(targetHeader, value);
+        }
+      }
 
-      console.log('[DEBUG] Sending request to Durable Object');
-      const response = await sessionManager.fetch(doRequest as any);
-      console.log('[DEBUG] Received response from Durable Object:', response.status);
-
+      const response = await sessionManager.fetch(new Request(request as any, { headers }) as any);
       return response as any;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      logger.error('WebSocket connection failed', {
+      logger.error('Relay transport connection failed', {
         requestId,
         error: error as Error,
-        context: {
-          deviceId,
-          errorMessage,
-          errorStack,
-          errorType: error?.constructor?.name,
-        },
-        tags: ['websocket', 'error'],
+        tags: ['relay', 'websocket', 'error'],
       });
-
-      console.error('WebSocket Error Details:', {
-        message: errorMessage,
-        stack: errorStack,
-        deviceId,
-      });
-
       return Response.json(
         {
           ok: false,
-          error: 'WebSocket connection failed',
-          details: errorMessage,
+          error: 'Relay transport connection failed',
+          details: error instanceof Error ? error.message : String(error),
         },
         { status: 500 }
       );
     }
   }
 
-  /**
-   * 获取指定设备的会话信息
-   */
-  static async getSessionInfo(context: MiddlewareContext): Promise<Response> {
-    const { env, logger, requestId, url } = context;
-    const deviceId = url.searchParams.get('device_id') ?? context.deviceId;
+  private static getRegistryStub(env: MiddlewareContext['env']) {
+    const registryId = env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME);
+    return env.CICADA_SESSIONS.get(registryId);
+  }
 
-    if (!deviceId) {
-      return Response.json(
-        {
-          ok: false,
-          error: 'device_id is required',
-        },
-        { status: 400 }
-      );
-    }
-
+  private static async forwardRegistryJSON(
+    context: MiddlewareContext,
+    pathname: string
+  ): Promise<Response> {
+    const { request, env, logger, requestId } = context;
     try {
-      const sessionId = env.CICADA_SESSIONS.idFromName(deviceId);
-      const sessionManager = await env.CICADA_SESSIONS.get(sessionId);
-      const infoResponse = await sessionManager.fetch('http://session/info', {
-        method: 'GET',
-        headers: {
-          'X-Device-ID': deviceId,
-        },
-      });
-
-      const data = await infoResponse.json();
-
-      return Response.json({
-        ok: true,
-        data,
+      const registry = this.getRegistryStub(env);
+      const body = await request.text();
+      const response = await registry.fetch(
+        new Request(`http://registry${pathname}`, {
+          method: request.method,
+          headers: request.headers,
+          body,
+        }) as any
+      );
+      return new Response(response.body as any, {
+        status: response.status,
+        headers: response.headers as any,
       });
     } catch (error) {
-      logger.error('Failed to fetch session info', {
+      logger.error('Registry JSON route failed', {
         requestId,
         error: error as Error,
-        context: { deviceId },
-        tags: ['session', 'error'],
+        tags: ['relay', 'registry', 'error'],
       });
-
       return Response.json(
         {
           ok: false,
-          error: 'Failed to fetch session info',
+          error: 'Registry request failed',
         },
         { status: 500 }
       );
     }
   }
+
 }

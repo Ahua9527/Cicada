@@ -48,38 +48,6 @@ export interface WebSocketConnectionResponse extends ApiResponse {
   };
 }
 
-export interface BatchCommandResponse extends ApiResponse {
-  data?: {
-    batch_id: string;
-    results: Array<{
-      device_id: DeviceId;
-      success: boolean;
-      error?: string;
-      timestamp: Timestamp;
-    }>;
-    summary: {
-      total: number;
-      successful: number;
-      failed: number;
-    };
-  };
-}
-
-export interface AuthChallengeRequest {
-  device_id: DeviceId;
-  timestamp: Timestamp;
-  api_key: string;
-  challenge?: string;
-}
-
-export interface AuthChallengeResponse extends ApiResponse {
-  data?: {
-    challenge: string;
-    expires_at: Timestamp;
-    signature_algorithm: string;
-  };
-}
-
 export interface CommandExecutionRecord {
   command: CommandType | string;
   result: CommandResult;
@@ -90,4 +58,3 @@ export interface ApiErrorPayload extends ApiResponse {
   code?: string;
   details?: JsonValue;
 }
-

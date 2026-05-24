@@ -22,6 +22,7 @@ export interface ApiResponse<T = unknown> {
   ok: boolean;
   success?: boolean;
   data?: T;
+  code?: string;
   error?: string;
   message?: string;
   timestamp?: number;
@@ -55,7 +56,6 @@ export interface ErrorDetail {
  * Runtime configuration exposed to Cloudflare Workers environment bindings.
  */
 export interface Env {
-  API_KEY: string;
   CICADA_SESSIONS: DurableObjectNamespace;
 
   NODE_ENV?: string;
@@ -109,7 +109,6 @@ export interface HealthStatus {
 export interface CicadaAgentConfig {
   relayURL: string;
   deviceId: string;
-  apiKey: string;
   autoConnect: boolean;
   showNotifications: boolean;
   enableAutoReconnect?: boolean;

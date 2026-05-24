@@ -4,6 +4,28 @@
  */
 
 import type { MiddlewareContext, DeviceListResponse, SystemStatusResponse } from '../../types';
+import { API_CONSTANTS, SESSION_CONSTANTS } from '../../config/constants';
+
+type RegistryDeviceList = {
+  success?: boolean;
+  devices?: NonNullable<DeviceListResponse['data']>['devices'];
+  total?: number;
+  active?: number;
+};
+
+type RegistryStatus = {
+  success?: boolean;
+  totalDevices?: number;
+  activeDevices?: number;
+  totalSessions?: number;
+  activeConnections?: number;
+};
+
+const emptyDeviceList = (): NonNullable<DeviceListResponse['data']> => ({
+  devices: [],
+  total: 0,
+  active: 0,
+});
 
 /**
  * Device Controller
@@ -16,22 +38,12 @@ export class DeviceController {
     const { env, logger, requestId } = context;
 
     try {
-      const sessionId = env.CICADA_SESSIONS.idFromName(deviceId);
-      const sessionManager = await env.CICADA_SESSIONS.get(sessionId);
-
-      const statusResponse = await sessionManager.fetch('http://session/status', {
-        method: 'GET',
-        headers: {
-          'X-Device-ID': deviceId,
-        },
-      });
-
-      const deviceStatus = (await statusResponse.json()) as {
-        deviceId: string;
-        connected: boolean;
-        lastActivity?: number;
-        uptime?: number;
-      };
+      const registryDevices = await this.getRegistryDevices(env);
+      const deviceStatus =
+        registryDevices.devices.find(device => device.deviceId === deviceId) ?? {
+          deviceId,
+          connected: false,
+        };
 
       logger.debug('Device status retrieved', {
         requestId,
@@ -65,23 +77,24 @@ export class DeviceController {
    * Get system status
    */
   static async getSystemStatus(context: MiddlewareContext): Promise<Response> {
-    const { logger, requestId } = context;
+    const { env, logger, requestId } = context;
 
     try {
+      const registryStatus = await this.getRegistryStatus(env);
       const systemStatus: SystemStatusResponse = {
         ok: true,
         data: {
           service: 'CicadaRelay',
-          version: '1.0.0',
+          version: API_CONSTANTS.VERSION,
           uptime: Date.now(),
-          totalDevices: 0,
-          activeDevices: 0,
+          totalDevices: registryStatus.totalDevices ?? 0,
+          activeDevices: registryStatus.activeDevices ?? 0,
           totalCommands: 0,
           commandsPerSecond: 0,
           memoryUsage: 0,
           durableObjectStats: {
-            totalSessions: 0,
-            activeConnections: 0,
+            totalSessions: registryStatus.totalSessions ?? 0,
+            activeConnections: registryStatus.activeConnections ?? 0,
             messagesQueued: 0,
           },
         },
@@ -114,17 +127,13 @@ export class DeviceController {
    * Get device list
    */
   static async getDeviceList(context: MiddlewareContext): Promise<Response> {
-    const { logger, requestId } = context;
+    const { env, logger, requestId } = context;
 
     try {
-      // TODO: Implement global device list retrieval
+      const registryDevices = await this.getRegistryDevices(env);
       const deviceListResponse: DeviceListResponse = {
         ok: true,
-        data: {
-          devices: [],
-          total: 0,
-          active: 0,
-        },
+        data: registryDevices,
       };
 
       logger.debug('Device list retrieved', {
@@ -163,7 +172,7 @@ export class DeviceController {
         status: 'healthy',
         timestamp: Date.now(),
         service: 'CicadaRelay',
-        version: '1.0.0',
+        version: API_CONSTANTS.VERSION,
         checks: {
           api: 'ok',
           durableObjects: 'ok',
@@ -193,5 +202,58 @@ export class DeviceController {
         { status: 503 }
       );
     }
+  }
+
+  private static hasRegistryBinding(env: MiddlewareContext['env']): boolean {
+    return (
+      typeof env.CICADA_SESSIONS?.idFromName === 'function' &&
+      typeof env.CICADA_SESSIONS?.get === 'function'
+    );
+  }
+
+  private static getRegistryStub(env: MiddlewareContext['env']) {
+    const registryId = env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME);
+    return env.CICADA_SESSIONS.get(registryId);
+  }
+
+  private static async getRegistryDevices(
+    env: MiddlewareContext['env']
+  ): Promise<NonNullable<DeviceListResponse['data']>> {
+    if (!this.hasRegistryBinding(env)) {
+      return emptyDeviceList();
+    }
+
+    const registry = this.getRegistryStub(env);
+    const response = await registry.fetch('http://session/registry/devices', {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      return emptyDeviceList();
+    }
+
+    const payload = (await response.json()) as RegistryDeviceList;
+    return {
+      devices: payload.devices ?? [],
+      total: payload.total ?? payload.devices?.length ?? 0,
+      active: payload.active ?? payload.devices?.filter(device => device.connected).length ?? 0,
+    };
+  }
+
+  private static async getRegistryStatus(env: MiddlewareContext['env']): Promise<RegistryStatus> {
+    if (!this.hasRegistryBinding(env)) {
+      return {};
+    }
+
+    const registry = this.getRegistryStub(env);
+    const response = await registry.fetch('http://session/registry/status', {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      return {};
+    }
+
+    return (await response.json()) as RegistryStatus;
   }
 }

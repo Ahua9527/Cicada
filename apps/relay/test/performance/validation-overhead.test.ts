@@ -13,9 +13,7 @@ describe('验证性能测试', () => {
   const createValidRequest = (cmd: string): CommandRequest => {
     return {
       device_id: 'MAC_1234567890ABCDEF1234567890ABCDEF',
-      cmd,
-      ts: Date.now(),
-      api_key: 'test-api-key-1234567890',
+      command: cmd,
     };
   };
 
@@ -132,9 +130,9 @@ describe('验证性能测试', () => {
     it('不同类型的验证失败性能应该一致', () => {
       const invalidRequests = [
         { ...createValidRequest('lock'), device_id: 'invalid' },
-        { ...createValidRequest('lock'), cmd: 'invalid_command' },
-        { ...createValidRequest('lock'), ts: 0 },
-        { ...createValidRequest('lock'), api_key: 'short' },
+        { ...createValidRequest('lock'), command: 'invalid_command' },
+        { ...createValidRequest('lock'), command: 123 as unknown as string },
+        { ...createValidRequest('lock'), params: [] as unknown as Record<string, never> },
       ];
 
       const durations: number[] = [];

@@ -8,14 +8,12 @@ export * from './logging.middleware';
 export * from './cors.middleware';
 export * from './security.middleware';
 export * from './rate-limit.middleware';
-export * from './auth.middleware';
 
 import { MiddlewarePipeline } from './pipeline';
 import { requestIdMiddleware, loggingMiddleware } from './logging.middleware';
 import { corsMiddleware, type CorsOptions } from './cors.middleware';
 import { securityHeadersMiddleware, requestSizeLimitMiddleware } from './security.middleware';
 import { rateLimitMiddleware, type RateLimitOptions } from './rate-limit.middleware';
-import { authMiddleware } from './auth.middleware';
 
 /**
  * 创建默认中间件管道的选项
@@ -23,7 +21,6 @@ import { authMiddleware } from './auth.middleware';
 export interface DefaultPipelineOptions {
   enableCORS?: boolean;
   enableRateLimit?: boolean;
-  allowedCommands?: string[];
   corsOptions?: CorsOptions;
   rateLimitOptions?: RateLimitOptions;
   maxRequestSize?: number;
@@ -36,7 +33,6 @@ export function createDefaultPipeline(options: DefaultPipelineOptions = {}): Mid
   const {
     enableCORS = false,
     enableRateLimit = true,
-    allowedCommands,
     corsOptions,
     rateLimitOptions = {
       windowMs: 60 * 1000, // 1分钟
@@ -62,9 +58,6 @@ export function createDefaultPipeline(options: DefaultPipelineOptions = {}): Mid
   if (enableRateLimit) {
     pipeline.use(rateLimitMiddleware(rateLimitOptions));
   }
-
-  // 认证中间件
-  pipeline.use(authMiddleware(allowedCommands));
 
   return pipeline;
 }

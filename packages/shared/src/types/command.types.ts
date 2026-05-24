@@ -35,18 +35,8 @@ export interface CommandParams {
 
 export interface CommandRequest {
   device_id: DeviceId;
-  cmd: CommandType | string;
-  ts: Timestamp;
-  api_key: string;
-  params?: Record<string, JsonValue>;
-  nonce?: string;
-}
-
-export interface BatchCommandRequest {
-  device_ids: DeviceId[];
-  cmd: CommandType | string;
-  ts: Timestamp;
-  api_key: string;
+  command: CommandType | string;
+  request_id?: string;
   params?: Record<string, JsonValue>;
 }
 
@@ -61,4 +51,3 @@ export interface CommandResult<T = JsonValue> {
   error?: string;
   data?: T;
 }
-

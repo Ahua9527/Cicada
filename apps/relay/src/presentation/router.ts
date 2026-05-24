@@ -6,11 +6,10 @@
 import type { MiddlewareContext } from '../types';
 import {
   handleWebSocketRoute,
-  handleSendCommandRoute,
   handleStatusRoute,
   handleDeviceListRoute,
   handleHealthRoute,
-  handleSessionInfoRoute,
+  handleShortcutCommandRoute,
 } from './routes';
 
 export interface Route {
@@ -35,13 +34,10 @@ export class Router {
     this.routes = [
       { pattern: /^\/$/, methods: ['GET'], handler: additionalHandlers.handleRoot },
       { pattern: /^\/favicon\.ico$/, methods: ['GET'], handler: additionalHandlers.handleFavicon },
-      { pattern: /^\/ws$/, methods: ['GET'], handler: handleWebSocketRoute },
-      { pattern: /^\/send$/, methods: ['POST'], handler: handleSendCommandRoute },
-      { pattern: /^\/api\/command$/, methods: ['POST'], handler: handleSendCommandRoute },
+      { pattern: /^\/relay\/[^/]+$/, methods: ['GET'], handler: handleWebSocketRoute },
+      { pattern: /^\/v1\/shortcuts\/command$/, methods: ['POST'], handler: handleShortcutCommandRoute },
       { pattern: /^\/status$/, methods: ['GET'], handler: handleStatusRoute },
       { pattern: /^\/devices$/, methods: ['GET'], handler: handleDeviceListRoute },
-      { pattern: /^\/api\/devices$/, methods: ['GET'], handler: handleDeviceListRoute },
-      { pattern: /^\/api\/sessions$/, methods: ['GET'], handler: handleSessionInfoRoute },
       { pattern: /^\/health$/, methods: ['GET'], handler: handleHealthRoute },
     ];
   }

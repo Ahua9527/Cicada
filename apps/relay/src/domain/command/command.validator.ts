@@ -2,7 +2,6 @@ import { Result } from '@cicada/shared/errors';
 import { ErrorCode, ErrorSeverity, CicadaError } from '@cicada/shared/errors';
 import type { JsonValue, DeviceId } from '@cicada/shared/types/common.types';
 import type { CommandType, CommandParams } from '@cicada/shared/types/command.types';
-import { CommandValidator as SharedCommandValidator } from '@cicada/shared/validators';
 import {
   Command,
   CommandId,
@@ -39,8 +38,6 @@ export class CommandValidationError extends CicadaError {
 }
 
 export class CommandValidator {
-  private readonly baseValidator = new SharedCommandValidator();
-
   validate(input: CommandValidationInput): Result<Command, CommandValidationError> {
     if (!input.deviceId || input.deviceId.trim() === '') {
       return Result.err(
