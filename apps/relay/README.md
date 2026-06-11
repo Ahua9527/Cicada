@@ -13,8 +13,10 @@ results; this path is intentionally not E2EE.
 - Worker entry: `src/index.ts`
 - Agent WebSocket route: `GET /relay/:liveSession`
 - Shortcuts command route: `POST /v1/shortcuts/command`
+- Bark vendor route: `/bark/*` by default, or Worker root when `BARK_ROOT_PATH=/`
 - Status routes: `GET /status`, `GET /status?device_id=...`, `GET /devices`
 - Durable Object binding: `CICADA_SESSIONS`
+- Bark D1 binding: `BARK_DATABASE`
 - Registry DO name: `__cicada_device_registry__`
 
 The same Durable Object class backs session rooms and the global registry.
@@ -31,9 +33,70 @@ Optional:
 | `ENABLE_CORS` | `false` | Enables configured CORS headers. |
 | `ALLOWED_ORIGINS` | local dev origins | Comma-separated allow list when CORS is enabled. |
 | `DEBUG_MODE` | `false` | Enables debug-level structured logs. |
+| `BARK_ROOT_PATH` | `/bark` | Mount path for the vendored Bark Worker. Set to `/` to expose Bark at Worker root while keeping existing Cicada routes. |
+| `BARK_BASIC_AUTH` | unset | Optional Basic Auth credential in `user:pass` form for Bark protected endpoints. |
+| `BARK_ALLOW_NEW_DEVICE` | `true` | Forwarded to Bark registration behavior. Set `false` to block new devices. |
+| `BARK_ALLOW_QUERY_NUMS` | `true` | Forwarded to Bark `/info` device counting behavior. |
 
-Do not commit `.dev.vars`, secrets, Wrangler state, coverage output, build
-output, or local `.cicada` state.
+Bark APNs values must be injected through deployed Worker secrets or local
+`apps/relay/.env`, not committed to this repository. Wrangler loads local
+`.env` values from the same directory as `wrangler.toml`.
+
+| Secret | Purpose |
+|---|---|
+| `BARK_APNS_PRIVATE_KEY` | APNs `.p8` private key PEM. |
+| `BARK_APNS_TEAM_ID` | Apple Developer Team ID. |
+| `BARK_APNS_KEY_ID` | APNs Auth Key ID. |
+| `BARK_APNS_TOPIC` | APNs topic, for example the Bark app bundle ID. |
+| `BARK_APNS_HOST_NAME` | Optional APNs host override. Defaults to `api.push.apple.com`. |
+
+For deployed Workers, set sensitive APNs values as secrets:
+
+```bash
+wrangler secret put BARK_APNS_PRIVATE_KEY
+wrangler secret put BARK_APNS_TEAM_ID
+wrangler secret put BARK_APNS_KEY_ID
+wrangler secret put BARK_APNS_TOPIC
+```
+
+For local development, copy `apps/relay/.env.example` to `apps/relay/.env` and
+replace the `TODO_...` placeholders with authorized APNs values. Do not create
+both `.dev.vars` and `.env` for the same local run; when `.dev.vars` exists,
+Wrangler does not include `.env` values in the Worker `env` object.
+
+`BARK_DATABASE` is a D1 binding configured in `wrangler.toml`, not a dotenv
+string. Create and bind the D1 database before exercising Bark registration or
+push flows.
+
+Do not commit `.env`, `.dev.vars`, secrets, Wrangler state, coverage output,
+build output, or local `.cicada` state.
+
+## Bark Vendor
+
+Relay vendors `cwxiaos/bark-worker` at commit
+`8bfd70c369b6dba3dbe53aad96d79a4367f57a45` under
+`vendor/bark-worker`. The upstream GPLv3 license and source notices are
+preserved there. This introduces GPLv3 compliance obligations for Relay
+distributions that include the vendor code.
+
+The adapter in `src/presentation/routes/bark.route.ts` only mounts Bark and maps
+Cicada env names to Bark's original env shape. Bark still provides
+`register`, `ping`, `healthz`, `info`, push path parsing, batch `device_keys`,
+Basic Auth, MCP sessions, and APNs auth-token caching through the vendored
+handler.
+
+Create and bind the Bark D1 database before deploying Bark:
+
+```bash
+wrangler d1 create cicada-bark
+wrangler d1 migrations apply cicada-bark \
+  --migrations-dir vendor/bark-worker/migrations
+```
+
+Then replace the placeholder `database_id` in the existing `[[d1_databases]]`
+block in `wrangler.toml` with the created database ID. Keep
+`migrations_dir = "vendor/bark-worker/migrations"` so Wrangler reads the
+vendored Bark migration files from their isolated directory.
 
 ## Agent WebSocket
 
@@ -106,7 +169,7 @@ cicada shortcut revoke <grantId>
 ```
 
 Default grant scope is `ping,status`. Use `--commands all` only when the
-Shortcut should be allowed to run all current 9 commands.
+Shortcut should be allowed to run all current 14 commands.
 
 ## Local Validation
 
