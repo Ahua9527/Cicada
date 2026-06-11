@@ -8,6 +8,11 @@ public enum DaemonControlAction: String, Codable {
     case shortcutGrantRevoke = "shortcut_grant_revoke"
     case powerAssertionStart = "power_assertion_start"
     case powerAssertionStop = "power_assertion_stop"
+    case sentryStart = "sentry_start"
+    case sentryStop = "sentry_stop"
+    case sentryStatus = "sentry_status"
+    case sentryUnlock = "sentry_unlock"
+    case sentryOpen = "sentry_open"
 }
 
 public struct DaemonControlRequest: Codable {
@@ -115,6 +120,26 @@ public final class UdsDaemonControlClient {
 
     public func powerAssertionStop() throws -> DaemonControlResponse {
         try request(DaemonControlRequest(action: .powerAssertionStop))
+    }
+
+    public func sentryStart() throws -> DaemonControlResponse {
+        try request(DaemonControlRequest(action: .sentryStart))
+    }
+
+    public func sentryStop() throws -> DaemonControlResponse {
+        try request(DaemonControlRequest(action: .sentryStop))
+    }
+
+    public func sentryStatus() throws -> DaemonControlResponse {
+        try request(DaemonControlRequest(action: .sentryStatus))
+    }
+
+    public func sentryUnlock() throws -> DaemonControlResponse {
+        try request(DaemonControlRequest(action: .sentryUnlock))
+    }
+
+    public func sentryOpen() throws -> DaemonControlResponse {
+        try request(DaemonControlRequest(action: .sentryOpen))
     }
 
     public func request(_ request: DaemonControlRequest) throws -> DaemonControlResponse {

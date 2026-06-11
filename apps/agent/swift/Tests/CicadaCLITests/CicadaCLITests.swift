@@ -8,15 +8,21 @@ import XCTest
 
 private final class FakeDaemonManager: DaemonManaging {
     var statusValue = DaemonStatus(installed: true, running: true, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
+    var recordCall: ((String) -> Void)?
     private(set) var calls: [String] = []
 
-    func install() throws { calls.append("install") }
-    func start() throws { calls.append("start") }
-    func stop() { calls.append("stop") }
-    func restart() throws { calls.append("restart") }
-    func uninstall() { calls.append("uninstall") }
+    func install() throws { append("install") }
+    func start() throws { append("start") }
+    func stop() { append("stop") }
+    func restart() throws { append("restart") }
+    func uninstall() { append("uninstall") }
     func status() -> DaemonStatus { statusValue }
     func logPaths() -> [String] { ["/tmp/daemon.log"] }
+
+    private func append(_ call: String) {
+        calls.append(call)
+        recordCall?("daemon.\(call)")
+    }
 }
 
 private final class FakeSentinelAppManager: SentinelAppManaging {
@@ -30,14 +36,20 @@ private final class FakeSentinelAppManager: SentinelAppManaging {
         notifierSocketReady: true,
         sentinelSocketReady: true
     )
+    var recordCall: ((String) -> Void)?
     private(set) var calls: [String] = []
 
-    func install() throws { calls.append("install") }
-    func start() throws { calls.append("start") }
-    func stop() { calls.append("stop") }
-    func restart() throws { calls.append("restart") }
-    func uninstall() { calls.append("uninstall") }
+    func install() throws { append("install") }
+    func start() throws { append("start") }
+    func stop() { append("stop") }
+    func restart() throws { append("restart") }
+    func uninstall() { append("uninstall") }
     func status() -> SentinelAppStatus { statusValue }
+
+    private func append(_ call: String) {
+        calls.append(call)
+        recordCall?("sentinel.\(call)")
+    }
 }
 
 private final class FakeSleepHoldManager: SleepHoldManaging {
@@ -79,7 +91,9 @@ private final class FakeSleepHoldManager: SleepHoldManaging {
 
 private final class FakeDaemonControlClient: DaemonControlClienting {
     var createCommands: [String] = []
+    var sentryCommands: [String] = []
     var createToken = "cicada_sc_secret"
+    var recordCall: ((String) -> Void)?
     var unavailable = false
 
     func shortcutGrantCreate(name: String, commands: [String], ttlMs: Int64) throws -> DaemonControlResponse {
@@ -115,7 +129,40 @@ private final class FakeDaemonControlClient: DaemonControlClienting {
     }
 
     func powerAssertionStop() throws -> DaemonControlResponse {
-        throw DaemonControlError.unavailable("missing socket")
+        recordCall?("daemonControl.power_assertion_stop")
+        return DaemonControlResponse(
+            ok: true,
+            commandResult: CommandExecutionResult(success: true, message: "power assertion stopped")
+        )
+    }
+
+    func sentryStart() throws -> DaemonControlResponse {
+        sentry("sentry_start")
+    }
+
+    func sentryStop() throws -> DaemonControlResponse {
+        sentry("sentry_stop")
+    }
+
+    func sentryStatus() throws -> DaemonControlResponse {
+        sentry("sentry_status")
+    }
+
+    func sentryUnlock() throws -> DaemonControlResponse {
+        sentry("sentry_unlock")
+    }
+
+    func sentryOpen() throws -> DaemonControlResponse {
+        sentry("sentry_open")
+    }
+
+    private func sentry(_ command: String) -> DaemonControlResponse {
+        sentryCommands.append(command)
+        recordCall?("daemonControl.\(command)")
+        return DaemonControlResponse(
+            ok: true,
+            commandResult: CommandExecutionResult(success: true, message: "\(command) ok")
+        )
     }
 }
 
@@ -254,6 +301,57 @@ final class CicadaCLITests: XCTestCase {
         XCTAssertTrue(result.stderr.contains("cicada start"))
     }
 
+    func testRunSentryCommandsUseDaemonControl() {
+        let fixture = CLIFixture()
+        let commands = ["sentry_start", "sentry_stop", "sentry_status", "sentry_unlock", "sentry_open"]
+
+        for command in commands {
+            let result = fixture.cli.run(arguments: ["run", command])
+
+            XCTAssertEqual(result.exitCode, 0, command)
+            XCTAssertTrue(result.stdout.contains("\(command) ok"), command)
+        }
+        XCTAssertEqual(fixture.daemonControl.sentryCommands, commands)
+        XCTAssertTrue(fixture.commandExecutor.commands.isEmpty)
+    }
+
+    func testStopStopsSentinelBeforeDaemon() {
+        let fixture = CLIFixture()
+
+        let result = fixture.cli.run(arguments: ["stop"])
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(
+            fixture.callOrder.calls,
+            [
+                "daemonControl.sentry_stop",
+                "daemonControl.power_assertion_stop",
+                "sentinel.stop",
+                "daemon.stop",
+            ]
+        )
+    }
+
+    func testRestartStopsSentinelBeforeDaemonThenStartsBoth() {
+        let fixture = CLIFixture()
+        _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
+
+        let result = fixture.cli.run(arguments: ["restart"])
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(
+            fixture.callOrder.calls,
+            [
+                "daemonControl.sentry_stop",
+                "daemonControl.power_assertion_stop",
+                "sentinel.stop",
+                "daemon.stop",
+                "daemon.start",
+                "sentinel.start",
+            ]
+        )
+    }
+
     func testAdvancedRoutesRemainAvailable() {
         let fixture = CLIFixture()
 
@@ -308,9 +406,18 @@ final class CicadaCLITests: XCTestCase {
     }
 }
 
+private final class CallOrder {
+    private(set) var calls: [String] = []
+
+    func append(_ call: String) {
+        calls.append(call)
+    }
+}
+
 private final class CLIFixture {
     let directory: URL
     let configStore: ConfigStore
+    let callOrder = CallOrder()
     let daemon = FakeDaemonManager()
     let sentinelApp = FakeSentinelAppManager()
     let sleepHold = FakeSleepHoldManager()
@@ -322,6 +429,9 @@ private final class CLIFixture {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("cicada-cli-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         configStore = ConfigStore(path: directory.appendingPathComponent("config.json").path)
+        daemon.recordCall = { [callOrder] call in callOrder.append(call) }
+        sentinelApp.recordCall = { [callOrder] call in callOrder.append(call) }
+        daemonControl.recordCall = { [callOrder] call in callOrder.append(call) }
         cli = CicadaCLI(
             configStore: configStore,
             daemonManager: daemon,

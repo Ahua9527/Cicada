@@ -30,6 +30,7 @@ final class DaemonControlTests: XCTestCase {
 
         XCTAssertThrowsError(try client.shortcutGrantList())
         XCTAssertThrowsError(try client.powerAssertionStart())
+        XCTAssertThrowsError(try client.sentryStart())
     }
 
     func testShortcutGrantControlPayloadsRoundTrip() throws {
@@ -83,6 +84,49 @@ final class DaemonControlTests: XCTestCase {
             from: try JSONEncoder().encode(response)
         )
         XCTAssertEqual(decodedResponse.commandResult, result)
+    }
+
+    func testSentryControlPayloadsRoundTrip() throws {
+        let request = DaemonControlRequest(action: .sentryStart)
+        let decodedRequest = try JSONDecoder().decode(
+            DaemonControlRequest.self,
+            from: try JSONEncoder().encode(request)
+        )
+        XCTAssertEqual(decodedRequest.action, .sentryStart)
+
+        let result = CommandExecutionResult(success: true, message: "Sentry started")
+        let response = DaemonControlResponse(ok: true, commandResult: result)
+        let decodedResponse = try JSONDecoder().decode(
+            DaemonControlResponse.self,
+            from: try JSONEncoder().encode(response)
+        )
+        XCTAssertEqual(decodedResponse.commandResult, result)
+    }
+
+    func testSentinelControlPayloadsRoundTrip() throws {
+        let request = SentinelControlRequest(action: .start)
+        let decodedRequest = try JSONDecoder().decode(
+            SentinelControlRequest.self,
+            from: try JSONEncoder().encode(request)
+        )
+        XCTAssertEqual(decodedRequest.action, .start)
+
+        let response = SentinelControlResponse(
+            ok: true,
+            message: "Running",
+            status: SentinelStatusSnapshot(
+                state: "Running",
+                activityHint: "",
+                recordingEnabled: false,
+                sleepHoldActive: true,
+                sleepHoldSessionId: "cicada-daemon-power-assertion"
+            )
+        )
+        let decodedResponse = try JSONDecoder().decode(
+            SentinelControlResponse.self,
+            from: try JSONEncoder().encode(response)
+        )
+        XCTAssertEqual(decodedResponse, response)
     }
 
     func testSentinelInstallRemovesLegacyNotifierLaunchAgentAndBinary() throws {

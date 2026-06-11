@@ -1,5 +1,7 @@
+import Darwin
 import Foundation
 import CicadaCore
+import CicadaIPC
 
 public final class MacOSCommandGateway {
     private let lockController: any NativeLockControlling
@@ -8,6 +10,10 @@ public final class MacOSCommandGateway {
     private let powerController: any NativePowerControlling
     private let displayController: any NativeDisplayControlling
     private let sleepHoldLeaseController: any SleepHoldLeasing
+    private let sentinelControlClient: any SentinelControlClienting
+    private let sentinelAppOpener: () -> Result<Void, NativeCommandError>
+    private let sentinelOpenRetryAttempts: Int
+    private let sentinelOpenRetryDelayMicros: useconds_t
 
     public convenience init() {
         let powerController = NativePowerController()
@@ -17,7 +23,9 @@ public final class MacOSCommandGateway {
             audioController: NativeAudioController(),
             powerController: powerController,
             displayController: NativeDisplayController(),
-            sleepHoldLeaseController: SleepHoldLeaseController()
+            sleepHoldLeaseController: SleepHoldLeaseController(),
+            sentinelControlClient: UdsSentinelControlClient(),
+            sentinelAppOpener: MacOSCommandGateway.openInstalledSentinelApp
         )
     }
 
@@ -27,7 +35,11 @@ public final class MacOSCommandGateway {
         audioController: any NativeAudioControlling,
         powerController: any NativePowerControlling,
         displayController: any NativeDisplayControlling,
-        sleepHoldLeaseController: any SleepHoldLeasing
+        sleepHoldLeaseController: any SleepHoldLeasing,
+        sentinelControlClient: any SentinelControlClienting = UdsSentinelControlClient(),
+        sentinelAppOpener: @escaping () -> Result<Void, NativeCommandError> = MacOSCommandGateway.openInstalledSentinelApp,
+        sentinelOpenRetryAttempts: Int = 20,
+        sentinelOpenRetryDelayMicros: useconds_t = 100_000
     ) {
         self.lockController = lockController
         self.bluetoothController = bluetoothController
@@ -35,6 +47,10 @@ public final class MacOSCommandGateway {
         self.powerController = powerController
         self.displayController = displayController
         self.sleepHoldLeaseController = sleepHoldLeaseController
+        self.sentinelControlClient = sentinelControlClient
+        self.sentinelAppOpener = sentinelAppOpener
+        self.sentinelOpenRetryAttempts = max(1, sentinelOpenRetryAttempts)
+        self.sentinelOpenRetryDelayMicros = sentinelOpenRetryDelayMicros
     }
 
     public func execute(command rawCommand: String) -> CommandExecutionResult {
@@ -61,6 +77,16 @@ public final class MacOSCommandGateway {
             return stopCaffeinate()
         case .status:
             return systemStatus()
+        case .sentryStart:
+            return executeSentinelAction(.start)
+        case .sentryStop:
+            return executeSentinelAction(.stop)
+        case .sentryStatus:
+            return executeSentinelAction(.status)
+        case .sentryUnlock:
+            return executeSentinelAction(.unlock)
+        case .sentryOpen:
+            return openSentinel()
         }
     }
 
@@ -187,6 +213,76 @@ public final class MacOSCommandGateway {
                 "bluetooth": bluetooth,
             ]
         )
+    }
+
+    private func openSentinel() -> CommandExecutionResult {
+        switch sentinelAppOpener() {
+        case .success:
+            return executeSentinelAction(
+                .open,
+                attempts: sentinelOpenRetryAttempts,
+                retryDelayMicros: sentinelOpenRetryDelayMicros
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: "Sentinel 打开失败: \(error.message)")
+        }
+    }
+
+    private static func openInstalledSentinelApp() -> Result<Void, NativeCommandError> {
+        guard FileManager.default.fileExists(atPath: RuntimePaths.sentinelAppPath) else {
+            return .success(())
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [RuntimePaths.sentinelAppPath]
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return .success(())
+        } catch {
+            return .failure(.message(String(describing: error)))
+        }
+    }
+
+    private func executeSentinelAction(
+        _ action: SentinelControlAction,
+        attempts: Int = 1,
+        retryDelayMicros: useconds_t = 0
+    ) -> CommandExecutionResult {
+        var lastError: Error?
+        let totalAttempts = max(1, attempts)
+
+        for attempt in 0 ..< totalAttempts {
+            do {
+                let response = try sentinelControlClient.request(SentinelControlRequest(action: action))
+                return CommandExecutionResult(
+                    success: response.ok,
+                    message: response.message,
+                    data: response.status.map(Self.sentinelStatusData)
+                )
+            } catch {
+                lastError = error
+                if attempt < totalAttempts - 1 {
+                    usleep(retryDelayMicros)
+                }
+            }
+        }
+
+        return CommandExecutionResult(
+            success: false,
+            message: "Sentinel 不可用: \(lastError.map(String.init(describing:)) ?? "unknown error")"
+        )
+    }
+
+    private static func sentinelStatusData(_ status: SentinelStatusSnapshot) -> [String: String] {
+        [
+            "state": status.state,
+            "activity_hint": status.activityHint,
+            "recording_enabled": status.recordingEnabled ? "true" : "false",
+            "sleep_hold_active": status.sleepHoldActive ? "true" : "false",
+            "sleep_hold_session_id": status.sleepHoldSessionId,
+        ]
     }
 
     private func batteryInfo() -> String {

@@ -109,6 +109,14 @@ final class DaemonRuntime {
                         error: result.success ? nil : result.message,
                         commandResult: result
                     )
+                case .sentryStart, .sentryStop, .sentryStatus, .sentryUnlock, .sentryOpen:
+                    let result = relayService.executeLocalCommand(request.action.rawValue)
+                    return DaemonControlResponse(
+                        ok: result.success,
+                        code: result.success ? nil : "sentry_command_failed",
+                        error: result.success ? nil : result.message,
+                        commandResult: result
+                    )
                 }
             }
             controlServer = server

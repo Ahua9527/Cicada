@@ -30,6 +30,11 @@ public protocol DaemonControlClienting {
     func shortcutGrantRevoke(grantId: String) throws -> DaemonControlResponse
     func powerAssertionStart() throws -> DaemonControlResponse
     func powerAssertionStop() throws -> DaemonControlResponse
+    func sentryStart() throws -> DaemonControlResponse
+    func sentryStop() throws -> DaemonControlResponse
+    func sentryStatus() throws -> DaemonControlResponse
+    func sentryUnlock() throws -> DaemonControlResponse
+    func sentryOpen() throws -> DaemonControlResponse
 }
 
 public protocol LocalCommandExecuting {
@@ -240,15 +245,21 @@ public final class CicadaCLI {
     }
 
     private func handleStop() -> CLIResult {
+        stopSentinelBeforeDaemon()
         daemonManager.stop()
-        sentinelAppManager.stop()
         return .success("Cicada 已停止。")
     }
 
     private func handleRestart() -> CLIResult {
+        stopSentinelBeforeDaemon()
         daemonManager.stop()
-        sentinelAppManager.stop()
         return handleStart()
+    }
+
+    private func stopSentinelBeforeDaemon() {
+        _ = try? daemonControlClient.sentryStop()
+        _ = try? daemonControlClient.powerAssertionStop()
+        sentinelAppManager.stop()
     }
 
     private func handleStatus(_ args: [String]) -> CLIResult {
@@ -397,6 +408,19 @@ public final class CicadaCLI {
             }
         }
 
+        if let sentryCommand = RemoteCommand(rawValue: command), sentryCommand.isSentryCommand {
+            do {
+                let response = try daemonControlResponse(for: sentryCommand)
+                let result = response.commandResult ?? CommandExecutionResult(
+                    success: response.ok,
+                    message: response.error ?? (response.ok ? "Sentinel 操作成功" : "Sentinel 操作失败")
+                )
+                return cliResult(from: result)
+            } catch {
+                return .failure("daemon 未运行或控制通道不可用，无法执行 \(command)。请先运行: cicada start")
+            }
+        }
+
         let result = commandExecutor.execute(command: command)
         if let config = try? configStore.load(), config.showNotifications {
             let level: NotificationLevel = result.success ? .success : .error
@@ -409,6 +433,23 @@ public final class CicadaCLI {
             )
         }
         return cliResult(from: result)
+    }
+
+    private func daemonControlResponse(for command: RemoteCommand) throws -> DaemonControlResponse {
+        switch command {
+        case .sentryStart:
+            return try daemonControlClient.sentryStart()
+        case .sentryStop:
+            return try daemonControlClient.sentryStop()
+        case .sentryStatus:
+            return try daemonControlClient.sentryStatus()
+        case .sentryUnlock:
+            return try daemonControlClient.sentryUnlock()
+        case .sentryOpen:
+            return try daemonControlClient.sentryOpen()
+        default:
+            return try daemonControlClient.sentryStatus()
+        }
     }
 
     private func handleAdvanced(_ args: [String]) -> CLIResult {
