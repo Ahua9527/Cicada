@@ -25,6 +25,11 @@ export const SUPPORTED_COMMANDS: ReadonlySet<CommandType | string> = new Set([
   'caffeinate',
   'decaffeinate',
   'status',
+  'sentry_start',
+  'sentry_stop',
+  'sentry_status',
+  'sentry_unlock',
+  'sentry_open',
 ]);
 
 /**

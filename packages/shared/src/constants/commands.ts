@@ -30,6 +30,11 @@ export const AUTHORITATIVE_COMMANDS: readonly CommandType[] = [
   'caffeinate',
   'decaffeinate',
   'status',
+  'sentry_start',
+  'sentry_stop',
+  'sentry_status',
+  'sentry_unlock',
+  'sentry_open',
 ] as const;
 
 /**
@@ -50,6 +55,11 @@ export const COMMAND_DESCRIPTIONS: Readonly<Record<CommandType, string>> = {
   caffeinate: '保持唤醒',
   decaffeinate: '允许休眠',
   status: '获取设备状态',
+  sentry_start: '启动哨兵',
+  sentry_stop: '停止哨兵',
+  sentry_status: '获取哨兵状态',
+  sentry_unlock: '解除哨兵告警',
+  sentry_open: '打开哨兵窗口',
 } as const;
 
 /**
@@ -60,6 +70,7 @@ export const COMMAND_CATEGORIES = {
   POWER: ['caffeinate', 'decaffeinate'] as const,
   HARDWARE: ['bt_toggle', 'volume_mute'] as const,
   UTILITY: ['ping', 'status'] as const,
+  SENTRY: ['sentry_start', 'sentry_stop', 'sentry_status', 'sentry_unlock', 'sentry_open'] as const,
 } as const;
 
 /**
@@ -101,4 +112,3 @@ export function getCommandDescription(cmd: CommandType): string {
 export function getDeprecatedCommandReplacement(cmd: string): CommandType | undefined {
   return DEPRECATED_COMMANDS[cmd as keyof typeof DEPRECATED_COMMANDS] as CommandType | undefined;
 }
-
