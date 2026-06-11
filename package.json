@@ -7,7 +7,7 @@
     "build": "pnpm run build:relay && pnpm run build:agent",
     "test": "pnpm run test:relay && pnpm run test:agent",
     "lint": "pnpm run lint:relay && pnpm run lint:agent",
-    "clean": "pnpm --filter @cicada/relay run clean && rm -rf packages/shared/dist packages/shared/*.tsbuildinfo apps/relay/*.tsbuildinfo apps/relay/.wrangler apps/agent/swift/.build apps/agent/native/notification-agent/.build",
+    "clean": "pnpm --filter @cicada/relay run clean && rm -rf packages/shared/dist packages/shared/*.tsbuildinfo apps/relay/*.tsbuildinfo apps/relay/.wrangler apps/agent/swift/.build apps/agent/native/sentinel-app/.build",
     "build:relay": "pnpm --filter @cicada/relay run build",
     "lint:relay": "pnpm --filter @cicada/relay run lint",
     "test:relay": "pnpm --filter @cicada/relay run test",

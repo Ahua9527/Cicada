@@ -19,13 +19,16 @@ private final class FakeDaemonManager: DaemonManaging {
     func logPaths() -> [String] { ["/tmp/daemon.log"] }
 }
 
-private final class FakeNotifierManager: NotifierManaging {
-    var statusValue = NotifierStatus(
+private final class FakeSentinelAppManager: SentinelAppManaging {
+    var statusValue = SentinelAppStatus(
         installed: true,
         running: true,
-        plistPath: "/tmp/notifier.plist",
-        binaryPath: "/tmp/cicada-notifier",
-        socketPath: "/tmp/notifier.sock"
+        plistPath: "/tmp/sentinel.plist",
+        appPath: "/tmp/Sentry.app",
+        socketPath: "/tmp/notifier.sock",
+        sentinelSocketPath: "/tmp/sentinel.sock",
+        notifierSocketReady: true,
+        sentinelSocketReady: true
     )
     private(set) var calls: [String] = []
 
@@ -34,7 +37,7 @@ private final class FakeNotifierManager: NotifierManaging {
     func stop() { calls.append("stop") }
     func restart() throws { calls.append("restart") }
     func uninstall() { calls.append("uninstall") }
-    func status() -> NotifierStatus { statusValue }
+    func status() -> SentinelAppStatus { statusValue }
 }
 
 private final class FakeSleepHoldManager: SleepHoldManaging {
@@ -184,11 +187,11 @@ final class CicadaCLITests: XCTestCase {
         let fixture = CLIFixture()
         _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
         fixture.daemon.statusValue = DaemonStatus(installed: false, running: false, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
-        fixture.notifier.statusValue = NotifierStatus(
+        fixture.sentinelApp.statusValue = SentinelAppStatus(
             installed: false,
             running: false,
-            plistPath: "/tmp/notifier.plist",
-            binaryPath: "/tmp/cicada-notifier",
+            plistPath: "/tmp/sentinel.plist",
+            appPath: "/tmp/Sentry.app",
             socketPath: "/tmp/notifier.sock"
         )
 
@@ -196,7 +199,7 @@ final class CicadaCLITests: XCTestCase {
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(fixture.daemon.calls, ["install", "start"])
-        XCTAssertEqual(fixture.notifier.calls, ["install", "start"])
+        XCTAssertEqual(fixture.sentinelApp.calls, ["install", "start"])
     }
 
     func testStatusJSONIncludesHealthSections() throws {
@@ -210,7 +213,11 @@ final class CicadaCLITests: XCTestCase {
         XCTAssertEqual(object["health"] as? String, "ready")
         XCTAssertNotNil(object["config"])
         XCTAssertNotNil(object["daemon"])
-        XCTAssertNotNil(object["notifier"])
+        let sentinel = try XCTUnwrap(object["sentinel"] as? [String: Any])
+        XCTAssertEqual(sentinel["notifierSocketPath"] as? String, "/tmp/notifier.sock")
+        XCTAssertEqual(sentinel["notifierSocketReady"] as? Bool, true)
+        XCTAssertEqual(sentinel["controlSocketPath"] as? String, "/tmp/sentinel.sock")
+        XCTAssertEqual(sentinel["controlSocketReady"] as? Bool, true)
         XCTAssertNotNil(object["nativeCapabilities"])
         XCTAssertNotNil(object["sleepHold"])
     }
@@ -252,9 +259,20 @@ final class CicadaCLITests: XCTestCase {
 
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "config", "path"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "daemon", "logs"]).exitCode, 0)
-        XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "notifier", "status"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "sleep", "status"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "doctor", "--json"]).exitCode, 0)
+    }
+
+    func testAdvancedNotifierCommandsAreRemoved() {
+        let fixture = CLIFixture()
+
+        let help = fixture.cli.run(arguments: ["advanced", "--help"])
+        let result = fixture.cli.run(arguments: ["advanced", "notifier", "status"])
+
+        XCTAssertEqual(help.exitCode, 0)
+        XCTAssertFalse(help.stdout.contains("advanced notifier"))
+        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertTrue(result.stderr.contains("未知 advanced 命令: notifier"))
     }
 
     func testAdvancedSleepHelpListsFullSleepHoldServiceCapabilities() {
@@ -294,7 +312,7 @@ private final class CLIFixture {
     let directory: URL
     let configStore: ConfigStore
     let daemon = FakeDaemonManager()
-    let notifier = FakeNotifierManager()
+    let sentinelApp = FakeSentinelAppManager()
     let sleepHold = FakeSleepHoldManager()
     let daemonControl = FakeDaemonControlClient()
     let commandExecutor = FakeCommandExecutor()
@@ -307,7 +325,7 @@ private final class CLIFixture {
         cli = CicadaCLI(
             configStore: configStore,
             daemonManager: daemon,
-            notifierManager: notifier,
+            sentinelAppManager: sentinelApp,
             sleepHoldManager: sleepHold,
             daemonControlClient: daemonControl,
             commandExecutor: commandExecutor,

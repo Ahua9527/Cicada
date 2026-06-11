@@ -25,8 +25,7 @@ for CANDIDATE in "/opt/homebrew/bin" "/usr/local/bin" "$HOME/.local/bin"; do
   fi
 done
 
-echo "[build] building notification agent (if swift is available)..."
-cd "$ROOT_DIR"
-bash "$ROOT_DIR/native/notification-agent/scripts/build.sh"
+echo "[build] building sentinel app (if xcodebuild is available)..."
+bash "$ROOT_DIR/native/sentinel-app/scripts/build.sh"
 
 echo "[build] done"

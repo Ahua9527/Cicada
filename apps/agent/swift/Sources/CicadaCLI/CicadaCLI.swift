@@ -15,13 +15,13 @@ public protocol DaemonManaging {
     func logPaths() -> [String]
 }
 
-public protocol NotifierManaging {
+public protocol SentinelAppManaging {
     func install() throws
     func start() throws
     func stop()
     func restart() throws
     func uninstall()
-    func status() -> NotifierStatus
+    func status() -> SentinelAppStatus
 }
 
 public protocol DaemonControlClienting {
@@ -42,9 +42,9 @@ extension DaemonManager: DaemonManaging {
     }
 }
 
-extension NotifierManager: NotifierManaging {
+extension SentinelAppManager: SentinelAppManaging {
     public func install() throws {
-        try install(sourceBinaryPath: nil)
+        try install(sourceAppPath: nil)
     }
 }
 extension UdsDaemonControlClient: DaemonControlClienting {}
@@ -65,7 +65,7 @@ public struct CLIResult: Equatable {
 public final class CicadaCLI {
     private let configStore: ConfigStore
     private let daemonManager: any DaemonManaging
-    private let notifierManager: any NotifierManaging
+    private let sentinelAppManager: any SentinelAppManaging
     private let sleepHoldManager: any SleepHoldManaging
     private let daemonControlClient: any DaemonControlClienting
     private let commandExecutor: any LocalCommandExecuting
@@ -77,7 +77,7 @@ public final class CicadaCLI {
         self.init(
             configStore: ConfigStore(),
             daemonManager: DaemonManager(),
-            notifierManager: NotifierManager(),
+            sentinelAppManager: SentinelAppManager(),
             sleepHoldManager: SleepHoldServiceManager(),
             daemonControlClient: UdsDaemonControlClient(),
             commandExecutor: MacOSCommandGateway(),
@@ -90,7 +90,7 @@ public final class CicadaCLI {
     public init(
         configStore: ConfigStore,
         daemonManager: any DaemonManaging,
-        notifierManager: any NotifierManaging,
+        sentinelAppManager: any SentinelAppManaging,
         sleepHoldManager: any SleepHoldManaging,
         daemonControlClient: any DaemonControlClienting,
         commandExecutor: any LocalCommandExecuting,
@@ -100,7 +100,7 @@ public final class CicadaCLI {
     ) {
         self.configStore = configStore
         self.daemonManager = daemonManager
-        self.notifierManager = notifierManager
+        self.sentinelAppManager = sentinelAppManager
         self.sleepHoldManager = sleepHoldManager
         self.daemonControlClient = daemonControlClient
         self.commandExecutor = commandExecutor
@@ -171,7 +171,6 @@ public final class CicadaCLI {
         Commands:
           cicada advanced config get|set|validate|path
           cicada advanced daemon install|start|stop|restart|status|uninstall|logs
-          cicada advanced notifier install|start|stop|restart|status|uninstall|test
           cicada advanced sleep install|uninstall|status|ping|create|extend|terminate
           cicada advanced doctor --json
         """
@@ -228,11 +227,11 @@ public final class CicadaCLI {
             }
             try daemonManager.start()
 
-            let notifierStatus = notifierManager.status()
-            if !notifierStatus.installed {
-                try notifierManager.install()
+            let sentinelStatus = sentinelAppManager.status()
+            if !sentinelStatus.installed {
+                try sentinelAppManager.install()
             }
-            try notifierManager.start()
+            try sentinelAppManager.start()
 
             return .success("Cicada 已启动。\n下一步: cicada shortcut create")
         } catch {
@@ -242,13 +241,13 @@ public final class CicadaCLI {
 
     private func handleStop() -> CLIResult {
         daemonManager.stop()
-        notifierManager.stop()
+        sentinelAppManager.stop()
         return .success("Cicada 已停止。")
     }
 
     private func handleRestart() -> CLIResult {
         daemonManager.stop()
-        notifierManager.stop()
+        sentinelAppManager.stop()
         return handleStart()
     }
 
@@ -262,7 +261,7 @@ public final class CicadaCLI {
         let health = report["health"] as? String ?? "unknown"
         let config = report["config"] as? [String: Any] ?? [:]
         let daemon = report["daemon"] as? [String: Any] ?? [:]
-        let notifier = report["notifier"] as? [String: Any] ?? [:]
+        let sentinel = report["sentinel"] as? [String: Any] ?? [:]
         let sleepHold = report["sleepHold"] as? [String: Any] ?? [:]
         let runtime = report["runtime"] as? [String: Any] ?? [:]
         let native = report["nativeCapabilities"] as? [String: Any] ?? [:]
@@ -270,7 +269,7 @@ public final class CicadaCLI {
             "Cicada: \(health)",
             "Config: \(boolText(config["valid"] as? Bool)) \(config["path"] as? String ?? "")",
             "Daemon: \(runningText(daemon))",
-            "Notifier: \(runningText(notifier))",
+            "Sentinel: \(runningText(sentinel))",
             "SleepHold: \(runningText(sleepHold)) \(sleepHold["powerStatus"] as? String ?? "unknown")",
             "Runtime: \(runtime["connectionState"] as? String ?? "unknown")",
             "Bluetooth: \(native["bluetooth"] as? String ?? "unknown")",
@@ -425,8 +424,6 @@ public final class CicadaCLI {
             return handleConfig(subArgs)
         case "daemon":
             return handleDaemon(subArgs)
-        case "notifier":
-            return handleNotifier(subArgs)
         case "sleep":
             return handleSleep(subArgs)
         case "doctor":
@@ -503,46 +500,6 @@ public final class CicadaCLI {
         }
     }
 
-    private func handleNotifier(_ args: [String]) -> CLIResult {
-        guard let action = args.first else {
-            return .failure("用法: cicada advanced notifier install|start|stop|restart|status|uninstall|test")
-        }
-        do {
-            switch action {
-            case "install":
-                try notifierManager.install()
-                return .success("notifier 已安装")
-            case "start":
-                try notifierManager.start()
-                return .success("notifier 已启动")
-            case "stop":
-                notifierManager.stop()
-                return .success("notifier 已停止")
-            case "restart":
-                try notifierManager.restart()
-                return .success("notifier 已重启")
-            case "status":
-                return .success(formatJSON(notifierObject(notifierManager.status())))
-            case "uninstall":
-                notifierManager.uninstall()
-                return .success("notifier 已卸载")
-            case "test":
-                let response = notifier.notifyQuick(
-                    source: "cli",
-                    level: .info,
-                    title: "Cicada 通知测试",
-                    message: "dynamic island 通知链路正常",
-                    durationMs: 2500
-                )
-                return response.ok ? .success("notifier 测试成功") : .failure("notifier 测试失败: \(response.code ?? "") \(response.error ?? "")")
-            default:
-                return .failure("用法: cicada advanced notifier install|start|stop|restart|status|uninstall|test")
-            }
-        } catch {
-            return .failure("notifier 操作失败: \(error)")
-        }
-    }
-
     private func handleSleep(_ args: [String]) -> CLIResult {
         guard let action = args.first else {
             return .failure("用法: cicada advanced sleep install|uninstall|status|ping|create|extend|terminate")
@@ -587,7 +544,7 @@ public final class CicadaCLI {
         let configExists = configStore.exists()
         let loadedConfig = try? configStore.load()
         let daemonStatus = daemonManager.status()
-        let notifierStatus = notifierManager.status()
+        let sentinelStatus = sentinelAppManager.status()
         let sleepHoldStatus = sleepHoldManager.status()
         let runtimeSnapshot = runtimeSnapshotLoader()
         var native = nativeCapabilities()
@@ -599,7 +556,7 @@ public final class CicadaCLI {
         let health: String = {
             if !configValid { return "needs_setup" }
             if !daemonStatus.running { return "stopped" }
-            if !notifierStatus.running { return "degraded" }
+            if !sentinelStatus.running { return "degraded" }
             return "ready"
         }()
 
@@ -624,7 +581,7 @@ public final class CicadaCLI {
                 "valid": configValid,
             ],
             "daemon": daemonObject(daemonStatus),
-            "notifier": notifierObject(notifierStatus),
+            "sentinel": sentinelObject(sentinelStatus),
             "sleepHold": sleepHoldObject(sleepHoldStatus),
             "runtime": runtime,
             "nativeCapabilities": native,
@@ -685,13 +642,17 @@ public final class CicadaCLI {
         ]
     }
 
-    private func notifierObject(_ status: NotifierStatus) -> [String: Any] {
+    private func sentinelObject(_ status: SentinelAppStatus) -> [String: Any] {
         [
             "installed": status.installed,
             "running": status.running,
             "plistPath": status.plistPath,
-            "binaryPath": status.binaryPath,
+            "appPath": status.appPath,
             "socketPath": status.socketPath,
+            "notifierSocketPath": status.notifierSocketPath,
+            "notifierSocketReady": status.notifierSocketReady,
+            "controlSocketPath": status.sentinelSocketPath,
+            "controlSocketReady": status.sentinelSocketReady,
         ]
     }
 

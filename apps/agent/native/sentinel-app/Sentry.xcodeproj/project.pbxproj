@@ -1,0 +1,583 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		60A000012E2F000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60A000012E2F000000000003 /* XCTest.framework */; };
+		50D001242DE0F18200BB8467 /* ColorfulX in Frameworks */ = {isa = PBXBuildFile; productRef = 50D001232DE0F18200BB8467 /* ColorfulX */; };
+		50D002042DE1000000BB8467 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 50D002032DE1000000BB8467 /* Pow */; };
+		50D002062DE1000000BB8467 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 50D002052DE1000000BB8467 /* Collections */; };
+		50D002082DE1000000BB8467 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 50D002072DE1000000BB8467 /* LaunchAtLogin */; };
+		50D0FD7E2DE0EEAE00BB8467 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 50D0FD7D2DE0EEAE00BB8467 /* SkyLightWindow */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		60A000012E2F000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 50D0FD5A2DE0ED6000BB8467 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50D0FD612DE0ED6000BB8467;
+			remoteInfo = Sentry;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		60A000012E2F000000000002 /* SentryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SentryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		60A000012E2F000000000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		50D0FD622DE0ED6000BB8467 /* Sentry.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sentry.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		50D001502DE0FDDE00BB8467 /* Exceptions for "Sentry" folder in "Sentry" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 50D0FD612DE0ED6000BB8467 /* Sentry */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		50D0FD642DE0ED6000BB8467 /* Sentry */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				50D001502DE0FDDE00BB8467 /* Exceptions for "Sentry" folder in "Sentry" target */,
+			);
+			path = Sentry;
+			sourceTree = "<group>";
+		};
+		60A000012E2F000000000004 /* SentryTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SentryTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		60A000012E2F000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60A000012E2F000000000001 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		50D0FD5F2DE0ED6000BB8467 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				50D0FD7E2DE0EEAE00BB8467 /* SkyLightWindow in Frameworks */,
+				50D001242DE0F18200BB8467 /* ColorfulX in Frameworks */,
+				50D002042DE1000000BB8467 /* Pow in Frameworks */,
+				50D002062DE1000000BB8467 /* Collections in Frameworks */,
+				50D002082DE1000000BB8467 /* LaunchAtLogin in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		50D0FD592DE0ED6000BB8467 = {
+			isa = PBXGroup;
+			children = (
+				50D0FD642DE0ED6000BB8467 /* Sentry */,
+				60A000012E2F000000000004 /* SentryTests */,
+				50D0FD632DE0ED6000BB8467 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		50D0FD632DE0ED6000BB8467 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				50D0FD622DE0ED6000BB8467 /* Sentry.app */,
+				60A000012E2F000000000002 /* SentryTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		60A000012E2F000000000008 /* SentryTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60A000012E2F00000000000D /* Build configuration list for PBXNativeTarget "SentryTests" */;
+			buildPhases = (
+				60A000012E2F000000000006 /* Sources */,
+				60A000012E2F000000000005 /* Frameworks */,
+				60A000012E2F000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				60A000012E2F00000000000A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				60A000012E2F000000000004 /* SentryTests */,
+			);
+			name = SentryTests;
+			packageProductDependencies = (
+			);
+			productName = SentryTests;
+			productReference = 60A000012E2F000000000002 /* SentryTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		50D0FD612DE0ED6000BB8467 /* Sentry */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 50D0FD6E2DE0ED6200BB8467 /* Build configuration list for PBXNativeTarget "Sentry" */;
+			buildPhases = (
+				50D0FD5E2DE0ED6000BB8467 /* Sources */,
+				50D0FD5F2DE0ED6000BB8467 /* Frameworks */,
+				50D0FD602DE0ED6000BB8467 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				50D0FD642DE0ED6000BB8467 /* Sentry */,
+			);
+			name = Sentry;
+			packageProductDependencies = (
+				50D0FD7D2DE0EEAE00BB8467 /* SkyLightWindow */,
+				50D001232DE0F18200BB8467 /* ColorfulX */,
+				50D002032DE1000000BB8467 /* Pow */,
+				50D002052DE1000000BB8467 /* Collections */,
+				50D002072DE1000000BB8467 /* LaunchAtLogin */,
+			);
+			productName = Sentry;
+			productReference = 50D0FD622DE0ED6000BB8467 /* Sentry.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		50D0FD5A2DE0ED6000BB8467 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					50D0FD612DE0ED6000BB8467 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					60A000012E2F000000000008 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 50D0FD612DE0ED6000BB8467;
+					};
+				};
+			};
+			buildConfigurationList = 50D0FD5D2DE0ED6000BB8467 /* Build configuration list for PBXProject "Sentry" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				"zh-Hans",
+			);
+			mainGroup = 50D0FD592DE0ED6000BB8467;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				50D0FD7C2DE0EEAE00BB8467 /* XCRemoteSwiftPackageReference "SkyLightWindow" */,
+				50D001222DE0F18200BB8467 /* XCRemoteSwiftPackageReference "ColorfulX" */,
+				50D002002DE1000000BB8467 /* XCRemoteSwiftPackageReference "Pow" */,
+				50D002012DE1000000BB8467 /* XCRemoteSwiftPackageReference "swift-collections" */,
+				50D002022DE1000000BB8467 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				50D0FD612DE0ED6000BB8467 /* Sentry */,
+				60A000012E2F000000000008 /* SentryTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		60A000012E2F000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		50D0FD602DE0ED6000BB8467 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		60A000012E2F000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		50D0FD5E2DE0ED6000BB8467 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		60A000012E2F00000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50D0FD612DE0ED6000BB8467 /* Sentry */;
+			targetProxy = 60A000012E2F000000000009 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		60A000012E2F00000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sentry.app/Contents/MacOS/Sentry";
+				TEST_TARGET_NAME = Sentry;
+			};
+			name = Debug;
+		};
+		60A000012E2F00000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sentry.app/Contents/MacOS/Sentry";
+				TEST_TARGET_NAME = Sentry;
+			};
+			name = Release;
+		};
+		50D0FD6C2DE0ED6200BB8467 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		50D0FD6D2DE0ED6200BB8467 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		50D0FD6F2DE0ED6200BB8467 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Sentry/Sentry.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 13;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sentry/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sentry;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sentry app needs this permission to record the space in front of your Mac. Your data will be stored locally.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Lakr Aream. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		50D0FD702DE0ED6200BB8467 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Sentry/Sentry.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 13;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sentry/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Sentry;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sentry app needs this permission to record the space in front of your Mac. Your data will be stored locally.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Lakr Aream. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		60A000012E2F00000000000D /* Build configuration list for PBXNativeTarget "SentryTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				60A000012E2F00000000000B /* Debug */,
+				60A000012E2F00000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		50D0FD5D2DE0ED6000BB8467 /* Build configuration list for PBXProject "Sentry" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				50D0FD6C2DE0ED6200BB8467 /* Debug */,
+				50D0FD6D2DE0ED6200BB8467 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		50D0FD6E2DE0ED6200BB8467 /* Build configuration list for PBXNativeTarget "Sentry" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				50D0FD6F2DE0ED6200BB8467 /* Debug */,
+				50D0FD702DE0ED6200BB8467 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		50D001222DE0F18200BB8467 /* XCRemoteSwiftPackageReference "ColorfulX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Lakr233/ColorfulX";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.7.0;
+			};
+		};
+		50D002022DE1000000BB8467 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
+		50D002002DE1000000BB8467 /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EmergeTools/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.6;
+			};
+		};
+		50D0FD7C2DE0EEAE00BB8467 /* XCRemoteSwiftPackageReference "SkyLightWindow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Lakr233/SkyLightWindow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		50D002012DE1000000BB8467 /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-collections.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		50D001232DE0F18200BB8467 /* ColorfulX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D001222DE0F18200BB8467 /* XCRemoteSwiftPackageReference "ColorfulX" */;
+			productName = ColorfulX;
+		};
+		50D002052DE1000000BB8467 /* Collections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D002012DE1000000BB8467 /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = Collections;
+		};
+		50D002072DE1000000BB8467 /* LaunchAtLogin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D002022DE1000000BB8467 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */;
+			productName = LaunchAtLogin;
+		};
+		50D002032DE1000000BB8467 /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D002002DE1000000BB8467 /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
+		};
+		50D0FD7D2DE0EEAE00BB8467 /* SkyLightWindow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D0FD7C2DE0EEAE00BB8467 /* XCRemoteSwiftPackageReference "SkyLightWindow" */;
+			productName = SkyLightWindow;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 50D0FD5A2DE0ED6000BB8467 /* Project object */;
+}
