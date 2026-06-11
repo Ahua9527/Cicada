@@ -21,7 +21,7 @@ export default {
   // TypeScript 支持配置
   preset: 'ts-jest',
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
+    '^.+\\.[tj]s$': ['ts-jest', {
       useESM: true,
     }],
   },

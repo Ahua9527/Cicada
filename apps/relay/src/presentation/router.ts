@@ -5,12 +5,16 @@
 
 import type { MiddlewareContext } from '../types';
 import {
+  BARK_ROUTE_METHODS,
+  handleBarkRoute,
   handleWebSocketRoute,
   handleStatusRoute,
   handleDeviceListRoute,
   handleHealthRoute,
   handleShortcutCommandRoute,
+  isBarkRequest,
 } from './routes';
+import { sanitizeRequestUrl } from './request-url-sanitizer';
 
 export interface Route {
   pattern: RegExp;
@@ -23,6 +27,11 @@ export interface Route {
  */
 export class Router {
   private routes: Route[] = [];
+  private barkRoute: Route = {
+    pattern: /^\/bark(?:\/.*)?$/,
+    methods: BARK_ROUTE_METHODS,
+    handler: handleBarkRoute,
+  };
 
   /**
    * Register routes
@@ -59,13 +68,14 @@ export class Router {
       const { request } = context;
       const url = new URL(request.url);
       const { pathname, method } = { pathname: url.pathname, method: request.method };
+      const sanitizedPathname = new URL(sanitizeRequestUrl(request.url, context.env)).pathname;
 
-      const route = this.findRoute(pathname, method);
+      const route = this.findRoute(pathname, method) ?? this.findBarkFallback(pathname, method, context);
 
       if (!route) {
         context.logger.warn('Route not found', {
           requestId: context.requestId,
-          context: { pathname, method },
+          context: { pathname: sanitizedPathname, method },
           tags: ['routing', 'error'],
         });
 
@@ -89,7 +99,7 @@ export class Router {
         context.logger.error('Route handler failed', {
           requestId: context.requestId,
           error: error as Error,
-          context: { pathname, method },
+          context: { pathname: sanitizedPathname, method },
           tags: ['routing', 'error'],
         });
 
@@ -107,5 +117,17 @@ export class Router {
         };
       }
     };
+  }
+
+  private findBarkFallback(
+    pathname: string,
+    method: string,
+    context: MiddlewareContext
+  ): Route | undefined {
+    if (!this.barkRoute.methods.includes(method)) {
+      return undefined;
+    }
+
+    return isBarkRequest(pathname, context.env) ? this.barkRoute : undefined;
   }
 }

@@ -4,6 +4,7 @@
 
 import type { Middleware, MiddlewareResult } from './types';
 import { extractResponse } from './types';
+import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
 
 /**
  * 安全头中间件
@@ -48,13 +49,14 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
       if (contentLength) {
         const size = parseInt(contentLength);
         if (size > maxSize) {
+          const sanitizedUrl = new URL(sanitizeRequestUrl(context.url, context.env));
           context.logger.warn('Request body too large', {
             requestId: context.requestId,
             context: {
               size,
               maxSize,
               method: context.method,
-              path: context.url.pathname,
+              path: sanitizedUrl.pathname,
             },
             tags: ['security', 'request-size'],
           });

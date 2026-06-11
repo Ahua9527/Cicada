@@ -7,6 +7,7 @@ import {
   requestIdMiddleware,
   corsMiddleware,
   securityHeadersMiddleware,
+  requestSizeLimitMiddleware,
   createDefaultPipeline,
 } from '../../../src/infrastructure/middleware';
 import { MiddlewareContext } from '../../../src/infrastructure/middleware/types';
@@ -115,6 +116,61 @@ describe('Middleware', () => {
       expect(capturedId.startsWith('req_')).toBe(true);
       expect((result as any).continue).toBe(true);
     });
+
+    it('should redact Bark secrets from request start logs', async () => {
+      const middleware = requestIdMiddleware();
+      const request = new Request(
+        'http://localhost/bark/devicekey/Front%20Door/Motion?devicetoken=abc123&group=sentry'
+      );
+      const logger = new Logger({ enableConsole: false });
+      const url = new URL(request.url);
+
+      const ctx: MiddlewareContext = {
+        request,
+        env: {} as any,
+        requestId: '',
+        logger,
+        timestamp: Date.now(),
+        url,
+        method: 'GET',
+        headers: {},
+      };
+
+      await middleware(ctx, async () => ({ continue: true }));
+
+      const [entry] = logger.getRecentLogs(1);
+      expect(entry.message).toBe('Request started: GET /bark/[device_key]/[payload]');
+      expect(entry.context?.url).toBe(
+        'http://localhost/bark/[device_key]/[payload]?devicetoken=%5BFILTERED%5D&group=%5BFILTERED%5D'
+      );
+    });
+
+    it('should redact legacy /bark request start logs when Bark uses a custom root', async () => {
+      const middleware = requestIdMiddleware();
+      const request = new Request(
+        'http://localhost/bark/devicekey/Front%20Door/Motion?devicetoken=abc123&group=sentry'
+      );
+      const logger = new Logger({ enableConsole: false });
+      const url = new URL(request.url);
+
+      const ctx: MiddlewareContext = {
+        request,
+        env: { BARK_ROOT_PATH: '/push' } as any,
+        requestId: '',
+        logger,
+        timestamp: Date.now(),
+        url,
+        method: 'GET',
+        headers: {},
+      };
+
+      await middleware(ctx, async () => ({ continue: true }));
+
+      const [entry] = logger.getRecentLogs(1);
+      expect(entry.message).toBe('Request started: GET /bark/[device_key]/[payload]');
+      expect(entry.context?.url).not.toContain('devicekey');
+      expect(entry.context?.url).not.toContain('abc123');
+    });
   });
 
   describe('securityHeadersMiddleware', () => {
@@ -146,6 +202,39 @@ describe('Middleware', () => {
 
       expect(nextCalled).toBe(true);
       expect((result as any).response).toBeDefined();
+    });
+  });
+
+  describe('requestSizeLimitMiddleware', () => {
+    it('should redact Bark paths when request size logs are emitted', async () => {
+      const middleware = requestSizeLimitMiddleware({ maxSize: 4 });
+      const request = new Request(
+        'http://localhost/bark/devicekey/Front%20Door/Motion?devicetoken=abc123',
+        {
+          method: 'POST',
+          headers: { 'content-length': '8' },
+          body: 'oversize',
+        }
+      );
+      const logger = new Logger({ enableConsole: false });
+      const url = new URL(request.url);
+
+      const ctx: MiddlewareContext = {
+        request,
+        env: {} as any,
+        requestId: 'test-id',
+        logger,
+        timestamp: Date.now(),
+        url,
+        method: 'POST',
+        headers: {},
+      };
+
+      const result = await middleware(ctx, async () => ({ continue: true }));
+      const [entry] = logger.getRecentLogs(1);
+
+      expect((result as any).response.status).toBe(413);
+      expect(entry.context?.path).toBe('/bark/[device_key]/[payload]');
     });
   });
 

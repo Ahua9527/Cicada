@@ -16,6 +16,8 @@ import {
   requestSizeLimitMiddleware,
 } from '../infrastructure/middleware';
 import { Router } from './router';
+import { BARK_ROUTE_METHODS } from './routes';
+import { sanitizeRequestUrl } from './request-url-sanitizer';
 import { API_CONSTANTS } from '../config/constants';
 
 /**
@@ -72,10 +74,11 @@ export class CicadaRelayApp {
       pipeline.use(
         corsMiddleware({
           allowedOrigins,
-          allowedMethods: ['GET', 'POST', 'OPTIONS'],
+          allowedMethods: BARK_ROUTE_METHODS,
           allowedHeaders: [
             'Content-Type',
             'Authorization',
+            'mcp-session-id',
             'X-Request-ID',
             'X-Device-ID',
             'X-Agent-Identity-Public-Key',
@@ -108,7 +111,7 @@ export class CicadaRelayApp {
    * Handle request
    */
   // eslint-disable-next-line no-undef
-  async handle(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const requestId = this.generateRequestId();
 
@@ -121,6 +124,7 @@ export class CicadaRelayApp {
       url,
       method: request.method,
       headers: this.parseHeaders(request.headers),
+      executionContext: ctx,
     };
 
     try {
@@ -128,7 +132,7 @@ export class CicadaRelayApp {
         requestId,
         context: {
           method: request.method,
-          url: this.sanitizeUrl(request.url),
+          url: this.sanitizeUrl(request.url, env),
           userAgent: request.headers.get('User-Agent'),
           ip: request.headers.get('CF-Connecting-IP'),
         },
@@ -154,7 +158,7 @@ export class CicadaRelayApp {
       this.logger.error('Request handling failed', {
         requestId,
         error: error as Error,
-        context: { method: request.method, url: this.sanitizeUrl(request.url) },
+        context: { method: request.method, url: this.sanitizeUrl(request.url, env) },
         tags: ['request', 'error'],
       });
 
@@ -196,17 +200,7 @@ export class CicadaRelayApp {
     return result;
   }
 
-  private sanitizeUrl(rawUrl: string): string {
-    const url = new URL(rawUrl);
-    if (url.pathname.startsWith('/relay/')) {
-      const [, relay, ...rest] = url.pathname.split('/');
-      url.pathname = `/${relay}/[session]${rest.length > 1 ? `/${rest.slice(1).join('/')}` : ''}`;
-    }
-    for (const key of ['api_key', 'nonce', 'signature', 'token', 'code']) {
-      if (url.searchParams.has(key)) {
-        url.searchParams.set(key, '[FILTERED]');
-      }
-    }
-    return url.toString();
+  private sanitizeUrl(rawUrl: string, env: Env = this.env ?? ({} as Env)): string {
+    return sanitizeRequestUrl(rawUrl, env);
   }
 }

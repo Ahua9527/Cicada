@@ -13,6 +13,19 @@ class_name = "CicadaSessionManager"
 tag = "v1"
 new_sqlite_classes = ["CicadaSessionManager"]
 
+# Bark Worker vendor D1 binding. Replace the account-specific database_id after
+# creating the database with `wrangler d1 create cicada-bark`.
+[[d1_databases]]
+binding = "BARK_DATABASE"
+database_name = "cicada-bark"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "vendor/bark-worker/migrations"
+
+# Bark routing defaults to /bark/* when BARK_ROOT_PATH is unset.
+# [vars]
+# BARK_ROOT_PATH = "/bark"
+# BARK_APNS_TOPIC = "me.fin.bark"
+
 # KV namespace for global state (可选)
 # [[kv_namespaces]]
 # binding = "CICADA_RELAY_GLOBAL"

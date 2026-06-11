@@ -267,6 +267,37 @@ describe('API Integration Tests', () => {
 
       expect(sanitized).toBe('https://relay.example/relay/[session]');
     });
+
+    it('should redact Bark device tokens, device keys, and notification path payloads', () => {
+      const sanitized = (app as any).sanitizeUrl(
+        'https://relay.example/bark/devicekey/Front%20Door/Motion?devicetoken=abc123&group=sentry'
+      );
+
+      expect(sanitized).toBe(
+        'https://relay.example/bark/[device_key]/[payload]?devicetoken=%5BFILTERED%5D&group=%5BFILTERED%5D'
+      );
+    });
+
+    it('should redact Bark batch push query payloads', () => {
+      const sanitized = (app as any).sanitizeUrl(
+        'https://relay.example/bark/push?device_keys=alpha,beta&title=Alarm&body=Motion&visible=yes'
+      );
+
+      expect(sanitized).toBe(
+        'https://relay.example/bark/push?device_keys=%5BFILTERED%5D&title=%5BFILTERED%5D&body=%5BFILTERED%5D&visible=yes'
+      );
+    });
+
+    it('should redact legacy /bark paths when Bark is mounted elsewhere', () => {
+      const customRootApp = new CicadaRelayApp({ ...mockEnv, BARK_ROOT_PATH: '/push' } as Env);
+      const sanitized = (customRootApp as any).sanitizeUrl(
+        'https://relay.example/bark/devicekey/Front%20Door/Motion?devicetoken=abc123&group=sentry'
+      );
+
+      expect(sanitized).toBe(
+        'https://relay.example/bark/[device_key]/[payload]?devicetoken=%5BFILTERED%5D&group=%5BFILTERED%5D'
+      );
+    });
   });
 
   describe('Request Validation', () => {

@@ -20,7 +20,7 @@
     },
     "composite": true
   },
-  "include": ["src/**/*", "test/**/*", "../../packages/shared/src/**/*"],
+  "include": ["src/**/*", "test/**/*", "vendor/bark-worker/main.js", "../../packages/shared/src/**/*"],
   "exclude": ["dist", "coverage", "../../packages/shared/dist", "../../packages/shared/node_modules"],
   "references": [
     { "path": "../../packages/shared" }
