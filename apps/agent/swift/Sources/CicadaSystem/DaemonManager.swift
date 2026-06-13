@@ -100,17 +100,7 @@ public final class DaemonManager {
     }
 
     private func resolveSourceBinaryPath(_ explicitPath: String?) -> String {
-        if let explicitPath, !explicitPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return explicitPath
-        }
-        let buildPath = FileManager.default.currentDirectoryPath + "/swift/.build/release/cicada-agent"
-        if FileManager.default.fileExists(atPath: buildPath) {
-            return buildPath
-        }
-        if FileManager.default.fileExists(atPath: RuntimePaths.daemonBinaryPath) {
-            return RuntimePaths.daemonBinaryPath
-        }
-        return buildPath
+        RuntimePaths.resolveDaemonSourceBinaryPath(explicitPath: explicitPath)
     }
 
     private func daemonPlist(binaryPath: String) -> String {

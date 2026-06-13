@@ -219,14 +219,7 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
     }
 
     private func resolveSourceBinaryPath() -> String {
-        let candidates = [
-            fm.currentDirectoryPath + "/swift/.build/release/cicada-sleephold",
-            fm.currentDirectoryPath + "/.build/release/cicada-sleephold",
-            fm.currentDirectoryPath + "/apps/agent/swift/.build/release/cicada-sleephold",
-            RuntimePaths.sleepHoldStagingBinaryPath,
-            RuntimePaths.sleepHoldBinaryPath,
-        ]
-        return candidates.first { fm.fileExists(atPath: $0) } ?? candidates[0]
+        RuntimePaths.resolveSleepHoldSourceBinaryPath()
     }
 
     private func sleepHoldPlist() -> String {

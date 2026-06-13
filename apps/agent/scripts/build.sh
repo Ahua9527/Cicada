@@ -26,6 +26,6 @@ for CANDIDATE in "/opt/homebrew/bin" "/usr/local/bin" "$HOME/.local/bin"; do
 done
 
 echo "[build] building sentinel app (if xcodebuild is available)..."
-bash "$ROOT_DIR/native/sentinel-app/scripts/build.sh"
+CICADA_HELPERS_SOURCE_DIR="$ROOT_DIR/swift/.build/release" bash "$ROOT_DIR/native/sentinel-app/scripts/build.sh"
 
 echo "[build] done"
