@@ -42,7 +42,6 @@ class NotchViewModel: NSObject, ObservableObject {
     enum ContentType: Int, Codable, Hashable, Equatable {
         case normal
         case menu
-        case settings
         case notification
     }
 
@@ -97,7 +96,10 @@ class NotchViewModel: NSObject, ObservableObject {
     }
 
     func showSettings() {
-        contentType = .settings
+        notchClose()
+        Task { @MainActor in
+            _ = SentryControlCenterRouter.shared.open(.notchDrop)
+        }
     }
 
     func showNotification(_ payload: NotchDropNotificationPayload) {
@@ -123,8 +125,8 @@ class NotchViewModel: NSObject, ObservableObject {
         case .normal:
             contentType = .menu
         case .menu:
-            contentType = .settings
-        case .settings, .notification:
+            showSettings()
+        case .notification:
             contentType = .normal
         }
     }

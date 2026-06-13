@@ -6,8 +6,26 @@ struct SentinelMenuBarView: View {
     @ObservedObject private var vm = ViewModel.shared
 
     var body: some View {
-        Button("Open Window") {
-            _ = controller.openMainWindow()
+        Button("Open Control Center") {
+            _ = SentryControlCenterRouter.shared.open(.overview)
+        }
+
+        Menu("Settings") {
+            Button("Alarms") {
+                _ = SentryControlCenterRouter.shared.open(.alarms)
+            }
+            Button("Notifications") {
+                _ = SentryControlCenterRouter.shared.open(.notifications)
+            }
+            Button("Recordings") {
+                _ = SentryControlCenterRouter.shared.open(.recordings)
+            }
+            Button("NotchDrop") {
+                _ = SentryControlCenterRouter.shared.open(.notchDrop)
+            }
+            Button("Maintenance") {
+                _ = SentryControlCenterRouter.shared.open(.maintenance)
+            }
         }
 
         Divider()
@@ -24,22 +42,6 @@ struct SentinelMenuBarView: View {
             _ = controller.unlockAlarm()
         }
         .disabled(vm.status != .activityDetected)
-
-        Button("Open Recording Folder") {
-            controller.openSavedClips()
-        }
-
-        Button("Open NotchDrop Folder") {
-            controller.openNotchDropFolder()
-        }
-
-        Button("Clear NotchDrop Tray") {
-            controller.clearNotchDropTray()
-        }
-
-        Button("Show Auto Sleep Status") {
-            controller.showSleepHoldStatus()
-        }
 
         Divider()
 

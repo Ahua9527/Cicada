@@ -24,9 +24,6 @@ struct NotchContentView: View {
             case .menu:
                 NotchMenuView(vm: vm)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
-            case .settings:
-                NotchSettingsView(vm: vm)
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
             case .notification:
                 if let payload = vm.notificationPayload {
                     NotchDropNotificationView(payload: payload, vm: vm)

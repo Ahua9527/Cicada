@@ -13,11 +13,7 @@ struct NotchHeaderView: View {
 
     var body: some View {
         HStack {
-            Text(
-                vm.contentType == .settings
-                    ? "Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown") (Build: \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"))"
-                    : "Notch Drop"
-            )
+            Text("Notch Drop")
             .contentTransition(.numericText())
             Spacer()
             Image(systemName: "ellipsis")
