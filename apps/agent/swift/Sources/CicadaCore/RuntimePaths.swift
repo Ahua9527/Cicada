@@ -10,6 +10,8 @@ public enum RuntimePaths {
     public static let cliBinaryName = "cicada"
     public static let daemonBinaryName = "cicada-agent"
     public static let sleepHoldBinaryName = "cicada-sleephold"
+    public static let sentinelAppName = "Cicada.app"
+    public static let legacySentinelAppName = "Sentry.app"
 
     public static let configPath = cicadaHome + "/config.json"
     public static let agentIdentityPath = cicadaHome + "/agent.identity.json"
@@ -19,7 +21,8 @@ public enum RuntimePaths {
     public static let sentinelSocketPath = runDir + "/sentinel.sock"
     public static let cliBinaryPath = binDir + "/" + cliBinaryName
     public static let daemonBinaryPath = binDir + "/" + daemonBinaryName
-    public static let sentinelAppPath = cicadaHome + "/apps/Sentry.app"
+    public static let sentinelAppPath = cicadaHome + "/apps/" + sentinelAppName
+    public static let legacySentinelAppPath = cicadaHome + "/apps/" + legacySentinelAppName
     public static let sentinelHelpersDir = sentinelAppPath + "/Contents/Helpers"
     public static let bundledCLIHelperPath = sentinelHelpersDir + "/" + cliBinaryName
     public static let bundledDaemonHelperPath = sentinelHelpersDir + "/" + daemonBinaryName
@@ -49,6 +52,10 @@ public enum RuntimePaths {
         appPath + "/Contents/Helpers/" + name
     }
 
+    public static var sentinelAppPathCandidates: [String] {
+        uniquePaths([sentinelAppPath, legacySentinelAppPath])
+    }
+
     public static func currentSentryAppPath(
         executablePath: String = CommandLine.arguments.first ?? "",
         bundlePath: String = Bundle.main.bundlePath,
@@ -74,7 +81,9 @@ public enum RuntimePaths {
         if let currentAppPath {
             candidates.append(helperPath(name: name, inApp: currentAppPath))
         }
-        candidates.append(helperPath(name: name, inApp: sentinelAppPath))
+        for appPath in sentinelAppPathCandidates {
+            candidates.append(helperPath(name: name, inApp: appPath))
+        }
         return uniquePaths(candidates)
     }
 

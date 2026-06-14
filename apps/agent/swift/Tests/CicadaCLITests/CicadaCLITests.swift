@@ -30,7 +30,7 @@ private final class FakeSentinelAppManager: SentinelAppManaging {
         installed: true,
         running: true,
         plistPath: "/tmp/sentinel.plist",
-        appPath: "/tmp/Sentry.app",
+        appPath: "/tmp/Cicada.app",
         socketPath: "/tmp/notifier.sock",
         sentinelSocketPath: "/tmp/sentinel.sock",
         notifierSocketReady: true,
@@ -238,7 +238,7 @@ final class CicadaCLITests: XCTestCase {
             installed: false,
             running: false,
             plistPath: "/tmp/sentinel.plist",
-            appPath: "/tmp/Sentry.app",
+            appPath: "/tmp/Cicada.app",
             socketPath: "/tmp/notifier.sock"
         )
 

@@ -28,7 +28,7 @@
 /* Begin PBXFileReference section */
 		60A000012E2F000000000002 /* SentryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SentryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		60A000012E2F000000000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
-		50D0FD622DE0ED6000BB8467 /* Sentry.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sentry.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		50D0FD622DE0ED6000BB8467 /* Cicada.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cicada.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,7 +93,7 @@
 		50D0FD632DE0ED6000BB8467 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				50D0FD622DE0ED6000BB8467 /* Sentry.app */,
+				50D0FD622DE0ED6000BB8467 /* Cicada.app */,
 				60A000012E2F000000000002 /* SentryTests.xctest */,
 			);
 			name = Products;
@@ -149,7 +149,7 @@
 				50D002072DE1000000BB8467 /* LaunchAtLogin */,
 			);
 			productName = Sentry;
-			productReference = 50D0FD622DE0ED6000BB8467 /* Sentry.app */;
+			productReference = 50D0FD622DE0ED6000BB8467 /* Cicada.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -259,7 +259,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sentry.app/Contents/MacOS/Sentry";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cicada.app/Contents/MacOS/Cicada";
 				TEST_TARGET_NAME = Sentry;
 			};
 			name = Debug;
@@ -283,7 +283,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sentry.app/Contents/MacOS/Sentry";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cicada.app/Contents/MacOS/Cicada";
 				TEST_TARGET_NAME = Sentry;
 			};
 			name = Release;
@@ -424,10 +424,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Sentry/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Sentry;
+				INFOPLIST_KEY_CFBundleDisplayName = Cicada;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Sentry app needs this permission to record the space in front of your Mac. Your data will be stored locally.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cicada needs this permission to record the space in front of your Mac. Your data will be stored locally.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Lakr Aream. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -436,7 +436,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Sentry;
+				PRODUCT_NAME = Cicada;
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -457,10 +458,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Sentry/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Sentry;
+				INFOPLIST_KEY_CFBundleDisplayName = Cicada;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Sentry app needs this permission to record the space in front of your Mac. Your data will be stored locally.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Cicada needs this permission to record the space in front of your Mac. Your data will be stored locally.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Lakr Aream. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -469,7 +470,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cicada.sentinel;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Sentry;
+				PRODUCT_NAME = Cicada;
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

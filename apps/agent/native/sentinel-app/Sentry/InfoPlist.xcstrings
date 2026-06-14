@@ -8,13 +8,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Sentry"
+            "value" : "Cicada"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sentry"
+            "value" : "Cicada"
           }
         }
       }
@@ -26,13 +26,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Sentry"
+            "value" : "Cicada"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sentry"
+            "value" : "Cicada"
           }
         }
       }
@@ -44,13 +44,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Sentry app needs this permission to record the space in front of your Mac. Your data will be stored locally."
+            "value" : "Cicada needs this permission to record the space in front of your Mac. Your data will be stored locally."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sentry 需要这个权限才能录制电脑前的内容。录制内容将被保存到本地。"
+            "value" : "Cicada 需要这个权限才能录制电脑前的内容。录制内容将被保存到本地。"
           }
         }
       }

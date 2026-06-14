@@ -39,6 +39,8 @@ struct SentinelAppRuntimePaths {
     let runDir: String
     let sentinelLabel: String
     let sentinelAppPath: String
+    let legacySentinelAppPath: String
+    let sentinelExecutableName: String
     let sentinelPlistPath: String
     let sentinelStdoutPath: String
     let sentinelStderrPath: String
@@ -54,6 +56,8 @@ struct SentinelAppRuntimePaths {
         runDir: RuntimePaths.runDir,
         sentinelLabel: RuntimePaths.sentinelLabel,
         sentinelAppPath: RuntimePaths.sentinelAppPath,
+        legacySentinelAppPath: RuntimePaths.legacySentinelAppPath,
+        sentinelExecutableName: "Cicada",
         sentinelPlistPath: RuntimePaths.sentinelPlistPath,
         sentinelStdoutPath: RuntimePaths.sentinelStdoutPath,
         sentinelStderrPath: RuntimePaths.sentinelStderrPath,
@@ -110,7 +114,8 @@ public final class SentinelAppManager {
             }
             try fm.copyItem(atPath: source, toPath: paths.sentinelAppPath)
         }
-        _ = chmod(executablePath(appPath: paths.sentinelAppPath), 0o755)
+        try removeLegacySentinelAppIfNeeded()
+        try normalizeInstalledAppBundle()
 
         let plist = sentinelPlist(appPath: paths.sentinelAppPath)
         try plist.write(toFile: paths.sentinelPlistPath, atomically: true, encoding: .utf8)
@@ -198,19 +203,76 @@ public final class SentinelAppManager {
         if let explicitPath, !explicitPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return explicitPath
         }
-        let buildPath = FileManager.default.currentDirectoryPath
-            + "/native/sentinel-app/.build/DerivedData/Build/Products/Release/Sentry.app"
-        if fm.fileExists(atPath: buildPath) {
-            return buildPath
+        let productsDir = FileManager.default.currentDirectoryPath
+            + "/native/sentinel-app/.build/DerivedData/Build/Products/Release"
+        let candidates = [
+            productsDir + "/" + RuntimePaths.sentinelAppName,
+            productsDir + "/" + RuntimePaths.legacySentinelAppName,
+            paths.sentinelAppPath,
+            paths.legacySentinelAppPath,
+        ]
+        for candidate in candidates where fm.fileExists(atPath: candidate) {
+            return candidate
         }
-        if fm.fileExists(atPath: paths.sentinelAppPath) {
-            return paths.sentinelAppPath
-        }
-        return buildPath
+        return candidates[0]
     }
 
     private func executablePath(appPath: String) -> String {
-        appPath + "/Contents/MacOS/Sentry"
+        appPath + "/Contents/MacOS/" + paths.sentinelExecutableName
+    }
+
+    private func normalizeInstalledAppBundle() throws {
+        let contents = URL(fileURLWithPath: paths.sentinelAppPath)
+            .appendingPathComponent("Contents", isDirectory: true)
+        let executable = contents
+            .appendingPathComponent("MacOS", isDirectory: true)
+            .appendingPathComponent(paths.sentinelExecutableName)
+        let legacyExecutable = contents
+            .appendingPathComponent("MacOS", isDirectory: true)
+            .appendingPathComponent("Sentry")
+
+        if !fm.fileExists(atPath: executable.path), fm.fileExists(atPath: legacyExecutable.path) {
+            try fm.copyItem(at: legacyExecutable, to: executable)
+        }
+        _ = chmod(executable.path, 0o755)
+        try normalizeInfoPlist(at: contents.appendingPathComponent("Info.plist"))
+    }
+
+    private func normalizeInfoPlist(at url: URL) throws {
+        guard fm.fileExists(atPath: url.path) else {
+            return
+        }
+
+        let data = try Data(contentsOf: url)
+        var format = PropertyListSerialization.PropertyListFormat.xml
+        guard var plist = try PropertyListSerialization.propertyList(
+            from: data,
+            options: .mutableContainers,
+            format: &format
+        ) as? [String: Any] else {
+            return
+        }
+
+        var changed = false
+        if plist["CFBundleExecutable"] as? String != paths.sentinelExecutableName {
+            plist["CFBundleExecutable"] = paths.sentinelExecutableName
+            changed = true
+        }
+        if plist["CFBundleDisplayName"] as? String != "Cicada" {
+            plist["CFBundleDisplayName"] = "Cicada"
+            changed = true
+        }
+        guard changed else {
+            return
+        }
+
+        let outputFormat: PropertyListSerialization.PropertyListFormat = format == .binary ? .binary : .xml
+        let output = try PropertyListSerialization.data(
+            fromPropertyList: plist,
+            format: outputFormat,
+            options: 0
+        )
+        try output.write(to: url, options: .atomic)
     }
 
     private func sentinelPlist(appPath: String) -> String {
@@ -257,6 +319,15 @@ public final class SentinelAppManager {
         _ = runner.run("/bin/launchctl", args: ["unload", paths.legacyNotifierPlistPath], timeoutMs: 5_000)
         _ = try? fm.removeItem(atPath: paths.legacyNotifierPlistPath)
         _ = try? fm.removeItem(atPath: paths.legacyNotifierBinaryPath)
+    }
+
+    private func removeLegacySentinelAppIfNeeded() throws {
+        guard paths.legacySentinelAppPath != paths.sentinelAppPath,
+              fm.fileExists(atPath: paths.legacySentinelAppPath)
+        else {
+            return
+        }
+        try fm.removeItem(atPath: paths.legacySentinelAppPath)
     }
 
     private func startAgentWithRetry() -> Bool {

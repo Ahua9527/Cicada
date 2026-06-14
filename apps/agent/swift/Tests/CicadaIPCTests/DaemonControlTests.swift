@@ -153,8 +153,46 @@ final class DaemonControlTests: XCTestCase {
             PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
         )
         let keepAlive = try XCTUnwrap(plist["KeepAlive"] as? [String: Any])
+        let programArguments = try XCTUnwrap(plist["ProgramArguments"] as? [String])
         XCTAssertEqual(keepAlive["Crashed"] as? Bool, true)
         XCTAssertFalse(plist["KeepAlive"] is Bool)
+        XCTAssertEqual(
+            programArguments,
+            [fixture.paths.sentinelAppPath + "/Contents/MacOS/Cicada"]
+        )
+    }
+
+    func testSentinelInstallRemovesLegacySentryApp() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createSourceApp()
+        try fixture.createLegacySentinelApp()
+
+        try fixture.manager.install(sourceAppPath: fixture.sourceAppPath)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.paths.sentinelAppPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacySentinelAppPath))
+    }
+
+    func testSentinelInstallMigratesLegacySourceAppExecutableAndInfoPlist() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createLegacySentinelApp(includeInfoPlist: true)
+
+        try fixture.manager.install()
+
+        let executable = fixture.paths.sentinelAppPath + "/Contents/MacOS/Cicada"
+        XCTAssertTrue(FileManager.default.fileExists(atPath: executable))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacySentinelAppPath))
+
+        let data = try Data(
+            contentsOf: URL(fileURLWithPath: fixture.paths.sentinelAppPath)
+                .appendingPathComponent("Contents/Info.plist")
+        )
+        let plist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+        )
+        XCTAssertEqual(plist["CFBundleExecutable"] as? String, "Cicada")
+        XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "Cicada")
+        XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "com.cicada.sentinel")
     }
 
     func testSentinelStopLeavesLaunchAgentLoaded() throws {
@@ -260,7 +298,9 @@ private final class SentinelAppManagerFixture {
         paths = SentinelAppRuntimePaths(
             runDir: runDir.path,
             sentinelLabel: "com.cicada.sentinel.test",
-            sentinelAppPath: appsDir.appendingPathComponent("Sentry.app", isDirectory: true).path,
+            sentinelAppPath: appsDir.appendingPathComponent("Cicada.app", isDirectory: true).path,
+            legacySentinelAppPath: appsDir.appendingPathComponent("Sentry.app", isDirectory: true).path,
+            sentinelExecutableName: "Cicada",
             sentinelPlistPath: launchAgentsDir.appendingPathComponent("com.cicada.sentinel.test.plist").path,
             sentinelStdoutPath: cicadaHome.appendingPathComponent("sentinel.stdout.log").path,
             sentinelStderrPath: cicadaHome.appendingPathComponent("sentinel.stderr.log").path,
@@ -272,7 +312,7 @@ private final class SentinelAppManagerFixture {
             legacyNotifierPlistPath: launchAgentsDir.appendingPathComponent("com.cicada.notifier.test.plist").path,
             legacyNotifierBinaryPath: binDir.appendingPathComponent("cicada-notifier").path
         )
-        sourceAppPath = root.appendingPathComponent("source/Sentry.app", isDirectory: true).path
+        sourceAppPath = root.appendingPathComponent("source/Cicada.app", isDirectory: true).path
         manager = SentinelAppManager(
             runner: runner,
             paths: paths,
@@ -287,7 +327,7 @@ private final class SentinelAppManagerFixture {
 
     func createSourceApp() throws {
         let executable = URL(fileURLWithPath: sourceAppPath)
-            .appendingPathComponent("Contents/MacOS/Sentry")
+            .appendingPathComponent("Contents/MacOS/Cicada")
         try FileManager.default.createDirectory(
             at: executable.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -310,7 +350,7 @@ private final class SentinelAppManagerFixture {
 
     func createInstalledSentinel() throws {
         let executable = URL(fileURLWithPath: paths.sentinelAppPath)
-            .appendingPathComponent("Contents/MacOS/Sentry")
+            .appendingPathComponent("Contents/MacOS/Cicada")
         try FileManager.default.createDirectory(
             at: executable.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -321,6 +361,33 @@ private final class SentinelAppManagerFixture {
             withIntermediateDirectories: true
         )
         FileManager.default.createFile(atPath: paths.sentinelPlistPath, contents: Data())
+    }
+
+    func createLegacySentinelApp(includeInfoPlist: Bool = false) throws {
+        let executable = URL(fileURLWithPath: paths.legacySentinelAppPath)
+            .appendingPathComponent("Contents/MacOS/Sentry")
+        try FileManager.default.createDirectory(
+            at: executable.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: executable.path, contents: Data())
+        if includeInfoPlist {
+            let infoPlist = executable
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Info.plist")
+            let plist: [String: Any] = [
+                "CFBundleDisplayName": "Sentry",
+                "CFBundleExecutable": "Sentry",
+                "CFBundleIdentifier": "com.cicada.sentinel",
+            ]
+            let data = try PropertyListSerialization.data(
+                fromPropertyList: plist,
+                format: .xml,
+                options: 0
+            )
+            try data.write(to: infoPlist)
+        }
     }
 }
 

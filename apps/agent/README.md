@@ -18,7 +18,7 @@ pnpm run lint:agent
 pnpm run test:agent
 ```
 
-`scripts/build.sh` installs the app to `~/.cicada/apps/Sentry.app`. Runtime
+`scripts/build.sh` installs the app to `~/.cicada/apps/Cicada.app`. Runtime
 control is exposed through the daemon/CLI commands `sentry_start`,
 `sentry_stop`, `sentry_status`, `sentry_unlock`, and `sentry_open`. The app also
 hosts the notifier socket at `~/.cicada/run/notifier.sock` and stores NotchDrop

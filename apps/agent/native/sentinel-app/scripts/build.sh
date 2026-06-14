@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build"
 CONFIGURATION="${CONFIGURATION:-Release}"
+APP_NAME="${CICADA_APP_NAME:-Cicada}"
+LEGACY_APP_NAME="Sentry"
 HELPERS_SOURCE_DIR="${CICADA_HELPERS_SOURCE_DIR:-$ROOT_DIR/../../swift/.build/release}"
 REQUIRE_HELPERS=0
 if [ -n "${CICADA_HELPERS_SOURCE_DIR:-}" ]; then
@@ -28,7 +30,7 @@ xcodebuild \
   SWIFT_ACTIVE_COMPILATION_CONDITIONS=CICADA_DISABLE_SIGNATURE_VALIDATION \
   build
 
-APP_PATH="$BUILD_DIR/DerivedData/Build/Products/$CONFIGURATION/Sentry.app"
+APP_PATH="$BUILD_DIR/DerivedData/Build/Products/$CONFIGURATION/$APP_NAME.app"
 INSTALL_DIR="$HOME/.cicada/apps"
 HELPERS_DIR="$APP_PATH/Contents/Helpers"
 HELPERS=(cicada cicada-agent cicada-sleephold)
@@ -53,7 +55,8 @@ else
 fi
 
 mkdir -p "$INSTALL_DIR"
-rm -rf "$INSTALL_DIR/Sentry.app"
-cp -R "$APP_PATH" "$INSTALL_DIR/Sentry.app"
+rm -rf "$INSTALL_DIR/$APP_NAME.app"
+cp -R "$APP_PATH" "$INSTALL_DIR/$APP_NAME.app"
+rm -rf "$INSTALL_DIR/$LEGACY_APP_NAME.app"
 
-echo "✅ Sentinel app installed to $INSTALL_DIR/Sentry.app"
+echo "✅ Sentinel app installed to $INSTALL_DIR/$APP_NAME.app"
