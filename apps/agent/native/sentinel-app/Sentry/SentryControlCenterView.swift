@@ -16,34 +16,34 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .overview:
-            return "Overview"
+            return String(localized: "Overview")
         case .alarms:
-            return "Alarms"
+            return String(localized: "Alarms")
         case .notifications:
-            return "Notifications"
+            return String(localized: "Notifications")
         case .recordings:
-            return "Recordings"
+            return String(localized: "Recordings")
         case .notchDrop:
-            return "NotchDrop"
+            return String(localized: "NotchDrop")
         case .maintenance:
-            return "Maintenance"
+            return String(localized: "Maintenance")
         }
     }
 
     var detail: String {
         switch self {
         case .overview:
-            return "Status and primary controls"
+            return String(localized: "Status and primary controls")
         case .alarms:
-            return "Trigger conditions"
+            return String(localized: "Trigger conditions")
         case .notifications:
-            return "Sound and Bark alerts"
+            return String(localized: "Sound and Bark alerts")
         case .recordings:
-            return "Camera capture"
+            return String(localized: "Camera capture")
         case .notchDrop:
-            return "Tray and launch behavior"
+            return String(localized: "Tray and launch behavior")
         case .maintenance:
-            return "Folders, SleepHold, diagnostics"
+            return String(localized: "Folders, SleepHold, diagnostics")
         }
     }
 
@@ -110,12 +110,12 @@ struct SentryControlCenterView: View {
                 } label: {
                     Image(systemName: "questionmark.circle")
                 }
-                .help("Help")
+                .help(String(localized: "Help"))
                 .popover(isPresented: $showsHelp) {
                     HelpPanelView()
                 }
 
-                Button(isActive ? "Stop" : "Start") {
+                Button(isActive ? String(localized: "Stop") : String(localized: "Start")) {
                     if isActive {
                         _ = controller.stop()
                     } else {
@@ -124,7 +124,7 @@ struct SentryControlCenterView: View {
                 }
                 .disabled(!config.canActivate && !isActive)
 
-                Button("Unlock") {
+                Button(String(localized: "Unlock")) {
                     _ = controller.unlockAlarm()
                 }
                 .disabled(viewModel.status != .activityDetected)
@@ -169,17 +169,17 @@ struct SentryControlCenterView: View {
     private func sidebarStatus(for section: SentryControlSection) -> String {
         switch section {
         case .overview:
-            return controller.statusTitle
+            return controller.localizedStatusTitle
         case .alarms:
-            return config.hasTriggerEnabled ? "Configured" : "Required"
+            return config.hasTriggerEnabled ? String(localized: "Configured") : String(localized: "Required")
         case .notifications:
-            return config.hasNotificationEnabled ? "Configured" : "Required"
+            return config.hasNotificationEnabled ? String(localized: "Configured") : String(localized: "Required")
         case .recordings:
-            return config.hasRecordingEnabled ? "Enabled" : "Off"
+            return config.hasRecordingEnabled ? String(localized: "Enabled") : String(localized: "Off")
         case .notchDrop:
-            return "Tray settings"
+            return String(localized: "Tray settings")
         case .maintenance:
-            return config.sleepHoldServiceIdentifier.isEmpty ? "SleepHold inactive" : "SleepHold active"
+            return config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "SleepHold inactive") : String(localized: "SleepHold active")
         }
     }
 
@@ -243,8 +243,8 @@ private struct SentryOverviewPane: View {
 
     var body: some View {
         SentryPane(
-            title: "Sentry Control Center",
-            subtitle: "One place for status, controls, and configuration."
+            title: String(localized: "Cicada Control Center"),
+            subtitle: String(localized: "One place for status, controls, and configuration.")
         ) {
             GroupBox {
                 VStack(alignment: .leading, spacing: 16) {
@@ -253,7 +253,7 @@ private struct SentryOverviewPane: View {
                             .frame(width: 52, height: 52)
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(controller.statusTitle)
+                            Text(controller.localizedStatusTitle)
                                 .font(.title3)
                                 .bold()
                             Text(statusDescription)
@@ -263,7 +263,7 @@ private struct SentryOverviewPane: View {
                         Spacer()
 
                         HStack(spacing: 8) {
-                            Button(isActive ? "Stop Sentry" : "Start Sentry") {
+                            Button(isActive ? String(localized: "Stop Cicada") : String(localized: "Start Cicada")) {
                                 if isActive {
                                     _ = controller.stop()
                                 } else {
@@ -272,7 +272,7 @@ private struct SentryOverviewPane: View {
                             }
                             .disabled(!config.canActivate && !isActive)
 
-                            Button("Unlock Alarm") {
+                            Button(String(localized: "Unlock Alarm")) {
                                 _ = controller.unlockAlarm()
                             }
                             .disabled(viewModel.status != .activityDetected)
@@ -287,37 +287,37 @@ private struct SentryOverviewPane: View {
                 }
             }
 
-            GroupBox("Readiness") {
+            GroupBox(String(localized: "Readiness")) {
                 VStack(spacing: 10) {
                     SentryStatusRow(
-                        title: "Alarm Triggers",
+                        title: String(localized: "Alarm Triggers"),
                         systemImage: "light.beacon.max",
-                        value: config.hasTriggerEnabled ? "Configured" : "Required",
+                        value: config.hasTriggerEnabled ? String(localized: "Configured") : String(localized: "Required"),
                         tint: config.hasTriggerEnabled ? .green : .orange
                     )
                     SentryStatusRow(
-                        title: "Notifications",
+                        title: String(localized: "Notifications"),
                         systemImage: "app.badge",
-                        value: config.hasNotificationEnabled ? "Configured" : "Required",
+                        value: config.hasNotificationEnabled ? String(localized: "Configured") : String(localized: "Required"),
                         tint: config.hasNotificationEnabled ? .green : .orange
                     )
                     SentryStatusRow(
-                        title: "Camera Recording",
+                        title: String(localized: "Camera Recording"),
                         systemImage: "camera",
-                        value: config.hasRecordingEnabled ? "Enabled" : "Off",
+                        value: config.hasRecordingEnabled ? String(localized: "Enabled") : String(localized: "Off"),
                         tint: config.hasRecordingEnabled ? .green : .secondary
                     )
                     SentryStatusRow(
-                        title: "Activation",
+                        title: String(localized: "Activation"),
                         systemImage: "lock",
-                        value: config.canActivate ? "Ready after lock" : "Needs alarm and notification",
+                        value: config.canActivate ? String(localized: "Ready after lock") : String(localized: "Needs alarm and notification"),
                         tint: config.canActivate ? .green : .orange
                     )
                 }
             }
 
             if !startupDiagnostics.isEmpty {
-                GroupBox("Startup Diagnostics") {
+                GroupBox(String(localized: "Startup Diagnostics")) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(startupDiagnostics) { diagnostic in
                             Label(diagnostic.message, systemImage: "exclamationmark.triangle.fill")
@@ -361,20 +361,20 @@ private struct SentryOverviewPane: View {
     private var statusDescription: String {
         switch viewModel.status {
         case .welcome:
-            return config.canActivate ? "Lock your Mac to activate Sentry." : "Finish required setup before activation."
+            return config.canActivate ? String(localized: "Lock your Mac to activate Cicada.") : String(localized: "Finish required setup before activation.")
         case .running:
-            return "Sentry is watching configured triggers."
+            return String(localized: "Cicada is watching configured triggers.")
         case .activityDetected:
-            return "An alarm is active until it is unlocked or stopped."
+            return String(localized: "An alarm is active until it is unlocked or stopped.")
         case .completed:
-            return "The current Sentry session has ended."
+            return String(localized: "The current Cicada session has ended.")
         }
     }
 
     private var versionText: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
-        return "Version \(version) (\(build))"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? String(localized: "Unknown")
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? String(localized: "Unknown")
+        return String(format: String(localized: "Version %@ (%@)"), version, build)
     }
 }
 
@@ -383,30 +383,30 @@ private struct SentryAlarmSettingsPane: View {
 
     var body: some View {
         SentryPane(
-            title: "Alarms",
-            subtitle: "Choose which system changes trigger Sentry."
+            title: String(localized: "Alarms"),
+            subtitle: String(localized: "Choose which system changes trigger Cicada.")
         ) {
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Alarm triggers fire when configured conditions are met.")
+                    Text(String(localized: "Alarm triggers fire when configured conditions are met."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Divider()
 
-                    Toggle("Closing Lid", isOn: $config.cfg.sentryTriggersLidEnabled)
-                    Toggle("Disconnected from Internet", isOn: $config.cfg.sentryTriggersInternetEnabled)
-                    Toggle("Disconnected from Power Adapter", isOn: $config.cfg.sentryTriggersPowerEnabled)
+                    Toggle(String(localized: "Closing Lid"), isOn: $config.cfg.sentryTriggersLidEnabled)
+                    Toggle(String(localized: "Disconnected from Internet"), isOn: $config.cfg.sentryTriggersInternetEnabled)
+                    Toggle(String(localized: "Disconnected from Power Adapter"), isOn: $config.cfg.sentryTriggersPowerEnabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            GroupBox("Auto Sleep") {
+            GroupBox(String(localized: "Auto Sleep")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("If SleepHold is not installed, disable automatic sleep for the most reliable trigger behavior.")
+                    Text(String(localized: "If SleepHold is not installed, disable automatic sleep for the most reliable trigger behavior."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button("Learn More") {
+                    Button(String(localized: "Learn More")) {
                         NSWorkspace.shared.open(
                             URL(string: "https://github.com/Lakr233/Sentry?tab=readme-ov-file#system-requirements")!
                         )
@@ -423,30 +423,30 @@ private struct SentryNotificationSettingsPane: View {
 
     var body: some View {
         SentryPane(
-            title: "Notifications",
-            subtitle: "Configure local sound and Bark alerts."
+            title: String(localized: "Notifications"),
+            subtitle: String(localized: "Configure local sound and Bark alerts.")
         ) {
-            GroupBox("Sound") {
+            GroupBox(String(localized: "Sound")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Playing sound is the quickest local warning when an alarm fires.")
+                    Text(String(localized: "Playing sound is the quickest local warning when an alarm fires."))
                         .foregroundStyle(.secondary)
-                    Toggle("Play Sound", isOn: $config.cfg.sentryAlarmsSoundsEnabled)
+                    Toggle(String(localized: "Play Sound"), isOn: $config.cfg.sentryAlarmsSoundsEnabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            GroupBox("Bark") {
+            GroupBox(String(localized: "Bark")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Connect Bark if you want alarm notifications on your phone.")
+                    Text(String(localized: "Connect Bark if you want alarm notifications on your phone."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Toggle(isOn: barkEnabledBinding) {
-                        Text("Use Bark")
+                        Text(String(localized: "Use Bark"))
                     }
 
-                    LabeledContent("Endpoint") {
-                        TextField("Server Endpoint", text: $config.cfg.sentryNotificationConfigBark.endpoint)
+                    LabeledContent(String(localized: "Endpoint")) {
+                        TextField(String(localized: "Server Endpoint"), text: $config.cfg.sentryNotificationConfigBark.endpoint)
                             .textFieldStyle(.roundedBorder)
                             .autocorrectionDisabled()
                             .onChange(of: config.cfg.sentryNotificationConfigBark.endpoint) { newValue in
@@ -487,21 +487,21 @@ private struct SentryRecordingSettingsPane: View {
 
     var body: some View {
         SentryPane(
-            title: "Recordings",
-            subtitle: "Capture camera clips when Sentry is activated."
+            title: String(localized: "Recordings"),
+            subtitle: String(localized: "Capture camera clips when Cicada is activated.")
         ) {
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Enable Camera Recording", isOn: $config.cfg.sentryRecordingEnabled)
+                    Toggle(String(localized: "Enable Camera Recording"), isOn: $config.cfg.sentryRecordingEnabled)
 
                     cameraContent
 
                     HStack {
-                        Button("Open Saved Clips") {
+                        Button(String(localized: "Open Saved Clips")) {
                             SentinelController.shared.openSavedClips()
                         }
                         Spacer()
-                        Text("Respect the privacy of others.")
+                        Text(String(localized: "Respect the privacy of others."))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -541,7 +541,7 @@ private struct SentryRecordingSettingsPane: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
             if cameraManager.availableCameras.count > 1 {
-                Picker("Camera", selection: selectedCameraBinding) {
+                Picker(String(localized: "Camera"), selection: selectedCameraBinding) {
                     ForEach(cameraManager.availableCameras, id: \.uniqueID) { camera in
                         Text(camera.localizedName).tag(camera as AVCaptureDevice?)
                     }
@@ -569,7 +569,7 @@ private struct SentryRecordingSettingsPane: View {
     }
 
     private var cameraAccessStatusText: String {
-        cameraManager.authorizationStatus == .denied ? "Camera Access Denied" : "Requesting Camera Access..."
+        cameraManager.authorizationStatus == .denied ? String(localized: "Camera Access Denied") : String(localized: "Requesting Camera Access...")
     }
 }
 
@@ -593,12 +593,12 @@ private struct NotchDropSettingsPane: View {
 
     var body: some View {
         SentryPane(
-            title: "NotchDrop",
-            subtitle: "Configure tray behavior and storage from the same control center."
+            title: String(localized: "NotchDrop"),
+            subtitle: String(localized: "Configure tray behavior and storage from the same control center.")
         ) {
-            GroupBox("General") {
+            GroupBox(String(localized: "General")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker("Language", selection: $settings.selectedLanguage) {
+                    Picker(String(localized: "Language"), selection: $settings.selectedLanguage) {
                         ForEach(Language.allCases) { language in
                             Text(language.localized).tag(language)
                         }
@@ -609,17 +609,17 @@ private struct NotchDropSettingsPane: View {
                     }
 
                     LaunchAtLogin.Toggle {
-                        Text("Launch at Login")
+                        Text(String(localized: "Launch at Login"))
                     }
 
-                    Toggle("Haptic Feedback", isOn: $settings.hapticFeedback)
+                    Toggle(String(localized: "Haptic Feedback"), isOn: $settings.hapticFeedback)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            GroupBox("File Storage") {
+            GroupBox(String(localized: "File Storage")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker("Keep Files", selection: $tray.selectedFileStorageTime) {
+                    Picker(String(localized: "Keep Files"), selection: $tray.selectedFileStorageTime) {
                         ForEach(TrayDrop.FileStorageTime.allCases) { time in
                             Text(time.localized).tag(time)
                         }
@@ -628,11 +628,11 @@ private struct NotchDropSettingsPane: View {
 
                     if tray.selectedFileStorageTime == .custom {
                         HStack {
-                            TextField("Value", value: $tray.customStorageTime, formatter: numberFormatter)
+                            TextField(String(localized: "Value"), value: $tray.customStorageTime, formatter: numberFormatter)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 72)
 
-                            Picker("Unit", selection: $tray.customStorageTimeUnit) {
+                            Picker(String(localized: "Unit"), selection: $tray.customStorageTimeUnit) {
                                 ForEach(TrayDrop.CustomstorageTimeUnit.allCases) { unit in
                                     Text(unit.localized).tag(unit)
                                 }
@@ -655,40 +655,40 @@ private struct SentryMaintenancePane: View {
 
     var body: some View {
         SentryPane(
-            title: "Maintenance",
-            subtitle: "Runtime paths, SleepHold status, and diagnostics."
+            title: String(localized: "Maintenance"),
+            subtitle: String(localized: "Runtime paths, SleepHold status, and diagnostics.")
         ) {
-            GroupBox("Folders") {
+            GroupBox(String(localized: "Folders")) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Button("Open Recording Folder") {
+                    Button(String(localized: "Open Recording Folder")) {
                         controller.openSavedClips()
                     }
-                    Button("Open NotchDrop Folder") {
+                    Button(String(localized: "Open NotchDrop Folder")) {
                         controller.openNotchDropFolder()
                     }
-                    Button("Clear NotchDrop Tray") {
+                    Button(String(localized: "Clear NotchDrop Tray")) {
                         controller.clearNotchDropTray()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            GroupBox("SleepHold") {
+            GroupBox(String(localized: "SleepHold")) {
                 VStack(spacing: 10) {
                     SentryStatusRow(
-                        title: "State",
+                        title: String(localized: "State"),
                         systemImage: "power",
-                        value: config.sleepHoldServiceIdentifier.isEmpty ? "Inactive" : "Active",
+                        value: config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "Inactive") : String(localized: "Active"),
                         tint: config.sleepHoldServiceIdentifier.isEmpty ? .secondary : .green
                     )
                     SentryStatusRow(
-                        title: "Session",
+                        title: String(localized: "Session"),
                         systemImage: "number",
-                        value: config.sleepHoldServiceIdentifier.isEmpty ? "None" : config.sleepHoldServiceIdentifier,
+                        value: config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "None") : config.sleepHoldServiceIdentifier,
                         tint: .secondary
                     )
                     SentryStatusRow(
-                        title: "Last Update",
+                        title: String(localized: "Last Update"),
                         systemImage: "clock",
                         value: config.sleepHoldServiceLastUpdate.formatted(date: .abbreviated, time: .standard),
                         tint: .secondary
@@ -696,14 +696,14 @@ private struct SentryMaintenancePane: View {
                 }
             }
 
-            GroupBox("Diagnostics") {
+            GroupBox(String(localized: "Diagnostics")) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Button("Run Startup Checks") {
+                    Button(String(localized: "Run Startup Checks")) {
                         appDelegate.runStartupChecks()
                     }
 
                     if appDelegate.startupDiagnostics.isEmpty {
-                        Text("No startup diagnostics are currently reported.")
+                        Text(String(localized: "No startup diagnostics are currently reported."))
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(appDelegate.startupDiagnostics) { diagnostic in

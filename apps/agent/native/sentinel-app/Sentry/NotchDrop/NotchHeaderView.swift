@@ -13,7 +13,7 @@ struct NotchHeaderView: View {
 
     var body: some View {
         HStack {
-            Text("Notch Drop")
+            Text(String(localized: "NotchDrop"))
             .contentTransition(.numericText())
             Spacer()
             Image(systemName: "ellipsis")

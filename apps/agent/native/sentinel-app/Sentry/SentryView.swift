@@ -53,10 +53,10 @@ struct SentryView: View {
                 .font(.largeTitle)
                 .opacity(0.2)
             Spacer()
-            Text("Sentry Activated")
+            Text(String(localized: "Cicada Activated"))
                 .bold()
                 .font(.largeTitle)
-            Text("This Mac is connected to the internet and is monitoring your behavior.")
+            Text(String(localized: "This Mac is connected to the internet and is monitoring your behavior."))
                 .bold()
         }
         .padding(32)

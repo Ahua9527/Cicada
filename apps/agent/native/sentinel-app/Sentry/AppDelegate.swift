@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
     private func preventSleep() {
         createAssertion(
             type: kIOPMAssertionTypeNoIdleSleep,
-            name: "Sentry app is monitoring system",
+            name: "Cicada app is monitoring system",
             storedIn: &sleepAssertionID,
             logPrefix: "failed to create sleep assertion",
             diagnosticID: "sleep-assertion"
@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
     private func preventDisplaySleep() {
         createAssertion(
             type: kIOPMAssertionTypeNoDisplaySleep,
-            name: "Sentry app is monitoring display",
+            name: "Cicada app is monitoring display",
             storedIn: &displayAssertionID,
             logPrefix: "failed to create display assertion",
             diagnosticID: "display-assertion"

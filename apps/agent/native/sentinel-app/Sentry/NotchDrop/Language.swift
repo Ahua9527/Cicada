@@ -9,10 +9,8 @@ import Cocoa
 
 enum Language: String, CaseIterable, Identifiable, Codable {
     case system = "Follow System"
-    case english = "English"
-    case german = "German"
     case simplifiedChinese = "Simplified Chinese"
-    case traditionalChinese = "Traditional Chinese"
+    case english = "English"
 
     var id: String { rawValue }
 
@@ -36,14 +34,10 @@ enum Language: String, CaseIterable, Identifiable, Codable {
             } else {
                 languageCode = "en"
             }
-        case .english:
-            languageCode = "en"
-        case .german:
-            languageCode = "de"
         case .simplifiedChinese:
             languageCode = "zh-Hans"
-        case .traditionalChinese:
-            languageCode = "zh-Hant"
+        case .english:
+            languageCode = "en"
         }
 
         Bundle.setLanguage(languageCode)

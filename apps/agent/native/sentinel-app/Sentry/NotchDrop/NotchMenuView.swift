@@ -27,7 +27,7 @@ struct NotchMenuView: View {
         ColorButton(
             color: colorfulColors,
             image: Image(.gitHub),
-            title: "GitHub"
+            title: LocalizedStringKey("GitHub")
         )
         .onTapGesture {
             NSWorkspace.shared.open(productPage)
@@ -40,7 +40,7 @@ struct NotchMenuView: View {
         ColorButton(
             color: colorfulColors,
             image: Image(systemName: "heart.fill"),
-            title: "Love Drop"
+            title: LocalizedStringKey("Love Drop")
         )
         .onTapGesture {
             NSWorkspace.shared.open(sponsorPage)
@@ -53,7 +53,7 @@ struct NotchMenuView: View {
         ColorButton(
             color: [.red],
             image: Image(systemName: "xmark"),
-            title: "Close"
+            title: LocalizedStringKey("Close")
         )
         .onTapGesture {
             vm.notchClose()
@@ -65,7 +65,7 @@ struct NotchMenuView: View {
         ColorButton(
             color: [.red],
             image: Image(systemName: "trash"),
-            title: "Clear"
+            title: LocalizedStringKey("Clear")
         )
         .onTapGesture {
             tvm.removeAll()

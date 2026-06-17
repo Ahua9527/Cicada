@@ -25,6 +25,8 @@ final class SentinelController: ObservableObject {
 
     let viewModel = ViewModel.shared
     private var mainWindowOpener: (() -> Void)?
+    private var isMacLockedProvider: () -> Bool? = DeviceCheck.isMacLocked
+    private var sentryFactory: (() -> Sentry)?
 
     private init() {}
 
@@ -46,6 +48,19 @@ final class SentinelController: ObservableObject {
         }
     }
 
+    var localizedStatusTitle: String {
+        switch viewModel.status {
+        case .welcome:
+            return String(localized: "Ready")
+        case .running:
+            return String(localized: "Running")
+        case .activityDetected:
+            return String(localized: "Activity Detected")
+        case .completed:
+            return String(localized: "Completed")
+        }
+    }
+
     func handleTimerTick() {
         print("[*] interface timer tik: \(viewModel.status)")
         defer { print("[*] interface timer tik out: \(viewModel.status)") }
@@ -58,7 +73,7 @@ final class SentinelController: ObservableObject {
         case .activityDetected:
             stopAlarmIfUnlocked()
         case .completed:
-            break
+            rearmIfUnlocked()
         }
     }
 
@@ -75,13 +90,14 @@ final class SentinelController: ObservableObject {
     }
 
     func stop() -> SentinelCommandResult {
-        guard let sentry, sentry.currentStatus != .idle else {
+        guard sentry != nil, sentry?.currentStatus != .idle else {
+            sentry = nil
             viewModel.status = .completed
             return result(ok: true, code: "already_stopped", message: "Sentry is not running")
         }
 
         viewModel.status = .completed
-        sentry.stop()
+        finishCurrentSession()
         return result(ok: true, code: nil, message: "Sentry stopped")
     }
 
@@ -121,6 +137,23 @@ final class SentinelController: ObservableObject {
         mainWindowOpener = nil
     }
 
+    func configureForTesting(
+        isMacLocked: @escaping () -> Bool?,
+        makeSentry: @escaping () -> Sentry
+    ) {
+        isMacLockedProvider = isMacLocked
+        sentryFactory = makeSentry
+    }
+
+    func resetForTesting() {
+        sentry?.stop()
+        sentry = nil
+        activityHint = ""
+        viewModel.status = .welcome
+        isMacLockedProvider = DeviceCheck.isMacLocked
+        sentryFactory = nil
+    }
+
     func openSavedClips() {
         try? FileManager.default.createDirectory(
             atPath: videoClipDir.path,
@@ -143,11 +176,11 @@ final class SentinelController: ObservableObject {
     func showSleepHoldStatus() {
         let status = statusSnapshot()
         let alert = NSAlert()
-        alert.messageText = "Disable Auto Sleep"
+        alert.messageText = String(localized: "Disable Auto Sleep")
         alert.informativeText = status.sleepHoldActive
-            ? "Active: \(status.sleepHoldSessionId)"
-            : "Inactive"
-        alert.addButton(withTitle: "OK")
+            ? String(format: String(localized: "Active: %@"), status.sleepHoldSessionId)
+            : String(localized: "Inactive")
+        alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
     }
 
@@ -169,34 +202,53 @@ final class SentinelController: ObservableObject {
     private func startFromWelcomeIfLocked() {
         guard viewModel.status == .welcome else { return }
         guard sentry == nil || sentry?.currentStatus == .idle else { return }
-        guard let isLocked = DeviceCheck.isMacLocked(), isLocked else { return }
+        guard let isLocked = isMacLockedProvider(), isLocked else { return }
         _ = start()
     }
 
     private func completeIfUnlocked() {
         guard viewModel.status == .running else { return }
-        guard let sentry else { return }
-        if DeviceCheck.isMacLocked() ?? true { return }
+        guard sentry != nil else { return }
+        if isMacLockedProvider() ?? true { return }
         viewModel.status = .completed
-        sentry.stop()
+        finishCurrentSession()
     }
 
     private func stopAlarmIfUnlocked() {
         guard viewModel.status == .activityDetected else { return }
-        guard let sentry else { return }
-        if DeviceCheck.isMacLocked() ?? true { return }
-        sentry.stop()
+        guard sentry != nil else { return }
+        if isMacLockedProvider() ?? true { return }
+        viewModel.status = .completed
+        finishCurrentSession()
+    }
+
+    private func rearmIfUnlocked() {
+        guard viewModel.status == .completed else { return }
+        guard isMacLockedProvider() == false else { return }
+        viewModel.status = .welcome
     }
 
     private func makeSentry() -> Sentry {
-        Sentry(configuration: SentryConfigurationManager.shared.cfg) { [weak self] alarmingReason in
+        if let sentryFactory {
+            return sentryFactory()
+        }
+
+        return Sentry(configuration: SentryConfigurationManager.shared.cfg) { [weak self] alarmingReason in
             guard let self else { return }
             print("[*] alarming reason: \(alarmingReason)")
             viewModel.status = .activityDetected
             activityHint = String(
-                localized: "An alarm was triggered at: \(Date().formatted()). Reason: \(alarmingReason)"
+                format: String(localized: "An alarm was triggered at: %@. Reason: %@"),
+                Date().formatted(),
+                alarmingReason
             )
         }
+    }
+
+    private func finishCurrentSession() {
+        let currentSentry = sentry
+        sentry = nil
+        currentSentry?.stop()
     }
 
     private func result(ok: Bool, code: String?, message: String) -> SentinelCommandResult {

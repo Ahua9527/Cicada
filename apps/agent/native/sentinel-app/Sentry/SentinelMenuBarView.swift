@@ -6,31 +6,31 @@ struct SentinelMenuBarView: View {
     @ObservedObject private var vm = ViewModel.shared
 
     var body: some View {
-        Button("Open Control Center") {
+        Button(String(localized: "Open Control Center")) {
             _ = SentryControlCenterRouter.shared.open(.overview)
         }
 
-        Menu("Settings") {
-            Button("Alarms") {
+        Menu(String(localized: "Settings")) {
+            Button(String(localized: "Alarms")) {
                 _ = SentryControlCenterRouter.shared.open(.alarms)
             }
-            Button("Notifications") {
+            Button(String(localized: "Notifications")) {
                 _ = SentryControlCenterRouter.shared.open(.notifications)
             }
-            Button("Recordings") {
+            Button(String(localized: "Recordings")) {
                 _ = SentryControlCenterRouter.shared.open(.recordings)
             }
-            Button("NotchDrop") {
+            Button(String(localized: "NotchDrop")) {
                 _ = SentryControlCenterRouter.shared.open(.notchDrop)
             }
-            Button("Maintenance") {
+            Button(String(localized: "Maintenance")) {
                 _ = SentryControlCenterRouter.shared.open(.maintenance)
             }
         }
 
         Divider()
 
-        Button(isActive ? "Stop Sentry" : "Start Sentry") {
+        Button(isActive ? String(localized: "Stop Cicada") : String(localized: "Start Cicada")) {
             if vm.status == .running || vm.status == .activityDetected {
                 _ = controller.stop()
             } else {
@@ -38,16 +38,16 @@ struct SentinelMenuBarView: View {
             }
         }
 
-        Button("Unlock Alarm") {
+        Button(String(localized: "Unlock Alarm")) {
             _ = controller.unlockAlarm()
         }
         .disabled(vm.status != .activityDetected)
 
         Divider()
 
-        Text("Status: \(controller.statusTitle)")
+        Text(String(format: String(localized: "Status: %@"), controller.localizedStatusTitle))
 
-        Button("Quit") {
+        Button(String(localized: "Quit")) {
             NSApp.terminate(nil)
         }
     }

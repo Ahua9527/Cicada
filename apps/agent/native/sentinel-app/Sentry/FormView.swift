@@ -48,7 +48,7 @@ struct FormView<Content: View, LeftBottomView: View>: View {
             HStack {
                 leftBottom()
                 Spacer()
-                Button("Close") {
+                Button(String(localized: "Close")) {
                     dismiss()
                 }
             }

@@ -29,16 +29,6 @@
         }
       }
     },
-    "**Sentry** adds a feature that detects and responds to potential theft or unauthorized access when you leave your Mac.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "**哨兵** 是一个能够在 Mac 锁定时检测电脑状态并阻止潜在危险的功能。"
-          }
-        }
-      }
-    },
     "& Press Option to delete": {
       "extractionState": "manual",
       "localizations": {
@@ -651,7 +641,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "英文"
+            "value": "English"
           }
         },
         "zh-Hant": {
@@ -1025,16 +1015,6 @@
         }
       }
     },
-    "Lock Your Mac to Activate Sentry": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "锁定你的 Mac 来激活哨兵"
-          }
-        }
-      }
-    },
     "Love Drop": {
       "localizations": {
         "de": {
@@ -1052,7 +1032,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "喜爱"
+            "value": "支持开发"
           }
         },
         "zh-Hant": {
@@ -1189,16 +1169,6 @@
         }
       }
     },
-    "Once set up, Sentry will **automatically activate** when you **lock** your device.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "当设置完毕后，哨兵会在 **锁定** 时 **自动启动**。"
-          }
-        }
-      }
-    },
     "One or more files failed to load": {
       "localizations": {
         "de": {
@@ -1273,66 +1243,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求访问相机中…"
-          }
-        }
-      }
-    },
-    "Sentry": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "哨兵"
-          }
-        }
-      }
-    },
-    "Sentry - Mac": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "哨兵 - Mac"
-          }
-        }
-      }
-    },
-    "Sentry Activated": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "哨兵已激活"
-          }
-        }
-      }
-    },
-    "Sentry Completed": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "哨兵已完成"
-          }
-        }
-      }
-    },
-    "Sentry is running outside of the App Sandbox in a local debug build. Permissions, file access, and release behavior may differ from the signed app.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sentry 当前在本地调试构建中以 App Sandbox 外运行。权限、文件访问和发布版本行为可能与已签名应用不同。"
-          }
-        }
-      }
-    },
-    "Sentry will not prevent your Mac from being stolen or damaged, but it can help you locate your Mac or identify the troublemaker.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "哨兵不能阻止你的 Mac 被偷窃或者损坏，但能一定程度减少这些事情发生的可能性，并帮助你确认是谁闯了祸。"
           }
         }
       }
@@ -1636,16 +1546,6 @@
         }
       }
     },
-    "Unable to configure Sentry. Please try again later.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法配置哨兵，请稍后再试。"
-          }
-        }
-      }
-    },
     "Unable to locate default speaker device. Please ensure your audio output is configured correctly.": {
       "localizations": {
         "zh-Hans": {
@@ -1739,22 +1639,982 @@
         }
       }
     },
-    "Welcome to Sentry": {
+    "**Cicada** adds a feature that detects and responds to potential theft or unauthorized access when you leave your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "欢迎来到哨兵"
+            "value": "**Cicada** 会在你离开 Mac 时检测并响应潜在盗用或未经授权访问。"
           }
         }
       }
     },
-    "When a selected trigger occurs, Sentry will either play a sound or send you a notification.": {
+    "Activation": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当选中的触发器被触发时，哨兵会播放声音或者向你发送通知。"
+            "value": "激活"
+          }
+        }
+      }
+    },
+    "Active": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活跃"
+          }
+        }
+      }
+    },
+    "Active: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活跃：%@"
+          }
+        }
+      }
+    },
+    "Alarm Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报警设置"
+          }
+        }
+      }
+    },
+    "Alarm Triggers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报警触发条件"
+          }
+        }
+      }
+    },
+    "Alarm triggers fire when configured conditions are met.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置的条件满足时会触发报警。"
+          }
+        }
+      }
+    },
+    "Alarms": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报警"
+          }
+        }
+      }
+    },
+    "An alarm is active until it is unlocked or stopped.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报警会保持激活，直到解锁或停止。"
+          }
+        }
+      }
+    },
+    "Auto Sleep": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动睡眠"
+          }
+        }
+      }
+    },
+    "Bark": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bark"
+          }
+        }
+      }
+    },
+    "Camera Recording": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头录制"
+          }
+        }
+      }
+    },
+    "Camera capture": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头捕捉"
+          }
+        }
+      }
+    },
+    "Capture camera clips when Cicada is activated.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 激活时捕捉摄像头片段。"
+          }
+        }
+      }
+    },
+    "Choose which system changes trigger Cicada.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择哪些系统变化会触发 Cicada。"
+          }
+        }
+      }
+    },
+    "Cicada": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada"
+          }
+        }
+      }
+    },
+    "Cicada - Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada - Mac"
+          }
+        }
+      }
+    },
+    "Cicada Activated": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 已激活"
+          }
+        }
+      }
+    },
+    "Cicada Control Center": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 控制中心"
+          }
+        }
+      }
+    },
+    "Cicada is running outside of the App Sandbox in a local debug or unsigned build. Permissions, file access, and release behavior may differ from the signed app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 正在本地调试或未签名构建中以 App Sandbox 外运行。权限、文件访问和发布版本行为可能不同。"
+          }
+        }
+      }
+    },
+    "Cicada is watching configured triggers.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 正在监控已配置的触发条件。"
+          }
+        }
+      }
+    },
+    "Cicada will not prevent your Mac from being stolen or damaged, but it can help you locate your Mac or identify the troublemaker.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 无法阻止你的 Mac 被盗或损坏，但可以帮助你定位 Mac 或识别可疑操作者。"
+          }
+        }
+      }
+    },
+    "Clear NotchDrop Tray": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空 NotchDrop 托盘"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成"
+          }
+        }
+      }
+    },
+    "Configure local sound and Bark alerts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置本机声音和 Bark 警报。"
+          }
+        }
+      }
+    },
+    "Configure tray behavior and storage from the same control center.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在同一个控制中心配置托盘行为和存储。"
+          }
+        }
+      }
+    },
+    "Configured": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已配置"
+          }
+        }
+      }
+    },
+    "Connect Bark if you want alarm notifications on your phone.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果你想在手机上接收报警通知，请连接 Bark。"
+          }
+        }
+      }
+    },
+    "Control Center...": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制中心..."
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断"
+          }
+        }
+      }
+    },
+    "Disable Auto Sleep": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "禁用自动睡眠"
+          }
+        }
+      }
+    },
+    "Enabled": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已启用"
+          }
+        }
+      }
+    },
+    "File Storage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件存储"
+          }
+        }
+      }
+    },
+    "Finish required setup before activation.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "激活前请完成必要设置。"
+          }
+        }
+      }
+    },
+    "Folders": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹"
+          }
+        }
+      }
+    },
+    "Folders, SleepHold, diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件夹、SleepHold 和诊断"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        }
+      }
+    },
+    "Haptic Feedback": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "触觉反馈"
+          }
+        }
+      }
+    },
+    "Help": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帮助"
+          }
+        }
+      }
+    },
+    "If SleepHold is not installed, disable automatic sleep for the most reliable trigger behavior.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如果未安装 SleepHold，请禁用自动睡眠以获得最可靠的触发行为。"
+          }
+        }
+      }
+    },
+    "Inactive": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未活跃"
+          }
+        }
+      }
+    },
+    "Keep Files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留文件"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Last Update": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次更新"
+          }
+        }
+      }
+    },
+    "Learn More": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "了解更多"
+          }
+        }
+      }
+    },
+    "Lock your Mac to activate Cicada.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "锁定你的 Mac 以激活 Cicada。"
+          }
+        }
+      }
+    },
+    "Maintenance": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "维护"
+          }
+        }
+      }
+    },
+    "Needs alarm and notification": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要报警和通知"
+          }
+        }
+      }
+    },
+    "No startup diagnostics are currently reported.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前没有启动诊断报告。"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无"
+          }
+        }
+      }
+    },
+    "NotchDrop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NotchDrop"
+          }
+        }
+      }
+    },
+    "NotchDrop Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NotchDrop 设置"
+          }
+        }
+      }
+    },
+    "Notification Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知设置"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Once set up, Cicada will **automatically activate** when you **lock** your device.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置完成后，Cicada 会在你**锁定**设备时**自动激活**。"
+          }
+        }
+      }
+    },
+    "One place for status, controls, and configuration.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在一处查看状态、控制和配置。"
+          }
+        }
+      }
+    },
+    "Open Control Center": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开控制中心"
+          }
+        }
+      }
+    },
+    "Open NotchDrop Folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 NotchDrop 文件夹"
+          }
+        }
+      }
+    },
+    "Open Recording Folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开录制文件夹"
+          }
+        }
+      }
+    },
+    "Overview": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "概览"
+          }
+        }
+      }
+    },
+    "Playing sound is the quickest local warning when an alarm fires.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报警触发时，播放声音是最快的本机警示方式。"
+          }
+        }
+      }
+    },
+    "Quit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出"
+          }
+        }
+      }
+    },
+    "Readiness": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "就绪状态"
+          }
+        }
+      }
+    },
+    "Ready": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "就绪"
+          }
+        }
+      }
+    },
+    "Ready after lock": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "锁定后就绪"
+          }
+        }
+      }
+    },
+    "Recording Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制设置"
+          }
+        }
+      }
+    },
+    "Recordings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "录制"
+          }
+        }
+      }
+    },
+    "Required": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "必填"
+          }
+        }
+      }
+    },
+    "Respect the privacy of others.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尊重他人的隐私。"
+          }
+        }
+      }
+    },
+    "Run Startup Checks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行启动检查"
+          }
+        }
+      }
+    },
+    "Running": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行中"
+          }
+        }
+      }
+    },
+    "Runtime paths, SleepHold status, and diagnostics.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行时路径、SleepHold 状态和诊断。"
+          }
+        }
+      }
+    },
+    "Session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话"
+          }
+        }
+      }
+    },
+    "SleepHold": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SleepHold"
+          }
+        }
+      }
+    },
+    "SleepHold active": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SleepHold 活跃"
+          }
+        }
+      }
+    },
+    "SleepHold inactive": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SleepHold 未活跃"
+          }
+        }
+      }
+    },
+    "Sound": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声音"
+          }
+        }
+      }
+    },
+    "Sound and Bark alerts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声音和 Bark 警报"
+          }
+        }
+      }
+    },
+    "Start": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始"
+          }
+        }
+      }
+    },
+    "Start Cicada": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动 Cicada"
+          }
+        }
+      }
+    },
+    "State": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "Status and primary controls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态和主要控制"
+          }
+        }
+      }
+    },
+    "Status: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态：%@"
+          }
+        }
+      }
+    },
+    "Stop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止"
+          }
+        }
+      }
+    },
+    "Stop Cicada": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止 Cicada"
+          }
+        }
+      }
+    },
+    "The current Cicada session has ended.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 Cicada 会话已结束。"
+          }
+        }
+      }
+    },
+    "This app should not run outside of sandbox which may cause trouble.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此应用不应在沙盒外运行，否则可能导致问题。"
+          }
+        }
+      }
+    },
+    "Tray and launch behavior": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "托盘和启动行为"
+          }
+        }
+      }
+    },
+    "Tray settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "托盘设置"
+          }
+        }
+      }
+    },
+    "Trigger conditions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "触发条件"
+          }
+        }
+      }
+    },
+    "Unable to configure Cicada. Please try again later.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法配置 Cicada。请稍后重试。"
+          }
+        }
+      }
+    },
+    "Unit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单位"
+          }
+        }
+      }
+    },
+    "Unknown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知"
+          }
+        }
+      }
+    },
+    "Unlock": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁"
+          }
+        }
+      }
+    },
+    "Unlock Alarm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁报警"
+          }
+        }
+      }
+    },
+    "Value": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数值"
+          }
+        }
+      }
+    },
+    "When a selected trigger occurs, Cicada will either play a sound or send you a notification.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当选中的触发条件发生时，Cicada 会播放声音或向你发送通知。"
           }
         }
       }
@@ -1784,16 +2644,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "年"
-          }
-        }
-      }
-    },
-    "You can enable camera recording when Sentry is activated.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "你可以在开启哨兵时启用录制。"
           }
         }
       }

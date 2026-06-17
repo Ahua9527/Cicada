@@ -37,6 +37,7 @@ final class Sentry: NSObject, ObservableObject {
     typealias WindowControllerFactory = (Sentry) -> NSWindowController?
     typealias WindowCloseAnimator = (NSView, @escaping () -> Void) -> Void
     typealias BarkRequestSender = (URLRequest) -> Void
+    typealias RuntimeStopper = (SentryMonitorRuntime?, @escaping () -> Void) -> Void
     private typealias WindowCloseContext = (controller: NSWindowController, contentView: NSView?)
 
     @Published var isAlrming: Bool = false
@@ -67,6 +68,7 @@ final class Sentry: NSObject, ObservableObject {
     private let makeWindowController: WindowControllerFactory
     private let animateWindowClose: WindowCloseAnimator
     private let barkRequestSender: BarkRequestSender
+    private let stopMonitorRuntime: RuntimeStopper
     private let readSystemVolume: () -> Float?
     private let setSystemVolume: (Float) -> Void
 
@@ -80,6 +82,7 @@ final class Sentry: NSObject, ObservableObject {
         makeWindowController: @escaping WindowControllerFactory = Sentry.makeDefaultWindowController,
         animateWindowClose: @escaping WindowCloseAnimator = Sentry.defaultWindowCloseAnimator,
         barkRequestSender: @escaping BarkRequestSender = Sentry.defaultBarkRequestSender,
+        stopMonitorRuntime: @escaping RuntimeStopper = Sentry.defaultStopMonitorRuntime,
         readSystemVolume: @escaping () -> Float? = AlarmEngine.readSystemVolume,
         setSystemVolume: @escaping (Float) -> Void = AlarmEngine.setSystemVolume
     ) {
@@ -89,6 +92,7 @@ final class Sentry: NSObject, ObservableObject {
         self.makeWindowController = makeWindowController
         self.animateWindowClose = animateWindowClose
         self.barkRequestSender = barkRequestSender
+        self.stopMonitorRuntime = stopMonitorRuntime
         self.readSystemVolume = readSystemVolume
         self.setSystemVolume = setSystemVolume
         super.init()
@@ -104,7 +108,9 @@ final class Sentry: NSObject, ObservableObject {
         guard status != .idle, status != .stopping else { return }
         status = .stopping
 
-        stopMonitorRuntime(detachRuntimeForStop())
+        stopMonitorRuntime(detachRuntimeForStop()) { [weak self] in
+            self?.finishStop()
+        }
     }
 
     func unlockAlarm() {
@@ -211,13 +217,13 @@ final class Sentry: NSObject, ObservableObject {
             return nil
         }
         let newURL = initialURL
-            .appendingPathComponent(String(localized: "Sentry - Mac"))
+            .appendingPathComponent(String(localized: "Cicada - Mac"))
             .appendingPathComponent(message)
         guard var comps = URLComponents(url: newURL, resolvingAgainstBaseURL: false) else { return nil }
         comps.queryItems = [
             .init(name: "level", value: "critical"),
             .init(name: "volume", value: "5"),
-            .init(name: "group", value: String(localized: "Sentry - Mac")),
+            .init(name: "group", value: String(localized: "Cicada - Mac")),
             .init(name: "isArchive", value: "1"),
             .init(name: "call", value: "1"),
             .init(name: "icon", value: "https://github.com/Lakr233/Sentry/blob/main/Sentry/Assets.xcassets/icon-512.imageset/icon-512@2x.png?raw=true"),
@@ -294,16 +300,16 @@ final class Sentry: NSObject, ObservableObject {
         )
     }
 
-    private func stopMonitorRuntime(_ runtime: SentryMonitorRuntime?) {
+    private static func defaultStopMonitorRuntime(_ runtime: SentryMonitorRuntime?, completion: @escaping () -> Void) {
         guard let runtime else {
-            finishStop()
+            completion()
             return
         }
 
         Task {
             await runtime.stop()
             await MainActor.run {
-                self.finishStop()
+                completion()
             }
         }
     }

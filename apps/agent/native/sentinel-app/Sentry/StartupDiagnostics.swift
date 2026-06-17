@@ -7,7 +7,7 @@ struct StartupDiagnostic: Identifiable, Equatable, Hashable {
 }
 
 extension StartupDiagnostic {
-    private static let genericStartupFailureMessage = String(localized: "Unable to configure Sentry. Please try again later.")
+    private static let genericStartupFailureMessage = String(localized: "Unable to configure Cicada. Please try again later.")
 
     private static func make(id: String, message: String) -> Self {
         .init(id: id, message: message)
@@ -16,7 +16,7 @@ extension StartupDiagnostic {
     static var sandboxDisabledLocalBuild: Self {
         make(
             id: "sandbox-disabled-local-build",
-            message: String(localized: "Sentry is running outside of the App Sandbox in a local debug or unsigned build. Permissions, file access, and release behavior may differ from the signed app.")
+            message: String(localized: "Cicada is running outside of the App Sandbox in a local debug or unsigned build. Permissions, file access, and release behavior may differ from the signed app.")
         )
     }
 
@@ -43,7 +43,7 @@ enum StartupLaunchDecision: Equatable {
 }
 
 enum StartupLaunchPolicy {
-    private static let sandboxRequiredMessage = "This app should not run outside of sandbox which may cause trouble."
+    private static let sandboxRequiredMessage = String(localized: "This app should not run outside of sandbox which may cause trouble.")
 
     static func evaluate(
         isRunningTests: Bool,

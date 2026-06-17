@@ -30,7 +30,10 @@ final class SentryStabilityTests: XCTestCase {
 
         XCTAssertEqual(
             decision,
-            .block("This app should not run outside of sandbox which may cause trouble.")
+            .block(String(
+                localized: "This app should not run outside of sandbox which may cause trouble.",
+                bundle: Bundle(for: AppDelegate.self)
+            ))
         )
     }
 
@@ -54,6 +57,87 @@ final class SentryStabilityTests: XCTestCase {
         )
 
         XCTAssertEqual(decision, .allow)
+    }
+
+    func testSimplifiedChineseLocalizationCatalogsAreComplete() throws {
+        let localizable = try loadStringCatalog(named: "Localizable")
+        let infoPlist = try loadStringCatalog(named: "InfoPlist")
+
+        assertSimplifiedChineseCatalogIsComplete(localizable, catalogName: "Localizable")
+        assertSimplifiedChineseCatalogIsComplete(infoPlist, catalogName: "InfoPlist")
+
+        XCTAssertEqual(
+            localizable.zhHansValue(for: "Cicada Control Center"),
+            "Cicada 控制中心"
+        )
+        XCTAssertEqual(localizable.zhHansValue(for: "Start Cicada"), "启动 Cicada")
+        XCTAssertEqual(localizable.zhHansValue(for: "Stop Cicada"), "停止 Cicada")
+        XCTAssertEqual(localizable.zhHansValue(for: "Startup Diagnostics"), "启动诊断")
+        XCTAssertEqual(localizable.zhHansValue(for: "Open Control Center"), "打开控制中心")
+        XCTAssertEqual(
+            localizable.zhHansValue(for: "One or more files failed to load"),
+            "一个或多个文件加载失败"
+        )
+        XCTAssertEqual(localizable.zhHansValue(for: "an hour"), "一小时")
+        XCTAssertEqual(localizable.zhHansValue(for: "a day"), "一天")
+        XCTAssertEqual(localizable.zhHansValue(for: "two days"), "两天")
+        XCTAssertEqual(infoPlist.zhHansValue(for: "CFBundleDisplayName"), "Cicada")
+        XCTAssertEqual(
+            infoPlist.zhHansValue(for: "NSCameraUsageDescription"),
+            "Cicada 需要这个权限才能录制电脑前的内容。录制内容将被保存到本地。"
+        )
+    }
+
+    func testSimplifiedChineseLocalizationIsPackagedInAppBundle() throws {
+        let appBundle = Bundle(for: AppDelegate.self)
+        let zhHansURL = try XCTUnwrap(appBundle.url(forResource: "zh-Hans", withExtension: "lproj"))
+        var isDirectory: ObjCBool = false
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: zhHansURL.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+
+        let zhHansBundle = try XCTUnwrap(Bundle(path: zhHansURL.path))
+        XCTAssertEqual(
+            zhHansBundle.localizedString(forKey: "Cicada Control Center", value: nil, table: nil),
+            "Cicada 控制中心"
+        )
+        XCTAssertEqual(
+            zhHansBundle.localizedString(forKey: "Start Cicada", value: nil, table: nil),
+            "启动 Cicada"
+        )
+        XCTAssertEqual(
+            zhHansBundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist"),
+            "Cicada 需要这个权限才能录制电脑前的内容。录制内容将被保存到本地。"
+        )
+    }
+
+    func testLanguagePickerOptionsAreLimitedToSupportedLanguages() {
+        XCTAssertEqual(Language.allCases, [.system, .simplifiedChinese, .english])
+    }
+
+    func testLanguageDisplayNamesMatchInterfaceLanguageRules() throws {
+        let localizable = try loadStringCatalog(named: "Localizable")
+
+        XCTAssertEqual(localizable.zhHansValue(for: "Follow System"), "跟随系统")
+        XCTAssertEqual(localizable.zhHansValue(for: "Simplified Chinese"), "简体中文")
+        XCTAssertEqual(localizable.zhHansValue(for: "English"), "English")
+        XCTAssertEqual(localizable.enValue(for: "Simplified Chinese"), "Simplified Chinese")
+        XCTAssertEqual(localizable.enValue(for: "English"), "English")
+    }
+
+    func testUnsupportedStoredLanguageFallsBackToSystem() {
+        for rawValue in ["German", "Traditional Chinese"] {
+            let provider = MemoryPersistProvider()
+            provider.set(Data("\"\(rawValue)\"".utf8), forKey: "selectedLanguage")
+
+            let persisted = Persist<Language>(
+                key: "selectedLanguage",
+                defaultValue: .system,
+                engine: provider
+            )
+
+            XCTAssertEqual(persisted.wrappedValue, .system, rawValue)
+        }
     }
 
     @MainActor
@@ -320,6 +404,125 @@ final class SentryStabilityTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletedSentinelSessionRearmsAfterUnlockAndStartsOnNextLock() {
+        let controller = SentinelController.shared
+        let viewModel = ViewModel.shared
+        var isLocked = false
+        var startCount = 0
+
+        controller.resetForTesting()
+        defer { controller.resetForTesting() }
+        controller.configureForTesting(
+            isMacLocked: { isLocked },
+            makeSentry: {
+                startCount += 1
+                return Sentry(
+                    configuration: .init(),
+                    onAlarmingActivaty: { _ in },
+                    shouldStartRuntimeLoop: false,
+                    makeWindowController: { _ in nil },
+                    readSystemVolume: { 0.5 },
+                    setSystemVolume: { _ in }
+                )
+            }
+        )
+
+        viewModel.status = .completed
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .welcome)
+        XCTAssertEqual(startCount, 0)
+
+        isLocked = true
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .running)
+        XCTAssertEqual(startCount, 1)
+    }
+
+    @MainActor
+    func testCompletedSentinelSessionStartsNextLockWhilePreviousStopIsFinishing() {
+        let controller = SentinelController.shared
+        let viewModel = ViewModel.shared
+        var isLocked = true
+        var startCount = 0
+
+        controller.resetForTesting()
+        defer { controller.resetForTesting() }
+        controller.configureForTesting(
+            isMacLocked: { isLocked },
+            makeSentry: {
+                startCount += 1
+                return Sentry(
+                    configuration: .init(),
+                    onAlarmingActivaty: { _ in },
+                    shouldStartRuntimeLoop: false,
+                    makeWindowController: { _ in nil },
+                    stopMonitorRuntime: { _, _ in },
+                    readSystemVolume: { 0.5 },
+                    setSystemVolume: { _ in }
+                )
+            }
+        )
+
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .running)
+        XCTAssertEqual(startCount, 1)
+
+        isLocked = false
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .completed)
+
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .welcome)
+
+        isLocked = true
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .running)
+        XCTAssertEqual(startCount, 2)
+    }
+
+    @MainActor
+    func testAlarmedSentinelSessionRearmsAfterUnlockAndStartsOnNextLock() {
+        let controller = SentinelController.shared
+        let viewModel = ViewModel.shared
+        var isLocked = true
+        var startCount = 0
+
+        controller.resetForTesting()
+        defer { controller.resetForTesting() }
+        controller.configureForTesting(
+            isMacLocked: { isLocked },
+            makeSentry: {
+                startCount += 1
+                return Sentry(
+                    configuration: .init(),
+                    onAlarmingActivaty: { _ in },
+                    shouldStartRuntimeLoop: false,
+                    makeWindowController: { _ in nil },
+                    readSystemVolume: { 0.5 },
+                    setSystemVolume: { _ in }
+                )
+            }
+        )
+
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .running)
+        XCTAssertEqual(startCount, 1)
+
+        viewModel.status = .activityDetected
+        isLocked = false
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .completed)
+
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .welcome)
+
+        isLocked = true
+        controller.handleTimerTick()
+        XCTAssertEqual(viewModel.status, .running)
+        XCTAssertEqual(startCount, 2)
+    }
+
+    @MainActor
     func testSentinelNotifierHandlerValidatesPayloadAndRenders() throws {
         let renderer = RecordingNotificationRenderer()
         let handler = SentinelNotifierRequestHandler(renderer: renderer)
@@ -546,6 +749,84 @@ final class SentryStabilityTests: XCTestCase {
         XCTAssertTrue(extended)
         XCTAssertEqual(server.recordedActions(), ["power_assertion_start", "power_assertion_start"])
     }
+}
+
+private func loadStringCatalog(named name: String) throws -> StringCatalog {
+    let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let catalogURL = testsDirectory
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sentry")
+        .appendingPathComponent("\(name).xcstrings")
+    let data = try Data(contentsOf: catalogURL)
+    return try JSONDecoder().decode(StringCatalog.self, from: data)
+}
+
+private func assertSimplifiedChineseCatalogIsComplete(
+    _ catalog: StringCatalog,
+    catalogName: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    var missing: [String] = []
+    var untranslated: [String] = []
+    var empty: [String] = []
+    var legacyBranding: [String] = []
+
+    for (key, entry) in catalog.strings {
+        guard let unit = entry.localizations?["zh-Hans"]?.stringUnit else {
+            missing.append(key)
+            continue
+        }
+        if unit.state != "translated" {
+            untranslated.append(key)
+        }
+        if unit.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            empty.append(key)
+        }
+        if unit.value.contains("Sentry") || unit.value.contains("哨兵") {
+            legacyBranding.append(key)
+        }
+    }
+
+    XCTAssertTrue(missing.isEmpty, "\(catalogName) missing zh-Hans: \(missing.sorted())", file: file, line: line)
+    XCTAssertTrue(
+        untranslated.isEmpty,
+        "\(catalogName) has untranslated zh-Hans entries: \(untranslated.sorted())",
+        file: file,
+        line: line
+    )
+    XCTAssertTrue(empty.isEmpty, "\(catalogName) has empty zh-Hans entries: \(empty.sorted())", file: file, line: line)
+    XCTAssertTrue(
+        legacyBranding.isEmpty,
+        "\(catalogName) has legacy user-facing branding: \(legacyBranding.sorted())",
+        file: file,
+        line: line
+    )
+}
+
+private struct StringCatalog: Decodable {
+    let strings: [String: StringCatalogEntry]
+
+    func zhHansValue(for key: String) -> String? {
+        strings[key]?.localizations?["zh-Hans"]?.stringUnit?.value
+    }
+
+    func enValue(for key: String) -> String? {
+        strings[key]?.localizations?["en"]?.stringUnit?.value
+    }
+}
+
+private struct StringCatalogEntry: Decodable {
+    let localizations: [String: StringCatalogLocalization]?
+}
+
+private struct StringCatalogLocalization: Decodable {
+    let stringUnit: StringCatalogStringUnit?
+}
+
+private struct StringCatalogStringUnit: Decodable {
+    let state: String
+    let value: String
 }
 
 private struct MockStartupCheckProvider: StartupCheckProviding {
