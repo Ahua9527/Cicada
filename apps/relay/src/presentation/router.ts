@@ -5,14 +5,11 @@
 
 import type { MiddlewareContext } from '../types';
 import {
-  BARK_ROUTE_METHODS,
-  handleBarkRoute,
   handleWebSocketRoute,
   handleStatusRoute,
   handleDeviceListRoute,
   handleHealthRoute,
   handleShortcutCommandRoute,
-  isBarkRequest,
 } from './routes';
 import { sanitizeRequestUrl } from './request-url-sanitizer';
 
@@ -27,11 +24,6 @@ export interface Route {
  */
 export class Router {
   private routes: Route[] = [];
-  private barkRoute: Route = {
-    pattern: /^\/bark(?:\/.*)?$/,
-    methods: BARK_ROUTE_METHODS,
-    handler: handleBarkRoute,
-  };
 
   /**
    * Register routes
@@ -68,9 +60,9 @@ export class Router {
       const { request } = context;
       const url = new URL(request.url);
       const { pathname, method } = { pathname: url.pathname, method: request.method };
-      const sanitizedPathname = new URL(sanitizeRequestUrl(request.url, context.env)).pathname;
+      const sanitizedPathname = new URL(sanitizeRequestUrl(request.url)).pathname;
 
-      const route = this.findRoute(pathname, method) ?? this.findBarkFallback(pathname, method, context);
+      const route = this.findRoute(pathname, method);
 
       if (!route) {
         context.logger.warn('Route not found', {
@@ -117,17 +109,5 @@ export class Router {
         };
       }
     };
-  }
-
-  private findBarkFallback(
-    pathname: string,
-    method: string,
-    context: MiddlewareContext
-  ): Route | undefined {
-    if (!this.barkRoute.methods.includes(method)) {
-      return undefined;
-    }
-
-    return isBarkRequest(pathname, context.env) ? this.barkRoute : undefined;
   }
 }

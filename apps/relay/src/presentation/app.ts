@@ -16,7 +16,6 @@ import {
   requestSizeLimitMiddleware,
 } from '../infrastructure/middleware';
 import { Router } from './router';
-import { BARK_ROUTE_METHODS } from './routes';
 import { sanitizeRequestUrl } from './request-url-sanitizer';
 import { API_CONSTANTS } from '../config/constants';
 
@@ -74,7 +73,7 @@ export class CicadaRelayApp {
       pipeline.use(
         corsMiddleware({
           allowedOrigins,
-          allowedMethods: BARK_ROUTE_METHODS,
+          allowedMethods: ['GET', 'POST', 'OPTIONS'],
           allowedHeaders: [
             'Content-Type',
             'Authorization',
@@ -132,7 +131,7 @@ export class CicadaRelayApp {
         requestId,
         context: {
           method: request.method,
-          url: this.sanitizeUrl(request.url, env),
+          url: this.sanitizeUrl(request.url),
           userAgent: request.headers.get('User-Agent'),
           ip: request.headers.get('CF-Connecting-IP'),
         },
@@ -158,7 +157,7 @@ export class CicadaRelayApp {
       this.logger.error('Request handling failed', {
         requestId,
         error: error as Error,
-        context: { method: request.method, url: this.sanitizeUrl(request.url, env) },
+        context: { method: request.method, url: this.sanitizeUrl(request.url) },
         tags: ['request', 'error'],
       });
 
@@ -200,7 +199,7 @@ export class CicadaRelayApp {
     return result;
   }
 
-  private sanitizeUrl(rawUrl: string, env: Env = this.env ?? ({} as Env)): string {
-    return sanitizeRequestUrl(rawUrl, env);
+  private sanitizeUrl(rawUrl: string): string {
+    return sanitizeRequestUrl(rawUrl);
   }
 }

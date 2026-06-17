@@ -1,4 +1,4 @@
-import type { D1Database, DurableObjectNamespace } from '@cloudflare/workers-types';
+import type { DurableObjectNamespace } from '@cloudflare/workers-types';
 
 /**
  * Shared primitive and infrastructure types used across Cicada and CicadaRelay.
@@ -57,7 +57,6 @@ export interface ErrorDetail {
  */
 export interface Env {
   CICADA_SESSIONS: DurableObjectNamespace;
-  BARK_DATABASE?: D1Database;
 
   NODE_ENV?: string;
   LOG_LEVEL?: string;
@@ -76,16 +75,6 @@ export interface Env {
   ENABLE_CACHING?: string;
   ALLOWED_ORIGINS?: string;
   USE_DDD_ARCHITECTURE?: string;
-  BARK_ROOT_PATH?: string;
-  BARK_BASIC_AUTH?: string;
-  BASIC_AUTH?: string;
-  BARK_ALLOW_NEW_DEVICE?: string;
-  BARK_ALLOW_QUERY_NUMS?: string;
-  BARK_APNS_PRIVATE_KEY?: string;
-  BARK_APNS_TEAM_ID?: string;
-  BARK_APNS_KEY_ID?: string;
-  BARK_APNS_TOPIC?: string;
-  BARK_APNS_HOST_NAME?: string;
 }
 
 /**

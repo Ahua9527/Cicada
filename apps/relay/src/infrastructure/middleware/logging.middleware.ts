@@ -19,7 +19,7 @@ export function requestIdMiddleware(): Middleware {
       context.requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    const sanitizedUrl = new URL(sanitizeRequestUrl(context.url, context.env));
+    const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));
 
     context.logger.info(`Request started: ${context.method} ${sanitizedUrl.pathname}`, {
       requestId: context.requestId,

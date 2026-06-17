@@ -49,7 +49,7 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
       if (contentLength) {
         const size = parseInt(contentLength);
         if (size > maxSize) {
-          const sanitizedUrl = new URL(sanitizeRequestUrl(context.url, context.env));
+          const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));
           context.logger.warn('Request body too large', {
             requestId: context.requestId,
             context: {
