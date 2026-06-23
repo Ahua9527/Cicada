@@ -889,16 +889,6 @@
         }
       }
     },
-    "If SleepHoldService is not installed, you may need to disable Mac's automatic sleep feature for these triggers to work effectively.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "如果未安装 SleepHoldService，你可能需要手动关闭 Mac 的自动睡眠功能，才能让这些触发器有效工作。"
-          }
-        }
-      }
-    },
     "If you have Bark installed on your phone, connect to Bark here. For more information, please visit [https://bark.day.app/](https://bark.day.app/).": {
       "localizations": {
         "zh-Hans": {
@@ -1149,16 +1139,6 @@
         }
       }
     },
-    "Note that you may need to disable Mac's automatic sleep feature for these triggers to work effectively.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请注意，你也许需要手动关闭 Mac 的自动睡眠功能才能让警报正确工作。"
-          }
-        }
-      }
-    },
     "OK": {
       "localizations": {
         "zh-Hans": {
@@ -1360,16 +1340,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "簡體中文"
-          }
-        }
-      }
-    },
-    "Sleep hold service is enabled. Your Mac wont sleep automatically.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "阻眠服务已连接，你的 Mac 在盒上盖子时将不会自动睡眠。"
           }
         }
       }
@@ -1669,16 +1639,6 @@
         }
       }
     },
-    "Active: %@": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "活跃：%@"
-          }
-        }
-      }
-    },
     "Alarm Settings": {
       "localizations": {
         "zh-Hans": {
@@ -1909,6 +1869,16 @@
         }
       }
     },
+    "Current Hold": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前防睡眠持有"
+          }
+        }
+      }
+    },
     "Connect Bark if you want alarm notifications on your phone.": {
       "localizations": {
         "zh-Hans": {
@@ -1935,16 +1905,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "诊断"
-          }
-        }
-      }
-    },
-    "Disable Auto Sleep": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "禁用自动睡眠"
           }
         }
       }
@@ -1989,12 +1949,12 @@
         }
       }
     },
-    "Folders, SleepHold, diagnostics": {
+    "Folders, sleep hold session, diagnostics": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "文件夹、SleepHold 和诊断"
+            "value": "文件夹、防睡眠会话和诊断"
           }
         }
       }
@@ -2029,22 +1989,32 @@
         }
       }
     },
-    "If SleepHold is not installed, disable automatic sleep for the most reliable trigger behavior.": {
+    "Holding": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果未安装 SleepHold，请禁用自动睡眠以获得最可靠的触发行为。"
+            "value": "持有中"
           }
         }
       }
     },
-    "Inactive": {
+    "Idle": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未活跃"
+            "value": "空闲"
+          }
+        }
+      }
+    },
+    "While Cicada is monitoring, it asks SleepHold to prevent sleep so alarm triggers stay reliable. If that hold is unavailable or blocked by system policy, disable automatic sleep in macOS.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 监控运行时会请求 SleepHold 阻止睡眠，以保持报警触发可靠。如果该防睡眠持有不可用或被系统策略阻止，请在 macOS 中手动禁用自动睡眠。"
           }
         }
       }
@@ -2135,6 +2105,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "无"
+          }
+        }
+      }
+    },
+    "No current session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无当前会话"
           }
         }
       }
@@ -2359,12 +2339,12 @@
         }
       }
     },
-    "Runtime paths, SleepHold status, and diagnostics.": {
+    "Runtime paths, sleep hold session, and diagnostics.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "运行时路径、SleepHold 状态和诊断。"
+            "value": "运行时路径、防睡眠会话和诊断。"
           }
         }
       }
@@ -2389,22 +2369,32 @@
         }
       }
     },
-    "SleepHold active": {
+    "Sleep Hold Session": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SleepHold 活跃"
+            "value": "防睡眠会话"
           }
         }
       }
     },
-    "SleepHold inactive": {
+    "Sleep hold active": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SleepHold 未活跃"
+            "value": "防睡眠持有中"
+          }
+        }
+      }
+    },
+    "Sleep hold idle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "防睡眠空闲"
           }
         }
       }
@@ -2459,12 +2449,12 @@
         }
       }
     },
-    "Status and primary controls": {
+    "Status and readiness": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "状态和主要控制"
+            "value": "状态与就绪"
           }
         }
       }

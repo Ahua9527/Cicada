@@ -7,7 +7,12 @@ import XCTest
 @testable import CicadaSystem
 
 private final class FakeDaemonManager: DaemonManaging {
-    var statusValue = DaemonStatus(installed: true, running: true, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
+    var statusValue = DaemonStatus(
+        installed: true,
+        running: true,
+        plistPath: "/tmp/agent.plist",
+        binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-agent"
+    )
     var recordCall: ((String) -> Void)?
     private(set) var calls: [String] = []
 
@@ -30,7 +35,7 @@ private final class FakeSentinelAppManager: SentinelAppManaging {
         installed: true,
         running: true,
         plistPath: "/tmp/sentinel.plist",
-        appPath: "/tmp/Cicada.app",
+        appPath: "/Applications/Cicada.app",
         socketPath: "/tmp/notifier.sock",
         sentinelSocketPath: "/tmp/sentinel.sock",
         notifierSocketReady: true,
@@ -57,7 +62,7 @@ private final class FakeSleepHoldManager: SleepHoldManaging {
         installed: true,
         running: true,
         plistPath: "/Library/LaunchDaemons/com.cicada.sleephold.plist",
-        binaryPath: "/tmp/cicada-sleephold",
+        binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-sleephold",
         socketPath: "/tmp/sleephold.sock",
         powerStatus: .canSleep,
         activeSessions: 0
@@ -233,12 +238,17 @@ final class CicadaCLITests: XCTestCase {
     func testStartInstallsMissingServices() {
         let fixture = CLIFixture()
         _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
-        fixture.daemon.statusValue = DaemonStatus(installed: false, running: false, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
+        fixture.daemon.statusValue = DaemonStatus(
+            installed: false,
+            running: false,
+            plistPath: "/tmp/agent.plist",
+            binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-agent"
+        )
         fixture.sentinelApp.statusValue = SentinelAppStatus(
             installed: false,
             running: false,
             plistPath: "/tmp/sentinel.plist",
-            appPath: "/tmp/Cicada.app",
+            appPath: "/Applications/Cicada.app",
             socketPath: "/tmp/notifier.sock"
         )
 

@@ -29,13 +29,6 @@ final class RuntimePathsTests: XCTestCase {
         XCTAssertEqual(path, "/tmp/Cicada.app")
     }
 
-    func testSentinelAppPathCandidatesKeepLegacyFallback() {
-        XCTAssertEqual(
-            RuntimePaths.sentinelAppPathCandidates,
-            [RuntimePaths.sentinelAppPath, RuntimePaths.legacySentinelAppPath]
-        )
-    }
-
     func testDaemonSourceResolutionPrefersExplicitPath() {
         let explicit = "/custom/cicada-agent"
 
@@ -54,7 +47,6 @@ final class RuntimePathsTests: XCTestCase {
         let existing = Set([
             currentBundleHelper,
             RuntimePaths.bundledDaemonHelperPath,
-            RuntimePaths.daemonBinaryPath,
         ])
 
         let resolved = RuntimePaths.resolveDaemonSourceBinaryPath(
@@ -66,15 +58,11 @@ final class RuntimePathsTests: XCTestCase {
         XCTAssertEqual(resolved, currentBundleHelper)
     }
 
-    func testDaemonSourceResolutionPrefersInstalledBundleBeforeLegacyBundle() {
-        let legacyBundleHelper = RuntimePaths.helperPath(
-            name: RuntimePaths.daemonBinaryName,
-            inApp: RuntimePaths.legacySentinelAppPath
-        )
+    func testDaemonSourceResolutionPrefersInstalledBundleBeforeSwiftBuild() {
+        let swiftBuildHelper = "/repo/apps/agent/swift/.build/release/cicada-agent"
         let existing = Set([
             RuntimePaths.bundledDaemonHelperPath,
-            legacyBundleHelper,
-            RuntimePaths.daemonBinaryPath,
+            swiftBuildHelper,
         ])
 
         let resolved = RuntimePaths.resolveDaemonSourceBinaryPath(
@@ -86,33 +74,30 @@ final class RuntimePathsTests: XCTestCase {
         XCTAssertEqual(resolved, RuntimePaths.bundledDaemonHelperPath)
     }
 
-    func testDaemonSourceResolutionFallsBackToLegacyBundleBeforeRuntimeBin() {
+    func testDaemonSourceResolutionDoesNotUseLegacyBundleAsSource() {
         let legacyBundleHelper = RuntimePaths.helperPath(
             name: RuntimePaths.daemonBinaryName,
             inApp: RuntimePaths.legacySentinelAppPath
         )
-        let existing = Set([
-            legacyBundleHelper,
-            RuntimePaths.daemonBinaryPath,
-        ])
 
         let resolved = RuntimePaths.resolveDaemonSourceBinaryPath(
             currentDirectoryPath: "/repo/apps/agent",
             currentAppPath: nil,
-            fileExists: { existing.contains($0) }
+            fileExists: { $0 == legacyBundleHelper }
         )
 
-        XCTAssertEqual(resolved, legacyBundleHelper)
+        XCTAssertEqual(resolved, RuntimePaths.bundledDaemonHelperPath)
     }
 
-    func testDaemonSourceResolutionFallsBackToRuntimeBin() {
+    func testDaemonSourceResolutionFallsBackToSwiftBuild() {
+        let swiftBuildHelper = "/repo/apps/agent/swift/.build/release/cicada-agent"
         let resolved = RuntimePaths.resolveDaemonSourceBinaryPath(
             currentDirectoryPath: "/repo/apps/agent",
             currentAppPath: nil,
-            fileExists: { $0 == RuntimePaths.daemonBinaryPath }
+            fileExists: { $0 == swiftBuildHelper }
         )
 
-        XCTAssertEqual(resolved, RuntimePaths.daemonBinaryPath)
+        XCTAssertEqual(resolved, swiftBuildHelper)
     }
 
     func testSleepHoldSourceResolutionPrefersCurrentBundleHelper() {
@@ -133,10 +118,10 @@ final class RuntimePathsTests: XCTestCase {
     }
 
     func testSleepHoldSourceResolutionPrefersInstalledBundleHelper() {
+        let swiftBuildHelper = "/repo/apps/agent/swift/.build/release/cicada-sleephold"
         let existing = Set([
             RuntimePaths.bundledSleepHoldHelperPath,
-            RuntimePaths.sleepHoldStagingBinaryPath,
-            RuntimePaths.sleepHoldBinaryPath,
+            swiftBuildHelper,
         ])
 
         let resolved = RuntimePaths.resolveSleepHoldSourceBinaryPath(
@@ -148,33 +133,29 @@ final class RuntimePathsTests: XCTestCase {
         XCTAssertEqual(resolved, RuntimePaths.bundledSleepHoldHelperPath)
     }
 
-    func testSleepHoldSourceResolutionFallsBackToLegacyBundleBeforeStagingBin() {
+    func testSleepHoldSourceResolutionDoesNotUseLegacyBundleAsSource() {
         let legacyBundleHelper = RuntimePaths.helperPath(
             name: RuntimePaths.sleepHoldBinaryName,
             inApp: RuntimePaths.legacySentinelAppPath
         )
-        let existing = Set([
-            legacyBundleHelper,
-            RuntimePaths.sleepHoldStagingBinaryPath,
-            RuntimePaths.sleepHoldBinaryPath,
-        ])
 
         let resolved = RuntimePaths.resolveSleepHoldSourceBinaryPath(
             currentDirectoryPath: "/repo/apps/agent",
             currentAppPath: nil,
-            fileExists: { existing.contains($0) }
+            fileExists: { $0 == legacyBundleHelper }
         )
 
-        XCTAssertEqual(resolved, legacyBundleHelper)
+        XCTAssertEqual(resolved, RuntimePaths.bundledSleepHoldHelperPath)
     }
 
-    func testSleepHoldSourceResolutionFallsBackToStagingBin() {
+    func testSleepHoldSourceResolutionFallsBackToSwiftBuild() {
+        let swiftBuildHelper = "/repo/apps/agent/swift/.build/release/cicada-sleephold"
         let resolved = RuntimePaths.resolveSleepHoldSourceBinaryPath(
             currentDirectoryPath: "/repo/apps/agent",
             currentAppPath: nil,
-            fileExists: { $0 == RuntimePaths.sleepHoldStagingBinaryPath }
+            fileExists: { $0 == swiftBuildHelper }
         )
 
-        XCTAssertEqual(resolved, RuntimePaths.sleepHoldStagingBinaryPath)
+        XCTAssertEqual(resolved, swiftBuildHelper)
     }
 }

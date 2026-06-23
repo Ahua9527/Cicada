@@ -33,21 +33,16 @@ public final class DaemonManager {
             throw CicadaError.io("daemon 二进制不存在: \(source)")
         }
 
-        try fm.createDirectory(atPath: RuntimePaths.binDir, withIntermediateDirectories: true)
-        if source != RuntimePaths.daemonBinaryPath {
-            if fm.fileExists(atPath: RuntimePaths.daemonBinaryPath) {
-                try fm.removeItem(atPath: RuntimePaths.daemonBinaryPath)
-            }
-            try fm.copyItem(atPath: source, toPath: RuntimePaths.daemonBinaryPath)
-        }
-        _ = chmod(RuntimePaths.daemonBinaryPath, 0o755)
+        try fm.createDirectory(atPath: RuntimePaths.cicadaHome, withIntermediateDirectories: true)
+        try fm.createDirectory(atPath: RuntimePaths.runDir, withIntermediateDirectories: true)
+        _ = chmod(source, 0o755)
 
         let legacyScriptPath = RuntimePaths.cicadaHome + "/cicada-agent.js"
         if fm.fileExists(atPath: legacyScriptPath) {
             try? fm.removeItem(atPath: legacyScriptPath)
         }
 
-        let plist = daemonPlist(binaryPath: RuntimePaths.daemonBinaryPath)
+        let plist = daemonPlist(binaryPath: source)
         try plist.write(toFile: RuntimePaths.daemonPlistPath, atomically: true, encoding: .utf8)
 
         _ = runner.run("/bin/launchctl", args: ["unload", RuntimePaths.daemonPlistPath], timeoutMs: 5_000)

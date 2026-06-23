@@ -18,8 +18,11 @@ pnpm run lint:agent
 pnpm run test:agent
 ```
 
-`scripts/build.sh` installs the app to `~/.cicada/apps/Cicada.app`. Runtime
-control is exposed through the daemon/CLI commands `sentry_start`,
-`sentry_stop`, `sentry_status`, `sentry_unlock`, and `sentry_open`. The app also
-hosts the notifier socket at `~/.cicada/run/notifier.sock` and stores NotchDrop
-tray files under `~/.cicada/notchdrop`.
+`scripts/build.sh` builds release artifacts without installing them into the
+local runtime. The delivered app root is `/Applications/Cicada.app`; its CLI,
+daemon, and SleepHold helper live under `Contents/Helpers`. Runtime control is
+exposed through the daemon/CLI commands `sentry_start`, `sentry_stop`,
+`sentry_status`, `sentry_unlock`, and `sentry_open`. The app also hosts the
+notifier socket at `~/.cicada/run/notifier.sock` and stores NotchDrop tray files
+under `~/.cicada/notchdrop`; `~/.cicada` is reserved for user data, logs,
+sockets, and cache.

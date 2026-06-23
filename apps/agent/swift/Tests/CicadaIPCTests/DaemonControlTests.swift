@@ -177,7 +177,7 @@ final class DaemonControlTests: XCTestCase {
         let fixture = try SentinelAppManagerFixture()
         try fixture.createLegacySentinelApp(includeInfoPlist: true)
 
-        try fixture.manager.install()
+        try fixture.manager.install(sourceAppPath: fixture.paths.legacySentinelAppPath)
 
         let executable = fixture.paths.sentinelAppPath + "/Contents/MacOS/Cicada"
         XCTAssertTrue(FileManager.default.fileExists(atPath: executable))
@@ -294,11 +294,12 @@ private final class SentinelAppManagerFixture {
         let runDir = cicadaHome.appendingPathComponent("run", isDirectory: true)
         let appsDir = cicadaHome.appendingPathComponent("apps", isDirectory: true)
         let binDir = cicadaHome.appendingPathComponent("bin", isDirectory: true)
+        let applicationsDir = root.appendingPathComponent("Applications", isDirectory: true)
         let launchAgentsDir = home.appendingPathComponent("Library/LaunchAgents", isDirectory: true)
         paths = SentinelAppRuntimePaths(
             runDir: runDir.path,
             sentinelLabel: "com.cicada.sentinel.test",
-            sentinelAppPath: appsDir.appendingPathComponent("Cicada.app", isDirectory: true).path,
+            sentinelAppPath: applicationsDir.appendingPathComponent("Cicada.app", isDirectory: true).path,
             legacySentinelAppPath: appsDir.appendingPathComponent("Sentry.app", isDirectory: true).path,
             sentinelExecutableName: "Cicada",
             sentinelPlistPath: launchAgentsDir.appendingPathComponent("com.cicada.sentinel.test.plist").path,

@@ -175,11 +175,15 @@ final class SentinelController: ObservableObject {
 
     func showSleepHoldStatus() {
         let status = statusSnapshot()
+        let holdState = status.sleepHoldActive ? String(localized: "Holding") : String(localized: "Idle")
+        let session = status.sleepHoldActive
+            ? status.sleepHoldSessionId
+            : String(localized: "No current session")
+        let currentHoldLabel = String(localized: "Current Hold")
+        let sessionLabel = String(localized: "Session")
         let alert = NSAlert()
-        alert.messageText = String(localized: "Disable Auto Sleep")
-        alert.informativeText = status.sleepHoldActive
-            ? String(format: String(localized: "Active: %@"), status.sleepHoldSessionId)
-            : String(localized: "Inactive")
+        alert.messageText = String(localized: "Sleep Hold Session")
+        alert.informativeText = "\(currentHoldLabel): \(holdState)\n\(sessionLabel): \(session)"
         alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()
     }
@@ -189,12 +193,13 @@ final class SentinelController: ObservableObject {
     }
 
     func statusSnapshot() -> SentinelStatusSnapshot {
-        let sleepHoldId = SentryConfigurationManager.shared.sleepHoldServiceIdentifier
+        let config = SentryConfigurationManager.shared
+        let sleepHoldId = config.sleepHoldSessionIdentifier
         return SentinelStatusSnapshot(
             state: statusTitle,
             activityHint: activityHint,
             recordingEnabled: showsSavedClips,
-            sleepHoldActive: !sleepHoldId.isEmpty,
+            sleepHoldActive: config.hasSleepHoldSession,
             sleepHoldSessionId: sleepHoldId
         )
     }

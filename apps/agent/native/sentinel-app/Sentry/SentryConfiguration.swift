@@ -29,6 +29,14 @@ final class SentryConfigurationManager: ObservableObject {
     @Published var sleepHoldServiceIdentifier: String = ""
     @Published var sleepHoldServiceLastUpdate: Date = .init()
 
+    var sleepHoldSessionIdentifier: String {
+        sleepHoldServiceIdentifier
+    }
+
+    var hasSleepHoldSession: Bool {
+        !sleepHoldSessionIdentifier.isEmpty
+    }
+
     init(
         sleepHoldClient: SleepHoldServiceClient = CicadaDaemonSleepHoldServiceClient(),
         now: @escaping () -> Date = Date.init,

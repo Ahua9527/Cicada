@@ -6,6 +6,7 @@ public enum RuntimePaths {
     public static let runDir = cicadaHome + "/run"
     public static let binDir = cicadaHome + "/bin"
     public static let daemonDir = cicadaHome + "/daemon"
+    public static let applicationsDir = "/Applications"
 
     public static let cliBinaryName = "cicada"
     public static let daemonBinaryName = "cicada-agent"
@@ -19,17 +20,17 @@ public enum RuntimePaths {
     public static let notifierSocketPath = runDir + "/notifier.sock"
     public static let daemonSocketPath = runDir + "/daemon.sock"
     public static let sentinelSocketPath = runDir + "/sentinel.sock"
-    public static let cliBinaryPath = binDir + "/" + cliBinaryName
-    public static let daemonBinaryPath = binDir + "/" + daemonBinaryName
-    public static let sentinelAppPath = cicadaHome + "/apps/" + sentinelAppName
+    public static let sentinelAppPath = applicationsDir + "/" + sentinelAppName
     public static let legacySentinelAppPath = cicadaHome + "/apps/" + legacySentinelAppName
     public static let sentinelHelpersDir = sentinelAppPath + "/Contents/Helpers"
     public static let bundledCLIHelperPath = sentinelHelpersDir + "/" + cliBinaryName
     public static let bundledDaemonHelperPath = sentinelHelpersDir + "/" + daemonBinaryName
     public static let bundledSleepHoldHelperPath = sentinelHelpersDir + "/" + sleepHoldBinaryName
-    public static let sleepHoldStagingBinaryPath = binDir + "/" + sleepHoldBinaryName
+    public static let cliBinaryPath = bundledCLIHelperPath
+    public static let daemonBinaryPath = bundledDaemonHelperPath
+    public static let sleepHoldStagingBinaryPath = bundledSleepHoldHelperPath
     public static let sleepHoldSocketPath = runDir + "/sleephold.sock"
-    public static let sleepHoldBinaryPath = "/usr/local/sbin/" + sleepHoldBinaryName
+    public static let sleepHoldBinaryPath = bundledSleepHoldHelperPath
 
     public static let daemonLabel = "com.cicada.agent"
     public static let sentinelLabel = "com.cicada.sentinel"
@@ -50,10 +51,6 @@ public enum RuntimePaths {
 
     public static func helperPath(name: String, inApp appPath: String = sentinelAppPath) -> String {
         appPath + "/Contents/Helpers/" + name
-    }
-
-    public static var sentinelAppPathCandidates: [String] {
-        uniquePaths([sentinelAppPath, legacySentinelAppPath])
     }
 
     public static func currentSentryAppPath(
@@ -81,9 +78,7 @@ public enum RuntimePaths {
         if let currentAppPath {
             candidates.append(helperPath(name: name, inApp: currentAppPath))
         }
-        for appPath in sentinelAppPathCandidates {
-            candidates.append(helperPath(name: name, inApp: appPath))
-        }
+        candidates.append(helperPath(name: name, inApp: sentinelAppPath))
         return uniquePaths(candidates)
     }
 
@@ -104,7 +99,6 @@ public enum RuntimePaths {
     ) -> [String] {
         bundledHelperSourceCandidates(named: daemonBinaryName, currentAppPath: currentAppPath)
             + swiftBuildBinaryCandidates(named: daemonBinaryName, currentDirectoryPath: currentDirectoryPath)
-            + [daemonBinaryPath]
     }
 
     public static func sleepHoldSourceBinaryCandidates(
@@ -113,7 +107,6 @@ public enum RuntimePaths {
     ) -> [String] {
         bundledHelperSourceCandidates(named: sleepHoldBinaryName, currentAppPath: currentAppPath)
             + swiftBuildBinaryCandidates(named: sleepHoldBinaryName, currentDirectoryPath: currentDirectoryPath)
-            + [sleepHoldStagingBinaryPath, sleepHoldBinaryPath]
     }
 
     public static func firstExistingPath(

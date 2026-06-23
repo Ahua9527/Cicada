@@ -33,7 +33,7 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
     var detail: String {
         switch self {
         case .overview:
-            return String(localized: "Status and primary controls")
+            return String(localized: "Status and readiness")
         case .alarms:
             return String(localized: "Trigger conditions")
         case .notifications:
@@ -43,7 +43,7 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         case .notchDrop:
             return String(localized: "Tray and launch behavior")
         case .maintenance:
-            return String(localized: "Folders, SleepHold, diagnostics")
+            return String(localized: "Folders, sleep hold session, diagnostics")
         }
     }
 
@@ -179,7 +179,7 @@ struct SentryControlCenterView: View {
         case .notchDrop:
             return String(localized: "Tray settings")
         case .maintenance:
-            return config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "SleepHold inactive") : String(localized: "SleepHold active")
+            return config.hasSleepHoldSession ? String(localized: "Sleep hold active") : String(localized: "Sleep hold idle")
         }
     }
 
@@ -261,22 +261,6 @@ private struct SentryOverviewPane: View {
                         }
 
                         Spacer()
-
-                        HStack(spacing: 8) {
-                            Button(isActive ? String(localized: "Stop Cicada") : String(localized: "Start Cicada")) {
-                                if isActive {
-                                    _ = controller.stop()
-                                } else {
-                                    _ = controller.start()
-                                }
-                            }
-                            .disabled(!config.canActivate && !isActive)
-
-                            Button(String(localized: "Unlock Alarm")) {
-                                _ = controller.unlockAlarm()
-                            }
-                            .disabled(viewModel.status != .activityDetected)
-                        }
                     }
 
                     if !controller.activityHint.isEmpty {
@@ -332,10 +316,6 @@ private struct SentryOverviewPane: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private var isActive: Bool {
-        viewModel.status == .running || viewModel.status == .activityDetected
     }
 
     @ViewBuilder
@@ -403,7 +383,7 @@ private struct SentryAlarmSettingsPane: View {
 
             GroupBox(String(localized: "Auto Sleep")) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(String(localized: "If SleepHold is not installed, disable automatic sleep for the most reliable trigger behavior."))
+                    Text(String(localized: "While Cicada is monitoring, it asks SleepHold to prevent sleep so alarm triggers stay reliable. If that hold is unavailable or blocked by system policy, disable automatic sleep in macOS."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(String(localized: "Learn More")) {
@@ -656,7 +636,7 @@ private struct SentryMaintenancePane: View {
     var body: some View {
         SentryPane(
             title: String(localized: "Maintenance"),
-            subtitle: String(localized: "Runtime paths, SleepHold status, and diagnostics.")
+            subtitle: String(localized: "Runtime paths, sleep hold session, and diagnostics.")
         ) {
             GroupBox(String(localized: "Folders")) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -676,15 +656,15 @@ private struct SentryMaintenancePane: View {
             GroupBox(String(localized: "SleepHold")) {
                 VStack(spacing: 10) {
                     SentryStatusRow(
-                        title: String(localized: "State"),
+                        title: String(localized: "Current Hold"),
                         systemImage: "power",
-                        value: config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "Inactive") : String(localized: "Active"),
-                        tint: config.sleepHoldServiceIdentifier.isEmpty ? .secondary : .green
+                        value: config.hasSleepHoldSession ? String(localized: "Holding") : String(localized: "Idle"),
+                        tint: config.hasSleepHoldSession ? .green : .secondary
                     )
                     SentryStatusRow(
                         title: String(localized: "Session"),
                         systemImage: "number",
-                        value: config.sleepHoldServiceIdentifier.isEmpty ? String(localized: "None") : config.sleepHoldServiceIdentifier,
+                        value: config.hasSleepHoldSession ? config.sleepHoldSessionIdentifier : String(localized: "No current session"),
                         tint: .secondary
                     )
                     SentryStatusRow(

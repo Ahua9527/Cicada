@@ -207,9 +207,7 @@ public final class SentinelAppManager {
             + "/native/sentinel-app/.build/DerivedData/Build/Products/Release"
         let candidates = [
             productsDir + "/" + RuntimePaths.sentinelAppName,
-            productsDir + "/" + RuntimePaths.legacySentinelAppName,
             paths.sentinelAppPath,
-            paths.legacySentinelAppPath,
         ]
         for candidate in candidates where fm.fileExists(atPath: candidate) {
             return candidate

@@ -31,7 +31,6 @@ xcodebuild \
   build
 
 APP_PATH="$BUILD_DIR/DerivedData/Build/Products/$CONFIGURATION/$APP_NAME.app"
-INSTALL_DIR="$HOME/.cicada/apps"
 HELPERS_DIR="$APP_PATH/Contents/Helpers"
 HELPERS=(cicada cicada-agent cicada-sleephold)
 
@@ -54,9 +53,4 @@ else
   echo "[sentinel] helper source directory not found; skipping helper embedding"
 fi
 
-mkdir -p "$INSTALL_DIR"
-rm -rf "$INSTALL_DIR/$APP_NAME.app"
-cp -R "$APP_PATH" "$INSTALL_DIR/$APP_NAME.app"
-rm -rf "$INSTALL_DIR/$LEGACY_APP_NAME.app"
-
-echo "✅ Sentinel app installed to $INSTALL_DIR/$APP_NAME.app"
+echo "✅ Sentinel app artifact: $APP_PATH"
