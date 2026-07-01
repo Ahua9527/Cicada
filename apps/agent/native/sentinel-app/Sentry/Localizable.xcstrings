@@ -985,6 +985,22 @@
         }
       }
     },
+    "Launch the Cicada app and services when you sign in.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launch the Cicada app and services when you sign in."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时启动 Cicada app 和服务。"
+          }
+        }
+      }
+    },
     "Learn More - Disable Auto Sleep": {
       "localizations": {
         "zh-Hans": {
@@ -1223,6 +1239,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求访问相机中…"
+          }
+        }
+      }
+    },
+    "Runtime": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行时"
           }
         }
       }
@@ -1789,6 +1821,22 @@
         }
       }
     },
+    "Cicada Relay Address": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada Relay Address"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada Relay 地址"
+          }
+        }
+      }
+    },
     "Cicada is running outside of the App Sandbox in a local debug or unsigned build. Permissions, file access, and release behavior may differ from the signed app.": {
       "localizations": {
         "zh-Hans": {
@@ -1849,6 +1897,22 @@
         }
       }
     },
+    "Configure the Cicada Relay address.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure the Cicada Relay address."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置 Cicada Relay 地址。"
+          }
+        }
+      }
+    },
     "Configure tray behavior and storage from the same control center.": {
       "localizations": {
         "zh-Hans": {
@@ -1865,6 +1929,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "已配置"
+          }
+        }
+      }
+    },
+    "Connection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接"
+          }
+        }
+      }
+    },
+    "Connection timeout must be greater than 0.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection timeout must be greater than 0."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接超时时间必须大于 0。"
           }
         }
       }
@@ -1909,12 +2005,44 @@
         }
       }
     },
+    "Device ID must match MAC_ followed by 32 hexadecimal characters.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device ID must match MAC_ followed by 32 hexadecimal characters."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device ID 必须匹配 MAC_ 后跟 32 位十六进制字符。"
+          }
+        }
+      }
+    },
     "Enabled": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "已启用"
+          }
+        }
+      }
+    },
+    "Enter a Cicada Relay address.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a Cicada Relay address."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入 Cicada Relay 地址。"
           }
         }
       }
@@ -1985,6 +2113,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "帮助"
+          }
+        }
+      }
+    },
+    "Heartbeat interval must be greater than 0.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heartbeat interval must be greater than 0."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "心跳间隔必须大于 0。"
           }
         }
       }
@@ -2075,6 +2219,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "维护"
+          }
+        }
+      }
+    },
+    "Maximum reconnect attempts cannot be negative.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum reconnect attempts cannot be negative."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最大重连次数不能为负数。"
           }
         }
       }
@@ -2279,6 +2439,22 @@
         }
       }
     },
+    "Reconnect interval must be greater than 0.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect interval must be greater than 0."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重连间隔必须大于 0。"
+          }
+        }
+      }
+    },
     "Recording Settings": {
       "localizations": {
         "zh-Hans": {
@@ -2295,6 +2471,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "录制"
+          }
+        }
+      }
+    },
+    "Relay": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay"
+          }
+        }
+      }
+    },
+    "Relay address configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay address configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay 地址配置"
+          }
+        }
+      }
+    },
+    "Relay settings reloaded.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay settings reloaded."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay 设置已重新载入。"
+          }
+        }
+      }
+    },
+    "Relay settings saved.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay settings saved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay 设置已保存。"
+          }
+        }
+      }
+    },
+    "Relay URL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay URL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay URL"
+          }
+        }
+      }
+    },
+    "Relay URL must be an http or https URL.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay URL must be an http or https URL."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relay URL 必须是 http 或 https URL。"
+          }
+        }
+      }
+    },
+    "Reload": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新载入"
           }
         }
       }
@@ -2345,6 +2633,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "运行时路径、防睡眠会话和诊断。"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
           }
         }
       }
@@ -2439,6 +2743,22 @@
         }
       }
     },
+    "Start Cicada at Login": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Cicada at Login"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时启动 Cicada"
+          }
+        }
+      }
+    },
     "State": {
       "localizations": {
         "zh-Hans": {
@@ -2519,6 +2839,22 @@
         }
       }
     },
+    "Tray behavior": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tray behavior"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "托盘行为"
+          }
+        }
+      }
+    },
     "Tray settings": {
       "localizations": {
         "zh-Hans": {
@@ -2545,6 +2881,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法配置 Cicada。请稍后重试。"
+          }
+        }
+      }
+    },
+    "Unable to load Relay settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to load Relay settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法加载 Relay 设置。"
+          }
+        }
+      }
+    },
+    "Unable to save Relay settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to save Relay settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存 Relay 设置。"
           }
         }
       }

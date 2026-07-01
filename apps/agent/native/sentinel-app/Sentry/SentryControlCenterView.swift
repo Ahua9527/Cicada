@@ -5,6 +5,7 @@ import SwiftUI
 
 enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
     case overview
+    case relay
     case alarms
     case notifications
     case recordings
@@ -17,6 +18,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return String(localized: "Overview")
+        case .relay:
+            return String(localized: "Relay")
         case .alarms:
             return String(localized: "Alarms")
         case .notifications:
@@ -34,6 +37,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return String(localized: "Status and readiness")
+        case .relay:
+            return String(localized: "Relay address configuration")
         case .alarms:
             return String(localized: "Trigger conditions")
         case .notifications:
@@ -41,7 +46,7 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         case .recordings:
             return String(localized: "Camera capture")
         case .notchDrop:
-            return String(localized: "Tray and launch behavior")
+            return String(localized: "Tray behavior")
         case .maintenance:
             return String(localized: "Folders, sleep hold session, diagnostics")
         }
@@ -51,6 +56,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return "eye"
+        case .relay:
+            return "network"
         case .alarms:
             return "light.beacon.max"
         case .notifications:
@@ -114,29 +121,11 @@ struct SentryControlCenterView: View {
                 .popover(isPresented: $showsHelp) {
                     HelpPanelView()
                 }
-
-                Button(isActive ? String(localized: "Stop") : String(localized: "Start")) {
-                    if isActive {
-                        _ = controller.stop()
-                    } else {
-                        _ = controller.start()
-                    }
-                }
-                .disabled(!config.canActivate && !isActive)
-
-                Button(String(localized: "Unlock")) {
-                    _ = controller.unlockAlarm()
-                }
-                .disabled(viewModel.status != .activityDetected)
             }
         }
         .onAppear {
             presentHelpIfNeeded()
         }
-    }
-
-    private var isActive: Bool {
-        viewModel.status == .running || viewModel.status == .activityDetected
     }
 
     @ViewBuilder
@@ -149,6 +138,8 @@ struct SentryControlCenterView: View {
                 viewModel: viewModel,
                 startupDiagnostics: appDelegate.startupDiagnostics
             )
+        case .relay:
+            SentryRelaySettingsPane()
         case .alarms:
             SentryAlarmSettingsPane(config: config)
         case .notifications:
@@ -170,6 +161,8 @@ struct SentryControlCenterView: View {
         switch section {
         case .overview:
             return controller.localizedStatusTitle
+        case .relay:
+            return String(localized: "Relay URL")
         case .alarms:
             return config.hasTriggerEnabled ? String(localized: "Configured") : String(localized: "Required")
         case .notifications:
@@ -355,6 +348,90 @@ private struct SentryOverviewPane: View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? String(localized: "Unknown")
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? String(localized: "Unknown")
         return String(format: String(localized: "Version %@ (%@)"), version, build)
+    }
+}
+
+struct SentryRelaySettingsPane: View {
+    private let store: CicadaRelayConfigStore
+    @State private var relayURL = ""
+    @State private var statusMessage: String?
+    @State private var statusTint = Color.secondary
+
+    init(store: CicadaRelayConfigStore = CicadaRelayConfigStore()) {
+        self.store = store
+    }
+
+    var body: some View {
+        SentryPane(
+            title: String(localized: "Relay"),
+            subtitle: String(localized: "Configure the Cicada Relay address.")
+        ) {
+            GroupBox(String(localized: "Connection")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    LabeledContent(String(localized: "Cicada Relay Address")) {
+                        TextField(String(localized: "Cicada Relay Address"), text: $relayURL)
+                            .textFieldStyle(.roundedBorder)
+                            .autocorrectionDisabled()
+                            .onSubmit(save)
+                    }
+
+                    HStack {
+                        Spacer()
+                        Button(String(localized: "Reload"), action: reload)
+                        Button(String(localized: "Save"), action: save)
+                            .keyboardShortcut(.defaultAction)
+                    }
+
+                    if let statusMessage {
+                        Text(statusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(statusTint)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .onAppear {
+            load(showSuccess: false)
+        }
+    }
+
+    private func reload() {
+        load(showSuccess: true)
+    }
+
+    private func load(showSuccess: Bool) {
+        do {
+            let config = try store.loadOrCreate()
+            relayURL = config.relayURL
+            if showSuccess {
+                statusMessage = String(localized: "Relay settings reloaded.")
+                statusTint = .green
+            }
+        } catch {
+            setError(prefix: String(localized: "Unable to load Relay settings."), error: error)
+        }
+    }
+
+    private func save() {
+        let trimmedRelayURL = relayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        relayURL = trimmedRelayURL
+
+        do {
+            let config = try store.saveRelayURL(trimmedRelayURL)
+            relayURL = config.relayURL
+            statusMessage = String(localized: "Relay settings saved.")
+            statusTint = .green
+        } catch {
+            setError(prefix: String(localized: "Unable to save Relay settings."), error: error)
+        }
+    }
+
+    private func setError(prefix: String, error: Error) {
+        let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        statusMessage = "\(prefix) \(description)"
+        statusTint = .red
     }
 }
 
@@ -588,10 +665,6 @@ private struct NotchDropSettingsPane: View {
                         newValue.apply()
                     }
 
-                    LaunchAtLogin.Toggle {
-                        Text(String(localized: "Launch at Login"))
-                    }
-
                     Toggle(String(localized: "Haptic Feedback"), isOn: $settings.hapticFeedback)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -638,6 +711,20 @@ private struct SentryMaintenancePane: View {
             title: String(localized: "Maintenance"),
             subtitle: String(localized: "Runtime paths, sleep hold session, and diagnostics.")
         ) {
+            GroupBox(String(localized: "Runtime")) {
+                VStack(alignment: .leading, spacing: 8) {
+                    LaunchAtLogin.Toggle {
+                        Text(String(localized: "Start Cicada at Login"))
+                    }
+
+                    Text(String(localized: "Launch the Cicada app and services when you sign in."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             GroupBox(String(localized: "Folders")) {
                 VStack(alignment: .leading, spacing: 10) {
                     Button(String(localized: "Open Recording Folder")) {

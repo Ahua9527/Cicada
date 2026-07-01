@@ -1,7 +1,6 @@
 import Cocoa
 import Combine
 import Foundation
-import LaunchAtLogin
 import SwiftUI
 
 class NotchViewModel: NSObject, ObservableObject {

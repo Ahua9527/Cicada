@@ -1,7 +1,6 @@
 import AppKit
 import Combine
 import Foundation
-import LaunchAtLogin
 
 @MainActor
 final class NotchDropCoordinator: ObservableObject, SentinelNotificationRendering {
@@ -33,14 +32,9 @@ final class NotchDropCoordinator: ObservableObject, SentinelNotificationRenderin
         pendingNotifications.count
     }
 
-    func start() {
+    func start(openInitialWindow: Bool = true) {
         try? FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
         try? FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
-
-        if !UserDefaults.standard.bool(forKey: "CicadaSentinelLaunchAtLoginInitialized") {
-            LaunchAtLogin.isEnabled = false
-            UserDefaults.standard.set(true, forKey: "CicadaSentinelLaunchAtLoginInitialized")
-        }
 
         _ = EventMonitors.shared
         TrayDrop.shared.cleanExpiredFiles()
@@ -61,7 +55,7 @@ final class NotchDropCoordinator: ObservableObject, SentinelNotificationRenderin
             }
         }
 
-        rebuildWindow(openAfterCreate: isFirstOpen && !LaunchAtLogin.wasLaunchedAtLogin)
+        rebuildWindow(openAfterCreate: isFirstOpen && openInitialWindow)
         isFirstOpen = false
     }
 

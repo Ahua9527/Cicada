@@ -70,8 +70,26 @@ final class SentryStabilityTests: XCTestCase {
             localizable.zhHansValue(for: "Cicada Control Center"),
             "Cicada 控制中心"
         )
-        XCTAssertEqual(localizable.zhHansValue(for: "Start Cicada"), "启动 Cicada")
-        XCTAssertEqual(localizable.zhHansValue(for: "Stop Cicada"), "停止 Cicada")
+        XCTAssertEqual(localizable.zhHansValue(for: "Relay"), "Relay")
+        XCTAssertEqual(localizable.zhHansValue(for: "Relay address configuration"), "Relay 地址配置")
+        XCTAssertEqual(localizable.zhHansValue(for: "Save"), "保存")
+        XCTAssertEqual(localizable.zhHansValue(for: "Reload"), "重新载入")
+        XCTAssertEqual(
+            localizable.zhHansValue(for: "Relay URL must be an http or https URL."),
+            "Relay URL 必须是 http 或 https URL。"
+        )
+        XCTAssertEqual(localizable.enValue(for: "Start Cicada at Login"), "Start Cicada at Login")
+        XCTAssertEqual(localizable.zhHansValue(for: "Start Cicada at Login"), "登录时启动 Cicada")
+        XCTAssertEqual(
+            localizable.enValue(for: "Launch the Cicada app and services when you sign in."),
+            "Launch the Cicada app and services when you sign in."
+        )
+        XCTAssertEqual(
+            localizable.zhHansValue(for: "Launch the Cicada app and services when you sign in."),
+            "登录时启动 Cicada app 和服务。"
+        )
+        XCTAssertEqual(localizable.zhHansValue(for: "Runtime"), "运行时")
+        XCTAssertEqual(localizable.zhHansValue(for: "Tray behavior"), "托盘行为")
         XCTAssertEqual(localizable.zhHansValue(for: "Startup Diagnostics"), "启动诊断")
         XCTAssertEqual(localizable.zhHansValue(for: "Open Control Center"), "打开控制中心")
         XCTAssertEqual(
@@ -102,8 +120,12 @@ final class SentryStabilityTests: XCTestCase {
             "Cicada 控制中心"
         )
         XCTAssertEqual(
-            zhHansBundle.localizedString(forKey: "Start Cicada", value: nil, table: nil),
-            "启动 Cicada"
+            zhHansBundle.localizedString(forKey: "Start Cicada at Login", value: nil, table: nil),
+            "登录时启动 Cicada"
+        )
+        XCTAssertEqual(
+            zhHansBundle.localizedString(forKey: "Relay settings saved.", value: nil, table: nil),
+            "Relay 设置已保存。"
         )
         XCTAssertEqual(
             zhHansBundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist"),
@@ -674,6 +696,7 @@ final class SentryStabilityTests: XCTestCase {
             "CICADA_DAEMON_SOCKET": "/tmp/cicada-daemon.sock",
             "CICADA_NOTIFIER_SOCKET": "/tmp/cicada-notifier.sock",
             "CICADA_SENTINEL_SOCKET": "/tmp/cicada-sentinel.sock",
+            "CICADA_HOME": "/tmp/cicada-home",
             "CICADA_NOTCHDROP_DIR": "/tmp/cicada-notchdrop",
         ]
 
@@ -690,6 +713,10 @@ final class SentryStabilityTests: XCTestCase {
             "/tmp/cicada-sentinel.sock"
         )
         XCTAssertEqual(
+            CicadaSentinelPaths.configPath(environment: environment, homeDirectory: "/Users/alice"),
+            "/tmp/cicada-home/config.json"
+        )
+        XCTAssertEqual(
             NotchDropPaths.storageDirectory(
                 environment: environment,
                 homeDirectory: "/Users/alice"
@@ -704,9 +731,86 @@ final class SentryStabilityTests: XCTestCase {
             "/Users/alice/.cicada/run/daemon.sock"
         )
         XCTAssertEqual(
+            CicadaSentinelPaths.configPath(environment: [:], homeDirectory: "/Users/alice"),
+            "/Users/alice/.cicada/config.json"
+        )
+        XCTAssertEqual(
             CicadaSentinelPaths.notchDropDirectory(environment: [:], homeDirectory: "/Users/alice").path,
             "/Users/alice/.cicada/notchdrop"
         )
+    }
+
+    func testRelayConfigStoreCreatesDefaultConfigAndPersistsRelayURL() throws {
+        let directory = try temporaryTestDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let path = directory.appendingPathComponent("config.json").path
+        let store = CicadaRelayConfigStore(path: path)
+
+        let config = try store.loadOrCreate()
+        XCTAssertEqual(config.relayURL, "https://example.com")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+        XCTAssertNotNil(config.deviceId.range(of: #"^MAC_[A-F0-9]{32}$"#, options: .regularExpression))
+
+        let saved = try store.saveRelayURL("  https://relay.example.com/api  ")
+
+        XCTAssertEqual(saved.relayURL, "https://relay.example.com/api")
+        XCTAssertEqual(try store.loadOrCreate().relayURL, "https://relay.example.com/api")
+    }
+
+    func testRelayConfigStoreRejectsInvalidRelayURLWithoutOverwriting() throws {
+        let directory = try temporaryTestDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let path = directory.appendingPathComponent("config.json").path
+        let store = CicadaRelayConfigStore(path: path)
+        _ = try store.loadOrCreate()
+        _ = try store.saveRelayURL("https://relay.example.com")
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+
+        XCTAssertThrowsError(try store.saveRelayURL("ftp://relay.example.com")) { error in
+            XCTAssertEqual(error as? CicadaRelayConfigStore.StoreError, .invalidRelayURL)
+        }
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
+
+        XCTAssertThrowsError(try store.saveRelayURL("   ")) { error in
+            XCTAssertEqual(error as? CicadaRelayConfigStore.StoreError, .emptyRelayURL)
+        }
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
+        XCTAssertEqual(try store.loadOrCreate().relayURL, "https://relay.example.com")
+    }
+
+    func testRelayConfigStorePreservesExistingCLIFieldsWhenSavingRelayURL() throws {
+        let directory = try temporaryTestDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let path = directory.appendingPathComponent("config.json").path
+        let existing = CicadaRelayConfig(
+            relayURL: "https://old.example.com",
+            deviceId: "MAC_0123456789ABCDEF0123456789ABCDEF",
+            autoConnect: false,
+            showNotifications: false,
+            enableAutoReconnect: false,
+            reconnectInterval: 7000,
+            maxReconnectAttempts: 3,
+            heartbeatInterval: 45000,
+            connectionTimeout: 12000
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(existing).write(to: URL(fileURLWithPath: path), options: .atomic)
+
+        let saved = try CicadaRelayConfigStore(path: path).saveRelayURL("https://new.example.com")
+
+        XCTAssertEqual(saved.relayURL, "https://new.example.com")
+        XCTAssertEqual(saved.deviceId, existing.deviceId)
+        XCTAssertEqual(saved.autoConnect, existing.autoConnect)
+        XCTAssertEqual(saved.showNotifications, existing.showNotifications)
+        XCTAssertEqual(saved.enableAutoReconnect, existing.enableAutoReconnect)
+        XCTAssertEqual(saved.reconnectInterval, existing.reconnectInterval)
+        XCTAssertEqual(saved.maxReconnectAttempts, existing.maxReconnectAttempts)
+        XCTAssertEqual(saved.heartbeatInterval, existing.heartbeatInterval)
+        XCTAssertEqual(saved.connectionTimeout, existing.connectionTimeout)
     }
 
     func testDaemonSleepHoldClientReportsUnavailableSocket() async {
@@ -749,6 +853,13 @@ final class SentryStabilityTests: XCTestCase {
         XCTAssertTrue(extended)
         XCTAssertEqual(server.recordedActions(), ["power_assertion_start", "power_assertion_start"])
     }
+}
+
+private func temporaryTestDirectory() throws -> URL {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("cicada-sentry-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    return url
 }
 
 private func loadStringCatalog(named name: String) throws -> StringCatalog {

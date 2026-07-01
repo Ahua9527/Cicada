@@ -10,6 +10,7 @@ import CoreAudio
 import Foundation
 import IOKit
 import IOKit.pwr_mgt
+import LaunchAtLogin
 import SwiftUI
 
 @MainActor
@@ -41,7 +42,7 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         startupDiagnostics = PendingStartupDiagnostics.consume()
         guard !isRunningTests else { return }
-        NotchDropCoordinator.shared.start()
+        NotchDropCoordinator.shared.start(openInitialWindow: !LaunchAtLogin.wasLaunchedAtLogin)
         SentinelIPCServer.shared.start()
         SentinelNotifierServer.shared.start()
         runStartupChecks()

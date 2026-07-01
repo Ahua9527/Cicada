@@ -30,6 +30,10 @@ struct App: SwiftUI.App {
 
                 Divider()
 
+                Button(String(localized: "Relay")) {
+                    _ = SentryControlCenterRouter.shared.open(.relay)
+                }
+
                 Button(String(localized: "Alarm Settings")) {
                     _ = SentryControlCenterRouter.shared.open(.alarms)
                 }
@@ -49,21 +53,6 @@ struct App: SwiftUI.App {
                 Button(String(localized: "Maintenance")) {
                     _ = SentryControlCenterRouter.shared.open(.maintenance)
                 }
-
-                Divider()
-
-                Button(ViewModel.shared.status == .running || ViewModel.shared.status == .activityDetected ? String(localized: "Stop Cicada") : String(localized: "Start Cicada")) {
-                    if ViewModel.shared.status == .running || ViewModel.shared.status == .activityDetected {
-                        _ = SentinelController.shared.stop()
-                    } else {
-                        _ = SentinelController.shared.start()
-                    }
-                }
-
-                Button(String(localized: "Unlock Alarm")) {
-                    _ = SentinelController.shared.unlockAlarm()
-                }
-                .disabled(ViewModel.shared.status != .activityDetected)
             }
         }
         .windowStyle(.hiddenTitleBar)
