@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 @testable import CicadaCore
@@ -29,6 +30,7 @@ final class DaemonControlTests: XCTestCase {
 
         XCTAssertThrowsError(try client.shortcutGrantList())
         XCTAssertThrowsError(try client.powerAssertionStart())
+        XCTAssertThrowsError(try client.sentryStart())
     }
 
     func testShortcutGrantControlPayloadsRoundTrip() throws {
@@ -82,5 +84,364 @@ final class DaemonControlTests: XCTestCase {
             from: try JSONEncoder().encode(response)
         )
         XCTAssertEqual(decodedResponse.commandResult, result)
+    }
+
+    func testSentryControlPayloadsRoundTrip() throws {
+        let request = DaemonControlRequest(action: .sentryStart)
+        let decodedRequest = try JSONDecoder().decode(
+            DaemonControlRequest.self,
+            from: try JSONEncoder().encode(request)
+        )
+        XCTAssertEqual(decodedRequest.action, .sentryStart)
+
+        let result = CommandExecutionResult(success: true, message: "Sentry started")
+        let response = DaemonControlResponse(ok: true, commandResult: result)
+        let decodedResponse = try JSONDecoder().decode(
+            DaemonControlResponse.self,
+            from: try JSONEncoder().encode(response)
+        )
+        XCTAssertEqual(decodedResponse.commandResult, result)
+    }
+
+    func testSentinelControlPayloadsRoundTrip() throws {
+        let request = SentinelControlRequest(action: .start)
+        let decodedRequest = try JSONDecoder().decode(
+            SentinelControlRequest.self,
+            from: try JSONEncoder().encode(request)
+        )
+        XCTAssertEqual(decodedRequest.action, .start)
+
+        let response = SentinelControlResponse(
+            ok: true,
+            message: "Running",
+            status: SentinelStatusSnapshot(
+                state: "Running",
+                activityHint: "",
+                recordingEnabled: false,
+                sleepHoldActive: true,
+                sleepHoldSessionId: "cicada-daemon-power-assertion"
+            )
+        )
+        let decodedResponse = try JSONDecoder().decode(
+            SentinelControlResponse.self,
+            from: try JSONEncoder().encode(response)
+        )
+        XCTAssertEqual(decodedResponse, response)
+    }
+
+    func testSentinelInstallRemovesLegacyNotifierLaunchAgentAndBinary() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createSourceApp()
+        try fixture.createLegacyNotifierArtifacts()
+
+        try fixture.manager.install(sourceAppPath: fixture.sourceAppPath)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacyNotifierPlistPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacyNotifierBinaryPath))
+        XCTAssertTrue(fixture.runner.calls.contains(.init("/bin/launchctl", ["stop", fixture.paths.legacyNotifierLabel])))
+        XCTAssertTrue(fixture.runner.calls.contains(.init("/bin/launchctl", ["unload", fixture.paths.legacyNotifierPlistPath])))
+    }
+
+    func testSentinelInstallUsesCrashOnlyKeepAlive() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createSourceApp()
+
+        try fixture.manager.install(sourceAppPath: fixture.sourceAppPath)
+
+        let data = try Data(contentsOf: URL(fileURLWithPath: fixture.paths.sentinelPlistPath))
+        let plist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+        )
+        let keepAlive = try XCTUnwrap(plist["KeepAlive"] as? [String: Any])
+        let programArguments = try XCTUnwrap(plist["ProgramArguments"] as? [String])
+        XCTAssertEqual(keepAlive["Crashed"] as? Bool, true)
+        XCTAssertFalse(plist["KeepAlive"] is Bool)
+        XCTAssertEqual(
+            programArguments,
+            [fixture.paths.sentinelAppPath + "/Contents/MacOS/Cicada"]
+        )
+    }
+
+    func testSentinelInstallRemovesLegacySentryApp() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createSourceApp()
+        try fixture.createLegacySentinelApp()
+
+        try fixture.manager.install(sourceAppPath: fixture.sourceAppPath)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.paths.sentinelAppPath))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacySentinelAppPath))
+    }
+
+    func testSentinelInstallMigratesLegacySourceAppExecutableAndInfoPlist() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createLegacySentinelApp(includeInfoPlist: true)
+
+        try fixture.manager.install(sourceAppPath: fixture.paths.legacySentinelAppPath)
+
+        let executable = fixture.paths.sentinelAppPath + "/Contents/MacOS/Cicada"
+        XCTAssertTrue(FileManager.default.fileExists(atPath: executable))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.paths.legacySentinelAppPath))
+
+        let data = try Data(
+            contentsOf: URL(fileURLWithPath: fixture.paths.sentinelAppPath)
+                .appendingPathComponent("Contents/Info.plist")
+        )
+        let plist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+        )
+        XCTAssertEqual(plist["CFBundleExecutable"] as? String, "Cicada")
+        XCTAssertEqual(plist["CFBundleDisplayName"] as? String, "Cicada")
+        XCTAssertEqual(plist["CFBundleIdentifier"] as? String, "com.cicada.sentinel")
+    }
+
+    func testSentinelStopLeavesLaunchAgentLoaded() throws {
+        let fixture = try SentinelAppManagerFixture()
+
+        fixture.manager.stop()
+
+        XCTAssertTrue(fixture.runner.calls.contains(.init("/bin/launchctl", ["stop", fixture.paths.sentinelLabel])))
+        XCTAssertFalse(fixture.runner.calls.contains(.init("/bin/launchctl", ["unload", fixture.paths.sentinelPlistPath])))
+    }
+
+    func testSentinelEnsureStartedWaitsForNotifierSocketInsteadOfControlSocketOnly() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createInstalledSentinel()
+        try FileManager.default.createDirectory(
+            atPath: (fixture.paths.sentinelSocketPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: fixture.paths.sentinelSocketPath, contents: Data())
+        fixture.runner.listStdout = fixture.paths.sentinelLabel
+
+        XCTAssertFalse(fixture.manager.ensureStarted())
+    }
+
+    func testSentinelStatusIgnoresStaleNotifierSocketFile() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createInstalledSentinel()
+        try FileManager.default.createDirectory(
+            atPath: (fixture.paths.notifierSocketPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: fixture.paths.notifierSocketPath, contents: Data())
+        fixture.runner.listStdout = fixture.paths.sentinelLabel
+
+        let status = fixture.manager.status()
+
+        XCTAssertFalse(status.notifierSocketReady)
+        XCTAssertFalse(status.running)
+        XCTAssertFalse(fixture.manager.ensureStarted())
+    }
+
+    func testSentinelStatusRequiresNotifierAndControlSockets() throws {
+        let fixture = try SentinelAppManagerFixture()
+        try fixture.createInstalledSentinel()
+        fixture.runner.listStdout = fixture.paths.sentinelLabel
+
+        let notifierServer = try UnixSocketServer(path: fixture.paths.notifierSocketPath)
+        var status = fixture.manager.status()
+        XCTAssertTrue(status.notifierSocketReady)
+        XCTAssertFalse(status.sentinelSocketReady)
+        XCTAssertFalse(status.running)
+
+        let sentinelServer = try UnixSocketServer(path: fixture.paths.sentinelSocketPath)
+        status = fixture.manager.status()
+        XCTAssertTrue(status.notifierSocketReady)
+        XCTAssertTrue(status.sentinelSocketReady)
+        XCTAssertTrue(status.running)
+
+        _ = notifierServer
+        _ = sentinelServer
+    }
+}
+
+private struct ProcessCall: Equatable {
+    let command: String
+    let args: [String]
+
+    init(_ command: String, _ args: [String]) {
+        self.command = command
+        self.args = args
+    }
+}
+
+private final class RecordingProcessRunner: ProcessRunning {
+    private(set) var calls: [ProcessCall] = []
+    var listStdout = ""
+
+    func run(_ command: String, args: [String], timeoutMs _: Int) -> ProcessResult {
+        calls.append(.init(command, args))
+        if command == "/bin/launchctl", args == ["list"] {
+            return ProcessResult(stdout: listStdout, stderr: "", code: 0)
+        }
+        return ProcessResult(stdout: "", stderr: "", code: 0)
+    }
+}
+
+private final class SentinelAppManagerFixture {
+    let root: URL
+    let paths: SentinelAppRuntimePaths
+    let runner = RecordingProcessRunner()
+    let manager: SentinelAppManager
+    let sourceAppPath: String
+
+    init() throws {
+        root = URL(fileURLWithPath: "/tmp", isDirectory: true)
+            .appendingPathComponent("csm-\(UUID().uuidString)", isDirectory: true)
+        let home = root.appendingPathComponent("home", isDirectory: true)
+        let cicadaHome = home.appendingPathComponent(".cicada", isDirectory: true)
+        let runDir = cicadaHome.appendingPathComponent("run", isDirectory: true)
+        let appsDir = cicadaHome.appendingPathComponent("apps", isDirectory: true)
+        let binDir = cicadaHome.appendingPathComponent("bin", isDirectory: true)
+        let applicationsDir = root.appendingPathComponent("Applications", isDirectory: true)
+        let launchAgentsDir = home.appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+        paths = SentinelAppRuntimePaths(
+            runDir: runDir.path,
+            sentinelLabel: "com.cicada.sentinel.test",
+            sentinelAppPath: applicationsDir.appendingPathComponent("Cicada.app", isDirectory: true).path,
+            legacySentinelAppPath: appsDir.appendingPathComponent("Sentry.app", isDirectory: true).path,
+            sentinelExecutableName: "Cicada",
+            sentinelPlistPath: launchAgentsDir.appendingPathComponent("com.cicada.sentinel.test.plist").path,
+            sentinelStdoutPath: cicadaHome.appendingPathComponent("sentinel.stdout.log").path,
+            sentinelStderrPath: cicadaHome.appendingPathComponent("sentinel.stderr.log").path,
+            notifierSocketPath: runDir.appendingPathComponent("notifier.sock").path,
+            sentinelSocketPath: runDir.appendingPathComponent("sentinel.sock").path,
+            daemonSocketPath: runDir.appendingPathComponent("daemon.sock").path,
+            notchDropDirectoryPath: cicadaHome.appendingPathComponent("notchdrop", isDirectory: true).path,
+            legacyNotifierLabel: "com.cicada.notifier.test",
+            legacyNotifierPlistPath: launchAgentsDir.appendingPathComponent("com.cicada.notifier.test.plist").path,
+            legacyNotifierBinaryPath: binDir.appendingPathComponent("cicada-notifier").path
+        )
+        sourceAppPath = root.appendingPathComponent("source/Cicada.app", isDirectory: true).path
+        manager = SentinelAppManager(
+            runner: runner,
+            paths: paths,
+            waitForNotifierAttempts: 1,
+            waitIntervalMicros: 0
+        )
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func createSourceApp() throws {
+        let executable = URL(fileURLWithPath: sourceAppPath)
+            .appendingPathComponent("Contents/MacOS/Cicada")
+        try FileManager.default.createDirectory(
+            at: executable.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: executable.path, contents: Data())
+    }
+
+    func createLegacyNotifierArtifacts() throws {
+        try FileManager.default.createDirectory(
+            atPath: (paths.legacyNotifierPlistPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            atPath: (paths.legacyNotifierBinaryPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: paths.legacyNotifierPlistPath, contents: Data())
+        FileManager.default.createFile(atPath: paths.legacyNotifierBinaryPath, contents: Data())
+    }
+
+    func createInstalledSentinel() throws {
+        let executable = URL(fileURLWithPath: paths.sentinelAppPath)
+            .appendingPathComponent("Contents/MacOS/Cicada")
+        try FileManager.default.createDirectory(
+            at: executable.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: executable.path, contents: Data())
+        try FileManager.default.createDirectory(
+            atPath: (paths.sentinelPlistPath as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: paths.sentinelPlistPath, contents: Data())
+    }
+
+    func createLegacySentinelApp(includeInfoPlist: Bool = false) throws {
+        let executable = URL(fileURLWithPath: paths.legacySentinelAppPath)
+            .appendingPathComponent("Contents/MacOS/Sentry")
+        try FileManager.default.createDirectory(
+            at: executable.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        FileManager.default.createFile(atPath: executable.path, contents: Data())
+        if includeInfoPlist {
+            let infoPlist = executable
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Info.plist")
+            let plist: [String: Any] = [
+                "CFBundleDisplayName": "Sentry",
+                "CFBundleExecutable": "Sentry",
+                "CFBundleIdentifier": "com.cicada.sentinel",
+            ]
+            let data = try PropertyListSerialization.data(
+                fromPropertyList: plist,
+                format: .xml,
+                options: 0
+            )
+            try data.write(to: infoPlist)
+        }
+    }
+}
+
+private final class UnixSocketServer {
+    private let fd: Int32
+    private let path: String
+
+    init(path: String) throws {
+        self.path = path
+        try FileManager.default.createDirectory(
+            atPath: (path as NSString).deletingLastPathComponent,
+            withIntermediateDirectories: true
+        )
+
+        fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        if fd < 0 {
+            throw POSIXError(.EIO)
+        }
+
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let maxPathLength = MemoryLayout.size(ofValue: addr.sun_path)
+        guard path.utf8.count < maxPathLength else {
+            close(fd)
+            throw DaemonControlError.socketPathTooLong
+        }
+
+        unlink(path)
+        withUnsafeMutableBytes(of: &addr.sun_path) { buffer in
+            buffer.initializeMemory(as: CChar.self, repeating: 0)
+            _ = path.withCString { source in
+                strncpy(buffer.baseAddress?.assumingMemoryBound(to: CChar.self), source, maxPathLength - 1)
+            }
+        }
+
+        let bound = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        if bound != 0 {
+            close(fd)
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+
+        if listen(fd, 4) != 0 {
+            close(fd)
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
+    deinit {
+        close(fd)
+        unlink(path)
     }
 }

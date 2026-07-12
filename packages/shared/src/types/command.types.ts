@@ -23,7 +23,12 @@ export type CommandType =
   | 'sleep_displays' // 显示器休眠
   | 'caffeinate'     // 保持唤醒
   | 'decaffeinate'   // 允许休眠
-  | 'status';        // 获取设备状态
+  | 'status'         // 获取设备状态
+  | 'sentry_start'   // 启动哨兵
+  | 'sentry_stop'    // 停止哨兵
+  | 'sentry_status'  // 获取哨兵状态
+  | 'sentry_unlock'  // 解除哨兵告警
+  | 'sentry_open';   // 打开哨兵窗口
 
 export interface CommandParams {
   timeout?: number;

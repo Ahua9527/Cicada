@@ -115,6 +115,7 @@ describe('Middleware', () => {
       expect(capturedId.startsWith('req_')).toBe(true);
       expect((result as any).continue).toBe(true);
     });
+
   });
 
   describe('securityHeadersMiddleware', () => {

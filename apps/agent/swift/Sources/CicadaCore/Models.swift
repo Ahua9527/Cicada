@@ -67,6 +67,22 @@ public enum RemoteCommand: String, CaseIterable {
     case caffeinate
     case decaffeinate
     case status
+    case sentryStart = "sentry_start"
+    case sentryStop = "sentry_stop"
+    case sentryStatus = "sentry_status"
+    case sentryUnlock = "sentry_unlock"
+    case sentryOpen = "sentry_open"
+}
+
+public extension RemoteCommand {
+    var isSentryCommand: Bool {
+        switch self {
+        case .sentryStart, .sentryStop, .sentryStatus, .sentryUnlock, .sentryOpen:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 public struct CommandExecutionResult: Codable, Equatable {

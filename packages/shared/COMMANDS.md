@@ -17,6 +17,11 @@ one WebSocket session open to Relay.
 | `caffeinate` | Start no-sleep mode |
 | `decaffeinate` | Stop no-sleep mode |
 | `status` | Read device status |
+| `sentry_start` | Start Sentinel monitoring |
+| `sentry_stop` | Stop Sentinel monitoring |
+| `sentry_status` | Read Sentinel status |
+| `sentry_unlock` | Unlock Sentinel alarm |
+| `sentry_open` | Open Sentinel window |
 
 Mac agent command execution is native Swift/macOS API code. The command path
 does not require installed shell utilities or third-party binaries. Bluetooth
@@ -26,6 +31,11 @@ binary. No-sleep mode uses a native IOPM assertion and can additionally use the
 vendored `Lakr233/SleepHoldService` session model through Cicada's own
 `cicada-sleephold` helper for lid-close sleep prevention. Permission-sensitive
 commands fail closed with a clear error.
+
+Sentinel commands are routed through the Cicada daemon to the local Sentinel
+app IPC socket. `sentry_start` starts the migrated Sentry runtime, including
+trigger monitoring, Bark notification, recording, and daemon-backed no-sleep
+assertions.
 
 ## Mac CLI Flow
 

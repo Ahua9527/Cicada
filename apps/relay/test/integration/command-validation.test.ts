@@ -30,6 +30,8 @@ describe('deleted legacy command and controller routes', () => {
     ['GET', '/ws'],
     ['GET', '/api/devices'],
     ['GET', '/api/sessions'],
+    ['GET', '/bark'],
+    ['POST', '/bark/device-key/title/body'],
   ])('%s %s is not registered', async (method, path) => {
     const response = await app.handle(
       new Request(`http://localhost${path}`, {
@@ -46,6 +48,22 @@ describe('deleted legacy command and controller routes', () => {
       ok: false,
       error: 'API endpoint not found',
       path,
+    });
+  });
+
+  it('ignores legacy Bark root path configuration', async () => {
+    const legacyEnv = { ...mockEnv, BARK_ROOT_PATH: '/push' } as Env;
+    const response = await app.handle(
+      new Request('http://localhost/push/device-key/title/body'),
+      legacyEnv,
+      mockCtx
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'API endpoint not found',
+      path: '/push/device-key/title/body',
     });
   });
 });

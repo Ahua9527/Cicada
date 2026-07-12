@@ -32,8 +32,8 @@ Optional:
 | `ALLOWED_ORIGINS` | local dev origins | Comma-separated allow list when CORS is enabled. |
 | `DEBUG_MODE` | `false` | Enables debug-level structured logs. |
 
-Do not commit `.dev.vars`, secrets, Wrangler state, coverage output, build
-output, or local `.cicada` state.
+Do not commit `.env`, `.dev.vars`, secrets, Wrangler state, coverage output,
+build output, or local `.cicada` state.
 
 ## Agent WebSocket
 
@@ -106,7 +106,7 @@ cicada shortcut revoke <grantId>
 ```
 
 Default grant scope is `ping,status`. Use `--commands all` only when the
-Shortcut should be allowed to run all current 9 commands.
+Shortcut should be allowed to run all current 14 commands.
 
 ## Local Validation
 

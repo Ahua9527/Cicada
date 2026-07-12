@@ -159,15 +159,10 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
         try fm.createDirectory(atPath: RuntimePaths.cicadaHome, withIntermediateDirectories: true)
         try fm.createDirectory(atPath: RuntimePaths.runDir, withIntermediateDirectories: true)
 
-        let source = resolveSourceBinaryPath()
-        guard fm.fileExists(atPath: source) else {
-            throw CicadaError.io("sleephold 二进制不存在: \(source)")
+        let binaryPath = RuntimePaths.sleepHoldBinaryPath
+        guard fm.fileExists(atPath: binaryPath) else {
+            throw CicadaError.io("SleepHold helper 不存在: \(binaryPath)。请先将 Cicada.app 安装到 /Applications")
         }
-
-        try runSudo(["/bin/mkdir", "-p", "/usr/local/sbin"])
-        try runSudo(["/bin/cp", "-f", source, RuntimePaths.sleepHoldBinaryPath])
-        try runSudo(["/usr/sbin/chown", "root:wheel", RuntimePaths.sleepHoldBinaryPath])
-        try runSudo(["/bin/chmod", "755", RuntimePaths.sleepHoldBinaryPath])
 
         let plistPath = RuntimePaths.runDir + "/com.cicada.sleephold.plist"
         try sleepHoldPlist().write(toFile: plistPath, atomically: true, encoding: .utf8)
@@ -182,7 +177,6 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
     public func uninstall() {
         _ = runner.run("/usr/bin/sudo", args: ["/bin/launchctl", "unload", RuntimePaths.sleepHoldPlistPath], timeoutMs: 5_000)
         _ = runner.run("/usr/bin/sudo", args: ["/bin/rm", "-f", RuntimePaths.sleepHoldPlistPath], timeoutMs: 5_000)
-        _ = runner.run("/usr/bin/sudo", args: ["/bin/rm", "-f", RuntimePaths.sleepHoldBinaryPath], timeoutMs: 5_000)
         _ = unlink(RuntimePaths.sleepHoldSocketPath)
     }
 
@@ -216,17 +210,6 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
 
     public func terminateSession(_ sessionId: String) throws -> SleepHoldControlResponse {
         try client.terminateSession(sessionId)
-    }
-
-    private func resolveSourceBinaryPath() -> String {
-        let candidates = [
-            fm.currentDirectoryPath + "/swift/.build/release/cicada-sleephold",
-            fm.currentDirectoryPath + "/.build/release/cicada-sleephold",
-            fm.currentDirectoryPath + "/apps/agent/swift/.build/release/cicada-sleephold",
-            RuntimePaths.sleepHoldStagingBinaryPath,
-            RuntimePaths.sleepHoldBinaryPath,
-        ]
-        return candidates.first { fm.fileExists(atPath: $0) } ?? candidates[0]
     }
 
     private func sleepHoldPlist() -> String {

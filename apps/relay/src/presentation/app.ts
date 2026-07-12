@@ -16,6 +16,7 @@ import {
   requestSizeLimitMiddleware,
 } from '../infrastructure/middleware';
 import { Router } from './router';
+import { sanitizeRequestUrl } from './request-url-sanitizer';
 import { API_CONSTANTS } from '../config/constants';
 
 /**
@@ -76,6 +77,7 @@ export class CicadaRelayApp {
           allowedHeaders: [
             'Content-Type',
             'Authorization',
+            'mcp-session-id',
             'X-Request-ID',
             'X-Device-ID',
             'X-Agent-Identity-Public-Key',
@@ -108,7 +110,7 @@ export class CicadaRelayApp {
    * Handle request
    */
   // eslint-disable-next-line no-undef
-  async handle(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const requestId = this.generateRequestId();
 
@@ -121,6 +123,7 @@ export class CicadaRelayApp {
       url,
       method: request.method,
       headers: this.parseHeaders(request.headers),
+      executionContext: ctx,
     };
 
     try {
@@ -197,16 +200,6 @@ export class CicadaRelayApp {
   }
 
   private sanitizeUrl(rawUrl: string): string {
-    const url = new URL(rawUrl);
-    if (url.pathname.startsWith('/relay/')) {
-      const [, relay, ...rest] = url.pathname.split('/');
-      url.pathname = `/${relay}/[session]${rest.length > 1 ? `/${rest.slice(1).join('/')}` : ''}`;
-    }
-    for (const key of ['api_key', 'nonce', 'signature', 'token', 'code']) {
-      if (url.searchParams.has(key)) {
-        url.searchParams.set(key, '[FILTERED]');
-      }
-    }
-    return url.toString();
+    return sanitizeRequestUrl(rawUrl);
   }
 }

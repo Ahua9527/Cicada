@@ -18,6 +18,7 @@ export interface MiddlewareContext {
   url: URL;
   method: string;
   headers: Record<string, string>;
+  executionContext?: ExecutionContext;
   deviceId?: string;
   validatedRequest?: CommandRequest;
 }

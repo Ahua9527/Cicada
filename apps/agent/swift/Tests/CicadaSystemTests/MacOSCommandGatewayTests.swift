@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 @testable import CicadaCore
+@testable import CicadaIPC
 @testable import CicadaSystem
 
 private final class FakeLockController: NativeLockControlling {
@@ -109,6 +110,30 @@ private final class FakeSleepHoldLeaseController: SleepHoldLeasing {
     }
 }
 
+private final class FakeSentinelControlClient: SentinelControlClienting {
+    private(set) var actions: [SentinelControlAction] = []
+    var queuedResults: [Result<SentinelControlResponse, Error>] = []
+    var response = SentinelControlResponse(
+        ok: true,
+        message: "Sentry started",
+        status: SentinelStatusSnapshot(
+            state: "Running",
+            activityHint: "",
+            recordingEnabled: false,
+            sleepHoldActive: true,
+            sleepHoldSessionId: "cicada-daemon-power-assertion"
+        )
+    )
+
+    func request(_ request: SentinelControlRequest) throws -> SentinelControlResponse {
+        actions.append(request.action)
+        if !queuedResults.isEmpty {
+            return try queuedResults.removeFirst().get()
+        }
+        return response
+    }
+}
+
 final class MacOSCommandGatewayTests: XCTestCase {
     func testNineCommandsUseNativeControllers() {
         let fixture = GatewayFixture()
@@ -207,6 +232,51 @@ final class MacOSCommandGatewayTests: XCTestCase {
         XCTAssertEqual(result.data?["sleep_hold"], "stopped")
         XCTAssertFalse(fixture.sleepHold.active)
     }
+
+    func testSentryCommandsUseSentinelIPC() {
+        let fixture = GatewayFixture()
+        let commands: [(String, SentinelControlAction)] = [
+            ("sentry_start", .start),
+            ("sentry_stop", .stop),
+            ("sentry_status", .status),
+            ("sentry_unlock", .unlock),
+            ("sentry_open", .open),
+        ]
+
+        for (command, action) in commands {
+            let result = fixture.gateway.execute(command: command)
+
+            XCTAssertTrue(result.success, command)
+            XCTAssertEqual(result.message, "Sentry started", command)
+            XCTAssertEqual(result.data?["state"], "Running", command)
+            XCTAssertEqual(result.data?["sleep_hold_active"], "true", command)
+            XCTAssertEqual(fixture.sentinel.actions.last, action, command)
+        }
+        XCTAssertEqual(fixture.sentinel.actions, commands.map { $0.1 })
+    }
+
+    func testSentryOpenReportsAppOpenFailureWithoutIPC() {
+        let fixture = GatewayFixture(sentinelAppOpener: { .failure(.message("launch denied")) })
+
+        let result = fixture.gateway.execute(command: "sentry_open")
+
+        XCTAssertFalse(result.success)
+        XCTAssertEqual(result.message, "Sentinel 打开失败: launch denied")
+        XCTAssertTrue(fixture.sentinel.actions.isEmpty)
+    }
+
+    func testSentryOpenRetriesIPCWhileSentinelAppStarts() {
+        let fixture = GatewayFixture(sentinelOpenRetryAttempts: 2, sentinelOpenRetryDelayMicros: 0)
+        fixture.sentinel.queuedResults = [
+            .failure(DaemonControlError.unavailable("No such file or directory")),
+            .success(fixture.sentinel.response),
+        ]
+
+        let result = fixture.gateway.execute(command: "sentry_open")
+
+        XCTAssertTrue(result.success)
+        XCTAssertEqual(fixture.sentinel.actions, [.open, .open])
+    }
 }
 
 private final class GatewayFixture {
@@ -216,16 +286,25 @@ private final class GatewayFixture {
     let power = FakePowerController()
     let display = FakeDisplayController()
     let sleepHold = FakeSleepHoldLeaseController()
+    let sentinel = FakeSentinelControlClient()
     let gateway: MacOSCommandGateway
 
-    init() {
+    init(
+        sentinelAppOpener: @escaping () -> Result<Void, NativeCommandError> = { .success(()) },
+        sentinelOpenRetryAttempts: Int = 1,
+        sentinelOpenRetryDelayMicros: useconds_t = 100_000
+    ) {
         gateway = MacOSCommandGateway(
             lockController: lock,
             bluetoothController: bluetooth,
             audioController: audio,
             powerController: power,
             displayController: display,
-            sleepHoldLeaseController: sleepHold
+            sleepHoldLeaseController: sleepHold,
+            sentinelControlClient: sentinel,
+            sentinelAppOpener: sentinelAppOpener,
+            sentinelOpenRetryAttempts: sentinelOpenRetryAttempts,
+            sentinelOpenRetryDelayMicros: sentinelOpenRetryDelayMicros
         )
     }
 }

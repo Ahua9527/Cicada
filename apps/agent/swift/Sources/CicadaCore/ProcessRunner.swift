@@ -12,6 +12,10 @@ public struct ProcessResult {
     }
 }
 
+public protocol ProcessRunning {
+    func run(_ command: String, args: [String], timeoutMs: Int) -> ProcessResult
+}
+
 public final class ProcessRunner {
     public init() {}
 
@@ -75,3 +79,5 @@ public final class ProcessRunner {
         return result.code == 0
     }
 }
+
+extension ProcessRunner: ProcessRunning {}

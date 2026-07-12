@@ -21,10 +21,13 @@ apps/relay/.wrangler/
 apps/agent/swift/.build/
 apps/agent/swift/.swiftpm/
 apps/agent/native/notification-agent/.build/
+apps/agent/native/sentinel-app/.build/
 
 # macOS and editors
 .DS_Store
 **/.DS_Store
+xcuserdata/
+*.xcuserstate
 .idea/
 .vscode/
 

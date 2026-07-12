@@ -7,34 +7,54 @@ import XCTest
 @testable import CicadaSystem
 
 private final class FakeDaemonManager: DaemonManaging {
-    var statusValue = DaemonStatus(installed: true, running: true, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
-    private(set) var calls: [String] = []
-
-    func install() throws { calls.append("install") }
-    func start() throws { calls.append("start") }
-    func stop() { calls.append("stop") }
-    func restart() throws { calls.append("restart") }
-    func uninstall() { calls.append("uninstall") }
-    func status() -> DaemonStatus { statusValue }
-    func logPaths() -> [String] { ["/tmp/daemon.log"] }
-}
-
-private final class FakeNotifierManager: NotifierManaging {
-    var statusValue = NotifierStatus(
+    var statusValue = DaemonStatus(
         installed: true,
         running: true,
-        plistPath: "/tmp/notifier.plist",
-        binaryPath: "/tmp/cicada-notifier",
-        socketPath: "/tmp/notifier.sock"
+        plistPath: "/tmp/agent.plist",
+        binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-agent"
     )
+    var recordCall: ((String) -> Void)?
     private(set) var calls: [String] = []
 
-    func install() throws { calls.append("install") }
-    func start() throws { calls.append("start") }
-    func stop() { calls.append("stop") }
-    func restart() throws { calls.append("restart") }
-    func uninstall() { calls.append("uninstall") }
-    func status() -> NotifierStatus { statusValue }
+    func install() throws { append("install") }
+    func start() throws { append("start") }
+    func stop() { append("stop") }
+    func restart() throws { append("restart") }
+    func uninstall() { append("uninstall") }
+    func status() -> DaemonStatus { statusValue }
+    func logPaths() -> [String] { ["/tmp/daemon.log"] }
+
+    private func append(_ call: String) {
+        calls.append(call)
+        recordCall?("daemon.\(call)")
+    }
+}
+
+private final class FakeSentinelAppManager: SentinelAppManaging {
+    var statusValue = SentinelAppStatus(
+        installed: true,
+        running: true,
+        plistPath: "/tmp/sentinel.plist",
+        appPath: "/Applications/Cicada.app",
+        socketPath: "/tmp/notifier.sock",
+        sentinelSocketPath: "/tmp/sentinel.sock",
+        notifierSocketReady: true,
+        sentinelSocketReady: true
+    )
+    var recordCall: ((String) -> Void)?
+    private(set) var calls: [String] = []
+
+    func install() throws { append("install") }
+    func start() throws { append("start") }
+    func stop() { append("stop") }
+    func restart() throws { append("restart") }
+    func uninstall() { append("uninstall") }
+    func status() -> SentinelAppStatus { statusValue }
+
+    private func append(_ call: String) {
+        calls.append(call)
+        recordCall?("sentinel.\(call)")
+    }
 }
 
 private final class FakeSleepHoldManager: SleepHoldManaging {
@@ -42,7 +62,7 @@ private final class FakeSleepHoldManager: SleepHoldManaging {
         installed: true,
         running: true,
         plistPath: "/Library/LaunchDaemons/com.cicada.sleephold.plist",
-        binaryPath: "/tmp/cicada-sleephold",
+        binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-sleephold",
         socketPath: "/tmp/sleephold.sock",
         powerStatus: .canSleep,
         activeSessions: 0
@@ -76,7 +96,9 @@ private final class FakeSleepHoldManager: SleepHoldManaging {
 
 private final class FakeDaemonControlClient: DaemonControlClienting {
     var createCommands: [String] = []
+    var sentryCommands: [String] = []
     var createToken = "cicada_sc_secret"
+    var recordCall: ((String) -> Void)?
     var unavailable = false
 
     func shortcutGrantCreate(name: String, commands: [String], ttlMs: Int64) throws -> DaemonControlResponse {
@@ -112,7 +134,40 @@ private final class FakeDaemonControlClient: DaemonControlClienting {
     }
 
     func powerAssertionStop() throws -> DaemonControlResponse {
-        throw DaemonControlError.unavailable("missing socket")
+        recordCall?("daemonControl.power_assertion_stop")
+        return DaemonControlResponse(
+            ok: true,
+            commandResult: CommandExecutionResult(success: true, message: "power assertion stopped")
+        )
+    }
+
+    func sentryStart() throws -> DaemonControlResponse {
+        sentry("sentry_start")
+    }
+
+    func sentryStop() throws -> DaemonControlResponse {
+        sentry("sentry_stop")
+    }
+
+    func sentryStatus() throws -> DaemonControlResponse {
+        sentry("sentry_status")
+    }
+
+    func sentryUnlock() throws -> DaemonControlResponse {
+        sentry("sentry_unlock")
+    }
+
+    func sentryOpen() throws -> DaemonControlResponse {
+        sentry("sentry_open")
+    }
+
+    private func sentry(_ command: String) -> DaemonControlResponse {
+        sentryCommands.append(command)
+        recordCall?("daemonControl.\(command)")
+        return DaemonControlResponse(
+            ok: true,
+            commandResult: CommandExecutionResult(success: true, message: "\(command) ok")
+        )
     }
 }
 
@@ -183,12 +238,17 @@ final class CicadaCLITests: XCTestCase {
     func testStartInstallsMissingServices() {
         let fixture = CLIFixture()
         _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
-        fixture.daemon.statusValue = DaemonStatus(installed: false, running: false, plistPath: "/tmp/agent.plist", binaryPath: "/tmp/cicada-agent")
-        fixture.notifier.statusValue = NotifierStatus(
+        fixture.daemon.statusValue = DaemonStatus(
             installed: false,
             running: false,
-            plistPath: "/tmp/notifier.plist",
-            binaryPath: "/tmp/cicada-notifier",
+            plistPath: "/tmp/agent.plist",
+            binaryPath: "/Applications/Cicada.app/Contents/Helpers/cicada-agent"
+        )
+        fixture.sentinelApp.statusValue = SentinelAppStatus(
+            installed: false,
+            running: false,
+            plistPath: "/tmp/sentinel.plist",
+            appPath: "/Applications/Cicada.app",
             socketPath: "/tmp/notifier.sock"
         )
 
@@ -196,7 +256,7 @@ final class CicadaCLITests: XCTestCase {
 
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(fixture.daemon.calls, ["install", "start"])
-        XCTAssertEqual(fixture.notifier.calls, ["install", "start"])
+        XCTAssertEqual(fixture.sentinelApp.calls, ["install", "start"])
     }
 
     func testStatusJSONIncludesHealthSections() throws {
@@ -210,7 +270,11 @@ final class CicadaCLITests: XCTestCase {
         XCTAssertEqual(object["health"] as? String, "ready")
         XCTAssertNotNil(object["config"])
         XCTAssertNotNil(object["daemon"])
-        XCTAssertNotNil(object["notifier"])
+        let sentinel = try XCTUnwrap(object["sentinel"] as? [String: Any])
+        XCTAssertEqual(sentinel["notifierSocketPath"] as? String, "/tmp/notifier.sock")
+        XCTAssertEqual(sentinel["notifierSocketReady"] as? Bool, true)
+        XCTAssertEqual(sentinel["controlSocketPath"] as? String, "/tmp/sentinel.sock")
+        XCTAssertEqual(sentinel["controlSocketReady"] as? Bool, true)
         XCTAssertNotNil(object["nativeCapabilities"])
         XCTAssertNotNil(object["sleepHold"])
     }
@@ -247,14 +311,76 @@ final class CicadaCLITests: XCTestCase {
         XCTAssertTrue(result.stderr.contains("cicada start"))
     }
 
+    func testRunSentryCommandsUseDaemonControl() {
+        let fixture = CLIFixture()
+        let commands = ["sentry_start", "sentry_stop", "sentry_status", "sentry_unlock", "sentry_open"]
+
+        for command in commands {
+            let result = fixture.cli.run(arguments: ["run", command])
+
+            XCTAssertEqual(result.exitCode, 0, command)
+            XCTAssertTrue(result.stdout.contains("\(command) ok"), command)
+        }
+        XCTAssertEqual(fixture.daemonControl.sentryCommands, commands)
+        XCTAssertTrue(fixture.commandExecutor.commands.isEmpty)
+    }
+
+    func testStopStopsSentinelBeforeDaemon() {
+        let fixture = CLIFixture()
+
+        let result = fixture.cli.run(arguments: ["stop"])
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(
+            fixture.callOrder.calls,
+            [
+                "daemonControl.sentry_stop",
+                "daemonControl.power_assertion_stop",
+                "sentinel.stop",
+                "daemon.stop",
+            ]
+        )
+    }
+
+    func testRestartStopsSentinelBeforeDaemonThenStartsBoth() {
+        let fixture = CLIFixture()
+        _ = fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com"])
+
+        let result = fixture.cli.run(arguments: ["restart"])
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(
+            fixture.callOrder.calls,
+            [
+                "daemonControl.sentry_stop",
+                "daemonControl.power_assertion_stop",
+                "sentinel.stop",
+                "daemon.stop",
+                "daemon.start",
+                "sentinel.start",
+            ]
+        )
+    }
+
     func testAdvancedRoutesRemainAvailable() {
         let fixture = CLIFixture()
 
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "config", "path"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "daemon", "logs"]).exitCode, 0)
-        XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "notifier", "status"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "sleep", "status"]).exitCode, 0)
         XCTAssertEqual(fixture.cli.run(arguments: ["advanced", "doctor", "--json"]).exitCode, 0)
+    }
+
+    func testAdvancedNotifierCommandsAreRemoved() {
+        let fixture = CLIFixture()
+
+        let help = fixture.cli.run(arguments: ["advanced", "--help"])
+        let result = fixture.cli.run(arguments: ["advanced", "notifier", "status"])
+
+        XCTAssertEqual(help.exitCode, 0)
+        XCTAssertFalse(help.stdout.contains("advanced notifier"))
+        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertTrue(result.stderr.contains("未知 advanced 命令: notifier"))
     }
 
     func testAdvancedSleepHelpListsFullSleepHoldServiceCapabilities() {
@@ -290,11 +416,20 @@ final class CicadaCLITests: XCTestCase {
     }
 }
 
+private final class CallOrder {
+    private(set) var calls: [String] = []
+
+    func append(_ call: String) {
+        calls.append(call)
+    }
+}
+
 private final class CLIFixture {
     let directory: URL
     let configStore: ConfigStore
+    let callOrder = CallOrder()
     let daemon = FakeDaemonManager()
-    let notifier = FakeNotifierManager()
+    let sentinelApp = FakeSentinelAppManager()
     let sleepHold = FakeSleepHoldManager()
     let daemonControl = FakeDaemonControlClient()
     let commandExecutor = FakeCommandExecutor()
@@ -304,10 +439,13 @@ private final class CLIFixture {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("cicada-cli-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         configStore = ConfigStore(path: directory.appendingPathComponent("config.json").path)
+        daemon.recordCall = { [callOrder] call in callOrder.append(call) }
+        sentinelApp.recordCall = { [callOrder] call in callOrder.append(call) }
+        daemonControl.recordCall = { [callOrder] call in callOrder.append(call) }
         cli = CicadaCLI(
             configStore: configStore,
             daemonManager: daemon,
-            notifierManager: notifier,
+            sentinelAppManager: sentinelApp,
             sleepHoldManager: sleepHold,
             daemonControlClient: daemonControl,
             commandExecutor: commandExecutor,

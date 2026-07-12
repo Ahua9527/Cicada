@@ -4,6 +4,7 @@
 
 import type { Middleware } from './types';
 import { extractResponse, isControlResult } from './types';
+import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
 
 /**
  * 生成请求ID中间件
@@ -18,28 +19,16 @@ export function requestIdMiddleware(): Middleware {
       context.requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    context.logger.info(`Request started: ${context.method} ${context.url.pathname}`, {
+    const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));
+
+    context.logger.info(`Request started: ${context.method} ${sanitizedUrl.pathname}`, {
       requestId: context.requestId,
-      context: { method: context.method, url: sanitizeUrl(context.url).toString() },
+      context: { method: context.method, url: sanitizedUrl.toString() },
       tags: ['request', 'start'],
     });
 
     return next();
   };
-}
-
-function sanitizeUrl(url: URL): URL {
-  const safeUrl = new URL(url.toString());
-  if (safeUrl.pathname.startsWith('/relay/')) {
-    const [, relay, ...rest] = safeUrl.pathname.split('/');
-    safeUrl.pathname = `/${relay}/[session]${rest.length > 1 ? `/${rest.slice(1).join('/')}` : ''}`;
-  }
-  for (const key of ['api_key', 'nonce', 'signature', 'token', 'code']) {
-    if (safeUrl.searchParams.has(key)) {
-      safeUrl.searchParams.set(key, '[FILTERED]');
-    }
-  }
-  return safeUrl;
 }
 
 /**

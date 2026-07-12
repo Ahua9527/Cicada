@@ -11,6 +11,7 @@ import {
   handleHealthRoute,
   handleShortcutCommandRoute,
 } from './routes';
+import { sanitizeRequestUrl } from './request-url-sanitizer';
 
 export interface Route {
   pattern: RegExp;
@@ -59,13 +60,14 @@ export class Router {
       const { request } = context;
       const url = new URL(request.url);
       const { pathname, method } = { pathname: url.pathname, method: request.method };
+      const sanitizedPathname = new URL(sanitizeRequestUrl(request.url)).pathname;
 
       const route = this.findRoute(pathname, method);
 
       if (!route) {
         context.logger.warn('Route not found', {
           requestId: context.requestId,
-          context: { pathname, method },
+          context: { pathname: sanitizedPathname, method },
           tags: ['routing', 'error'],
         });
 
@@ -89,7 +91,7 @@ export class Router {
         context.logger.error('Route handler failed', {
           requestId: context.requestId,
           error: error as Error,
-          context: { pathname, method },
+          context: { pathname: sanitizedPathname, method },
           tags: ['routing', 'error'],
         });
 

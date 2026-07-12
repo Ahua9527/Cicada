@@ -6,13 +6,13 @@ public final class UdsNotifier {
     private let socketPath: String
     private let timeoutMs: Int
     private let autoStart: Bool
-    private let manager: NotifierManager
+    private let manager: SentinelAppManager
 
     public init(
         socketPath: String = RuntimePaths.notifierSocketPath,
         timeoutMs: Int = 1000,
         autoStart: Bool = true,
-        manager: NotifierManager = NotifierManager()
+        manager: SentinelAppManager = SentinelAppManager()
     ) {
         self.socketPath = socketPath
         self.timeoutMs = timeoutMs
@@ -30,7 +30,7 @@ public final class UdsNotifier {
             return firstAttempt
         }
 
-        Logger.warn("UdsNotifier", "Notifier agent unavailable, attempting auto-start")
+        Logger.warn("UdsNotifier", "Sentinel notifier socket unavailable, attempting auto-start")
         if manager.ensureStarted() {
             return sendRequest(request)
         }

@@ -5,7 +5,7 @@
 1. 与 CicadaRelay 建立 agent WebSocket 长连接
 2. 发布 Shortcuts capability grants
 3. 接收 `shortcut_command` 并在本机执行
-4. 通过 UDS 将结果发送到 `cicada-notifier`
+4. 通过 UDS 将结果发送到 Sentinel 内置 notifier socket
 5. 可选安装 root `cicada-sleephold` helper，用于合盖防睡眠
 
 ## 配置文件
@@ -33,11 +33,11 @@
 ## 用户流程
 
 ```bash
-~/.cicada/bin/cicada setup --relay-url https://your-cicada-relay.workers.dev
-~/.cicada/bin/cicada start
-~/.cicada/bin/cicada shortcut create
-~/.cicada/bin/cicada status
-~/.cicada/bin/cicada run ping
+cicada setup --relay-url https://your-cicada-relay.workers.dev
+cicada start
+cicada shortcut create
+cicada status
+cicada run ping
 ```
 
 ## CLI 能力边界
@@ -45,9 +45,9 @@
 | 命令 | 能力边界 |
 |---|---|
 | `cicada setup [--relay-url <url>]` | 创建或更新 `~/.cicada/config.json`，生成 `deviceId`，写入 Relay URL；不启动 daemon。 |
-| `cicada start` | 安装缺失的 daemon/notifier 并启动本机 agent 服务；daemon 自动连接 Relay。 |
-| `cicada stop` / `cicada restart` | 停止或重启 daemon/notifier。 |
-| `cicada status [--json]` | 合并 config、daemon、notifier、runtime snapshot 和原生权限/能力摘要；不是完整端到端网络 smoke。 |
+| `cicada start` | 安装缺失的 daemon/Sentinel 并启动本机 agent 服务；daemon 自动连接 Relay。 |
+| `cicada stop` / `cicada restart` | 停止或重启 daemon/Sentinel。 |
+| `cicada status [--json]` | 合并 config、daemon、Sentinel、runtime snapshot 和原生权限/能力摘要；不是完整端到端网络 smoke。 |
 | `cicada shortcut create [--name <name>] [--commands <csv|all>] [--ttl <duration>]` | 创建 iOS Shortcuts token，默认授权 `ping,status`、30 天；完整 token 只显示一次。 |
 | `cicada shortcut list` / `cicada shortcut revoke <id>` | 查看或撤销 Shortcuts token；通过 `~/.cicada/run/daemon.sock` 请求 daemon，daemon 不运行时失败。 |
 | `cicada run <command>` | 本机直接执行 9 个 Mac 命令，用于测试和手动操作；绕过 Relay 与 Shortcuts token。 |
@@ -57,7 +57,6 @@
 ```bash
 cicada advanced config get|set|validate|path
 cicada advanced daemon install|start|stop|restart|status|uninstall|logs
-cicada advanced notifier install|start|stop|restart|status|uninstall|test
 cicada advanced sleep install|uninstall|status|ping|create|extend|terminate
 cicada advanced doctor --json
 ```
@@ -91,12 +90,12 @@ cicada advanced sleep status
 安装后：
 
 1. LaunchDaemon: `/Library/LaunchDaemons/com.cicada.sleephold.plist`
-2. Binary: `/usr/local/sbin/cicada-sleephold`
+2. Binary: `/Applications/Cicada.app/Contents/Helpers/cicada-sleephold`
 3. Local socket: `~/.cicada/run/sleephold.sock`
 
-`apps/agent/scripts/build.sh` 会把 helper 先放到
-`~/.cicada/bin/cicada-sleephold`；`cicada advanced sleep install` 再通过
-管理员权限安装到 `/usr/local/sbin/cicada-sleephold`。
+SleepHold helper 随 `Cicada.app` 集成；`cicada advanced sleep install` 只在
+用户显式授权后安装 root LaunchDaemon，并让它指向 app bundle 内的 helper。
+这一步不发生在 build 阶段。
 
 完整控制能力：
 
@@ -116,7 +115,7 @@ cicada advanced sleep uninstall
 agent daemon 在线后，在 Mac 上创建 Shortcuts token：
 
 ```bash
-~/.cicada/bin/cicada shortcut create --name iPhone --commands ping,status --ttl 30d
+cicada shortcut create --name iPhone --commands ping,status --ttl 30d
 ```
 
 输出包含完整 token，且只显示这一次：
@@ -139,8 +138,8 @@ agent daemon 在线后，在 Mac 上创建 Shortcuts token：
 管理命令：
 
 ```bash
-~/.cicada/bin/cicada shortcut list
-~/.cicada/bin/cicada shortcut revoke <grantId>
+cicada shortcut list
+cicada shortcut revoke <grantId>
 ```
 
 默认命令范围是 `ping,status`。需要授权全部 9 个命令时显式使用
@@ -166,7 +165,12 @@ Body:
 
 1. Label: `com.cicada.agent`
 2. plist: `~/Library/LaunchAgents/com.cicada.agent.plist`
-3. binary: `~/.cicada/bin/cicada-agent`
+3. binary: `/Applications/Cicada.app/Contents/Helpers/cicada-agent`
+
+CLI 对外入口建议使用 symlink，例如：
+`/usr/local/bin/cicada -> /Applications/Cicada.app/Contents/Helpers/cicada`。
+真实 binary 归属于 `Cicada.app`，`~/.cicada` 只存配置、日志、状态、socket
+和缓存。
 
 ## 日志
 
