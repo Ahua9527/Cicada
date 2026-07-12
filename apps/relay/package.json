@@ -39,7 +39,7 @@
   "devDependencies": {
     "@types/node": "^24.13.3",
     "typescript": "^5.9.3",
-    "wrangler": "^4.45.0",
+    "wrangler": "4.107.0",
     "ws": "^8.21.0",
     "@types/jest": "^29.5.12",
     "jest": "^29.7.0",
@@ -52,6 +52,6 @@
   },
   "dependencies": {
     "@cicada/shared": "workspace:*",
-    "@cloudflare/workers-types": "^4.20251014.0"
+    "@cloudflare/workers-types": "^4.20260702.1"
   }
 }
