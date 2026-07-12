@@ -10,6 +10,12 @@ describe('DeviceService', () => {
 
   const DEVICE_ID = 'MAC_0123456789abcdef0123456789abcdef' as DeviceId;
   const SESSION_ID = 'session-123';
+  const repositoryError = new CicadaError('DB error', ErrorCode.SYSTEM_ERROR, {
+    severity: ErrorSeverity.HIGH,
+  });
+
+  const createDevice = (): Device =>
+    Device.create({ deviceId: DEVICE_ID, platform: 'macOS', version: '1.0.0' });
 
   beforeEach(() => {
     mockRepository = {
@@ -61,15 +67,52 @@ describe('DeviceService', () => {
     it('should handle repository errors', async () => {
       mockRepository.findById.mockResolvedValue({
         success: false,
-        error: new CicadaError('DB error', ErrorCode.SYSTEM_ERROR, {
-          severity: ErrorSeverity.HIGH,
-        }),
+        error: repositoryError,
       });
 
       const result = await service.registerDevice(DEVICE_ID, 'macOS', '1.0.0');
 
       expect(result.success).toBe(false);
     });
+
+    it('should save an existing device without metadata', async () => {
+      const device = createDevice();
+      mockRepository.findById.mockResolvedValue({ success: true, data: device });
+      mockRepository.save.mockResolvedValue({ success: true, data: undefined });
+
+      await expect(service.registerDevice(DEVICE_ID, 'macOS', '1.0.0')).resolves.toEqual({
+        success: true,
+        data: device,
+      });
+    });
+
+    it.each(['existing', 'new'] as const)('should return %s device save failures', async kind => {
+      mockRepository.findById.mockResolvedValue({
+        success: true,
+        data: kind === 'existing' ? createDevice() : null,
+      });
+      mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.registerDevice(DEVICE_ID, 'macOS', '1.0.0')).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
+    });
+
+    it.each([new Error('registration failed'), 'registration failed'])(
+      'should wrap registration exceptions (%p)',
+      async thrown => {
+        mockRepository.findById.mockRejectedValue(thrown);
+
+        const result = await service.registerDevice(DEVICE_ID, 'macOS', '1.0.0');
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.code).toBe(ErrorCode.SYSTEM_ERROR);
+          expect(result.error.cause).toBe(thrown instanceof Error ? thrown : undefined);
+        }
+      }
+    );
   });
 
   describe('getDevice', () => {
@@ -131,6 +174,20 @@ describe('DeviceService', () => {
         expect(result.error.code).toBe(ErrorCode.DEVICE_NOT_FOUND);
       }
     });
+
+    it.each(['lookup', 'save'] as const)('should return %s failures', async operation => {
+      mockRepository.findById.mockResolvedValue(
+        operation === 'lookup'
+          ? { success: false, error: repositoryError }
+          : { success: true, data: createDevice() }
+      );
+      mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.updateMetadata(DEVICE_ID, {})).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
+    });
   });
 
   describe('connectDevice', () => {
@@ -161,6 +218,20 @@ describe('DeviceService', () => {
         expect(result.error.code).toBe(ErrorCode.DEVICE_NOT_FOUND);
       }
     });
+
+    it.each(['lookup', 'save'] as const)('should return %s failures', async operation => {
+      mockRepository.findById.mockResolvedValue(
+        operation === 'lookup'
+          ? { success: false, error: repositoryError }
+          : { success: true, data: createDevice() }
+      );
+      mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.connectDevice(DEVICE_ID, SESSION_ID)).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
+    });
   });
 
   describe('disconnectDevice', () => {
@@ -188,6 +259,20 @@ describe('DeviceService', () => {
       const result = await service.disconnectDevice(DEVICE_ID);
 
       expect(result.success).toBe(true);
+    });
+
+    it.each(['lookup', 'save'] as const)('should return %s failures', async operation => {
+      mockRepository.findById.mockResolvedValue(
+        operation === 'lookup'
+          ? { success: false, error: repositoryError }
+          : { success: true, data: createDevice() }
+      );
+      mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.disconnectDevice(DEVICE_ID)).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
     });
   });
 
@@ -217,6 +302,20 @@ describe('DeviceService', () => {
       if (!result.success) {
         expect(result.error.code).toBe(ErrorCode.DEVICE_NOT_FOUND);
       }
+    });
+
+    it.each(['lookup', 'save'] as const)('should return %s failures', async operation => {
+      mockRepository.findById.mockResolvedValue(
+        operation === 'lookup'
+          ? { success: false, error: repositoryError }
+          : { success: true, data: createDevice() }
+      );
+      mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.recordPing(DEVICE_ID)).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
     });
   });
 
@@ -249,6 +348,15 @@ describe('DeviceService', () => {
         expect(result.data).toBeNull();
       }
     });
+
+    it('should return lookup failures', async () => {
+      mockRepository.findById.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.getDeviceInfo(DEVICE_ID)).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
+    });
   });
 
   describe('getDeviceStatus', () => {
@@ -279,6 +387,15 @@ describe('DeviceService', () => {
       if (result.success) {
         expect(result.data).toBeNull();
       }
+    });
+
+    it('should return lookup failures', async () => {
+      mockRepository.findById.mockResolvedValue({ success: false, error: repositoryError });
+
+      await expect(service.getDeviceStatus(DEVICE_ID)).resolves.toEqual({
+        success: false,
+        error: repositoryError,
+      });
     });
   });
 });

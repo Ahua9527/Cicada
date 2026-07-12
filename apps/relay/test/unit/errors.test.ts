@@ -10,8 +10,12 @@ import {
   RateLimitError,
   SystemError,
   TimeoutError,
+  ProtocolError,
+  WebSocketError,
   ErrorFactory,
   ErrorHandler,
+  handleError,
+  handleAsyncError,
   isRetryableError,
   calculateRetryDelay,
 } from '../../src/utils/errors';
@@ -102,6 +106,22 @@ describe('Error Classes', () => {
       expect(error.context?.timeout).toBe(5000);
     });
   });
+
+  it('creates protocol and WebSocket errors with their public defaults', () => {
+    const protocolError = new ProtocolError();
+    const webSocketError = new WebSocketError();
+
+    expect(protocolError).toMatchObject({
+      message: '协议错误',
+      type: ErrorType.PROTOCOL_ERROR,
+      statusCode: 400,
+    });
+    expect(webSocketError).toMatchObject({
+      message: 'WebSocket连接错误',
+      type: ErrorType.WEBSOCKET_ERROR,
+      statusCode: 500,
+    });
+  });
 });
 
 describe('ErrorFactory', () => {
@@ -131,6 +151,45 @@ describe('ErrorFactory', () => {
     const error = ErrorFactory.create('unknown' as ErrorType, 'Unknown error');
 
     expect(error).toBeInstanceOf(SystemError);
+  });
+
+  it.each([
+    [ErrorType.RATE_LIMIT_EXCEEDED, RateLimitError],
+    [ErrorType.PROTOCOL_ERROR, ProtocolError],
+    [ErrorType.WEBSOCKET_ERROR, WebSocketError],
+    [ErrorType.SYSTEM_ERROR, SystemError],
+  ])('creates the expected error for %s', (type, expectedClass) => {
+    const error = ErrorFactory.create(type, 'custom', { field: 'value' }, 'req-factory');
+
+    expect(error).toBeInstanceOf(expectedClass);
+    expect(error.requestId).toBe('req-factory');
+  });
+
+  it('creates timeout defaults when context is omitted', () => {
+    const error = ErrorFactory.create(ErrorType.TIMEOUT_ERROR);
+
+    expect(error).toBeInstanceOf(TimeoutError);
+    expect(error.context).toMatchObject({ operation: 'unknown', timeout: 30000 });
+  });
+
+  it('creates an unknown-device error when context is omitted', () => {
+    const error = ErrorFactory.create(ErrorType.DEVICE_OFFLINE);
+
+    expect(error).toBeInstanceOf(DeviceOfflineError);
+    expect(error.message).toContain('unknown');
+  });
+
+  it.each([
+    ['ValidationError', ValidationError],
+    ['TimeoutError', TimeoutError],
+  ])('maps native %s names', (name, expectedClass) => {
+    const nativeError = new Error('native details');
+    nativeError.name = name;
+
+    const result = ErrorFactory.fromNativeError(nativeError, undefined, { operation: 'test' }, 'req-native');
+
+    expect(result).toBeInstanceOf(expectedClass);
+    expect(result.requestId).toBe('req-native');
   });
 
   it('should convert native error to application error', () => {
@@ -223,11 +282,46 @@ describe('ErrorHandler', () => {
     expect(mockLogger.error).toHaveBeenCalled();
   });
 
-  it('should wrap async function', () => {
-    const originalFn = jest.fn().mockResolvedValue('success');
+  it('should wrap and invoke an async function', async () => {
+    const originalFn = jest.fn(async (value: unknown) => value);
     const wrappedFn = errorHandler.wrapAsync(originalFn, 'req-123');
 
-    expect(typeof wrappedFn).toBe('function');
+    await expect(wrappedFn('success')).resolves.toBe('success');
+    expect(originalFn).toHaveBeenCalledWith('success');
+  });
+
+  it('should throw the API response when a wrapped function fails', async () => {
+    const originalFn = jest.fn(async () => {
+      throw new ValidationError('bad argument');
+    });
+    const wrappedFn = errorHandler.wrapAsync(originalFn, 'req-123');
+
+    await expect(wrappedFn()).rejects.toEqual({ ok: false, error: 'bad argument' });
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Error occurred',
+      expect.objectContaining({ requestId: 'req-123' })
+    );
+  });
+});
+
+describe('Global error helpers', () => {
+  it('handles a global synchronous error', () => {
+    expect(handleError(new ValidationError('invalid'), 'req-global')).toEqual({
+      ok: false,
+      error: 'invalid',
+    });
+  });
+
+  it('handles successful and failed global async operations', async () => {
+    await expect(handleAsyncError(async () => 'ok')).resolves.toEqual({
+      success: true,
+      data: 'ok',
+    });
+    await expect(
+      handleAsyncError(async () => {
+        throw new ValidationError('invalid');
+      })
+    ).resolves.toEqual({ success: false, error: { ok: false, error: 'invalid' } });
   });
 });
 
@@ -331,6 +425,12 @@ describe('AppError Base Class', () => {
       details: { field: 'value' },
       request_id: 'req-123',
     });
+  });
+
+  it('omits optional API response fields when absent', () => {
+    const error = new ConcreteAppError('Test error', ErrorType.SYSTEM_ERROR);
+
+    expect(error.toApiResponse()).toEqual({ ok: false, error: 'Test error' });
   });
 
   it('should get error details', () => {

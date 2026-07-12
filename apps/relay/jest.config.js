@@ -3,19 +3,21 @@
  */
 
 export default {
+  rootDir: '../..',
+
   // 测试环境
   testEnvironment: 'node',
 
   // 测试文件匹配模式
   testMatch: [
-    '<rootDir>/test/**/*.test.ts',
-    '<rootDir>/test/**/*.spec.ts'
+    '<rootDir>/apps/relay/test/**/*.test.ts',
+    '<rootDir>/apps/relay/test/**/*.spec.ts'
   ],
 
   // 忽略的文件和目录
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/dist/'
+    '<rootDir>/apps/relay/dist/'
   ],
 
   // TypeScript 支持配置
@@ -23,16 +25,17 @@ export default {
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', {
       useESM: true,
+      tsconfig: '<rootDir>/apps/relay/tsconfig.json',
     }],
   },
   extensionsToTreatAsEsm: ['.ts'],
 
   // 模块路径映射
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@test/(.*)$': '<rootDir>/test/$1',
-    '^@cicada/shared$': '<rootDir>/../../packages/shared/src',
-    '^@cicada/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+    '^@/(.*)$': '<rootDir>/apps/relay/src/$1',
+    '^@test/(.*)$': '<rootDir>/apps/relay/test/$1',
+    '^@cicada/shared$': '<rootDir>/packages/shared/src',
+    '^@cicada/shared/(.*)$': '<rootDir>/packages/shared/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 
@@ -42,32 +45,20 @@ export default {
   // 覆盖率配置
   collectCoverage: false,
   collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/types/**',
-    '!src/api/index.ts',
-    '!src/domain/**/index.ts',
-    '!src/infrastructure/**/index.ts',
-    '!src/presentation/**/index.ts',
-    '!src/infrastructure/crypto/**',
-    '!src/infrastructure/logger/filters.ts',
-    '!src/infrastructure/logger/formatters.ts',
-    // Durable Object behavior is covered by integration tests; keep legacy/internal
-    // compatibility branches out of the global unit coverage gate.
-    '!src/infrastructure/persistence/durable-objects/session-manager.do.ts',
-    '!src/infrastructure/persistence/repositories/**',
-    '!src/infrastructure/middleware/cors.middleware.ts',
-    '!src/infrastructure/middleware/logging.middleware.ts',
-    '!src/infrastructure/middleware/pipeline.ts',
-    '!src/infrastructure/middleware/rate-limit.middleware.ts',
-    '!src/infrastructure/middleware/security.middleware.ts',
-    '!src/application/services/device.service.ts',
-    '!src/application/services/session.service.ts',
-    '!src/presentation/controllers/session.controller.ts',
-    '!src/presentation/routes/websocket.route.ts',
-    '!src/utils/debug-formatters.ts',
-    '!src/utils/errors.ts',
-    '!src/utils/logger.ts',
+    'apps/relay/src/**/*.ts',
+    'packages/shared/src/validators/**/*.ts',
+    '!apps/relay/src/**/*.d.ts',
+    '!apps/relay/src/types/**',
+    '!apps/relay/src/api/index.ts',
+    '!apps/relay/src/domain/**/index.ts',
+    '!apps/relay/src/infrastructure/**/index.ts',
+    '!apps/relay/src/presentation/**/index.ts',
+    '!apps/relay/src/infrastructure/crypto/**',
+    '!apps/relay/src/infrastructure/logger/filters.ts',
+    '!apps/relay/src/infrastructure/logger/formatters.ts',
+    '!apps/relay/src/infrastructure/persistence/repositories/**',
+    '!apps/relay/src/utils/debug-formatters.ts',
+    '!apps/relay/src/utils/logger.ts',
   ],
 
   // 覆盖率报告格式
@@ -79,7 +70,7 @@ export default {
   ],
 
   // 覆盖率输出目录
-  coverageDirectory: 'coverage',
+  coverageDirectory: '<rootDir>/apps/relay/coverage',
 
   // 覆盖率阈值
   coverageThreshold: {
@@ -92,7 +83,7 @@ export default {
   },
 
   // 设置文件
-  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/apps/relay/test/setup.ts'],
 
   // 清理模拟
   clearMocks: true,
@@ -107,10 +98,4 @@ export default {
   // 错误处理
   errorOnDeprecated: true,
 
-  // 全局变量
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json'
-    }
-  }
 };
