@@ -184,6 +184,40 @@ private final class FakeCommandExecutor: LocalCommandExecuting {
 }
 
 final class CicadaCLITests: XCTestCase {
+    func testShortcutCreateParserPreservesFlagSemantics() throws {
+        let parsed = try CLIArgumentParser.shortcutCreate([
+            "--name", "Desk",
+            "--commands", " ping,status,ping ",
+            "--ttl", "2h",
+        ])
+
+        XCTAssertEqual(parsed.name, "Desk")
+        XCTAssertEqual(parsed.commands, ["ping", "status"])
+        XCTAssertEqual(parsed.ttlMs, 2 * 60 * 60 * 1000)
+    }
+
+    func testShortcutCreateParserPreservesArgumentErrors() {
+        for (arguments, message) in [
+            (["--name"], "--name 需要值"),
+            (["--commands"], "--commands 需要值"),
+            (["--ttl"], "--ttl 需要值"),
+            (["--unknown"], "未知参数: --unknown"),
+        ] {
+            XCTAssertThrowsError(try CLIArgumentParser.shortcutCreate(arguments)) { error in
+                XCTAssertEqual(String(describing: error), message)
+            }
+        }
+    }
+
+    func testDurationParserPreservesSupportedUnitsAndFallback() {
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("2d"), 2 * 24 * 60 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("3h"), 3 * 60 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("4m"), 4 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("5000"), 5000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds(nil), ShortcutGrantStore.defaultTtlMs)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("invalid"), ShortcutGrantStore.defaultTtlMs)
+    }
+
     func testDefaultHelpShowsOnlyUserFacingCommands() {
         let fixture = CLIFixture()
 
