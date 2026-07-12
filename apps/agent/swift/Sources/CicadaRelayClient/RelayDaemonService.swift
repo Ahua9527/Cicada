@@ -215,12 +215,19 @@ public final class RelayDaemonService: NSObject {
     }
 
     private func processRawMessage(_ raw: String) {
-        if isPongMessage(raw) {
+        if RelayMessageCodec.isPong(raw) {
             lastPongAt = Date()
             return
         }
 
-        if isShortcutGrantUpdateAck(raw) {
+        if let acknowledgement = RelayMessageCodec.shortcutGrantUpdateAcknowledgement(raw) {
+            if !acknowledgement.accepted {
+                Logger.warn(
+                    "RelayDaemon",
+                    "shortcut grant update rejected",
+                    data: ["code": acknowledgement.code]
+                )
+            }
             return
         }
 
@@ -230,21 +237,15 @@ public final class RelayDaemonService: NSObject {
     }
 
     private func processShortcutCommand(_ raw: String) -> Bool {
-        guard let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              object["type"] as? String == "shortcut_command",
-              let dataObject = object["data"] as? [String: Any] else {
-            return false
-        }
-
-        let requestId = dataObject["requestId"] as? String ?? object["id"] as? String ?? ""
-        let grantId = dataObject["grantId"] as? String ?? ""
-        let command = dataObject["command"] as? String ?? ""
-        let authorization = shortcutGrantStore.authorize(grantId: grantId, command: command)
+        guard let incoming = RelayMessageCodec.shortcutCommand(raw) else { return false }
+        let authorization = shortcutGrantStore.authorize(
+            grantId: incoming.grantId,
+            command: incoming.command
+        )
         guard authorization.allowed else {
             sendShortcutResult(
-                requestId: requestId,
-                command: command,
+                requestId: incoming.requestId,
+                command: incoming.command,
                 ok: false,
                 success: false,
                 message: authorization.error ?? "Shortcut grant rejected.",
@@ -254,10 +255,13 @@ public final class RelayDaemonService: NSObject {
             return true
         }
 
-        let result = handleCommand(command, commandId: requestId.isEmpty ? "shortcut" : requestId)
+        let result = handleCommand(
+            incoming.command,
+            commandId: incoming.requestId.isEmpty ? "shortcut" : incoming.requestId
+        )
         sendShortcutResult(
-            requestId: requestId,
-            command: command,
+            requestId: incoming.requestId,
+            command: incoming.command,
             ok: true,
             success: result.success,
             message: result.message,
@@ -295,62 +299,18 @@ public final class RelayDaemonService: NSObject {
         code: String? = nil,
         error: String? = nil
     ) {
-        var payloadData: [String: Any] = [
-            "requestId": requestId,
-            "command": command,
-            "ok": ok,
-            "success": success,
-            "message": message,
-        ]
-        if let data {
-            payloadData["data"] = data
-        }
-        if let code {
-            payloadData["code"] = code
-        }
-        if let error {
-            payloadData["error"] = error
-        }
-        let payload: [String: Any] = [
-            "type": "shortcut_result",
-            "id": requestId,
-            "from": "agent",
-            "sent_at": Int64(Date().timeIntervalSince1970 * 1000),
-            "data": payloadData,
-        ]
-        guard JSONSerialization.isValidJSONObject(payload),
-              let serialized = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: serialized, encoding: .utf8) else {
-            return
-        }
+        guard let text = RelayMessageCodec.shortcutResult(
+            requestId: requestId,
+            command: command,
+            ok: ok,
+            success: success,
+            message: message,
+            data: data,
+            code: code,
+            error: error,
+            sentAt: Int64(Date().timeIntervalSince1970 * 1000)
+        ) else { return }
         sendRelayText(text)
-    }
-
-    private func isPongMessage(_ raw: String) -> Bool {
-        guard let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = object["type"] as? String else {
-            return raw.contains("\"type\":\"pong\"") || raw.contains("\"type\": \"pong\"")
-        }
-
-        return type == "pong"
-    }
-
-    private func isShortcutGrantUpdateAck(_ raw: String) -> Bool {
-        guard let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = object["type"] as? String else {
-            return raw.contains("\"type\":\"shortcut_grant_update_ack\"")
-                || raw.contains("\"type\": \"shortcut_grant_update_ack\"")
-        }
-
-        guard type == "shortcut_grant_update_ack" else {
-            return false
-        }
-        if object["ok"] as? Bool == false {
-            Logger.warn("RelayDaemon", "shortcut grant update rejected", data: ["code": object["code"] as? String ?? "unknown"])
-        }
-        return true
     }
 
     private func appendDaemonLog(command: String, result: CommandExecutionResult) {
@@ -473,48 +433,18 @@ public final class RelayDaemonService: NSObject {
     }
 
     private func sendPing() {
-        let payload = [
-            "type": "ping",
-            "timestamp": String(Int64(Date().timeIntervalSince1970 * 1000)),
-        ]
-
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: data, encoding: .utf8) else {
-            return
-        }
-
+        guard let text = RelayMessageCodec.ping(
+            timestamp: Int64(Date().timeIntervalSince1970 * 1000)
+        ) else { return }
         sendRelayText(text)
     }
 
     private func sendShortcutGrantUpdate(state: String, grant: ShortcutGrant) {
-        var grantObject: [String: Any] = [
-            "grantId": grant.grantId,
-            "deviceId": grant.deviceId,
-            "name": grant.name,
-            "tokenHash": grant.tokenHash,
-            "tokenPreview": grant.tokenPreview,
-            "allowedCommands": grant.allowedCommands,
-            "expiresAt": grant.expiresAt,
-            "createdAt": grant.createdAt,
-            "updatedAt": grant.updatedAt,
-        ]
-        if let revokedAt = grant.revokedAt {
-            grantObject["revokedAt"] = revokedAt
-        }
-        let payload: [String: Any] = [
-            "type": "shortcut_grant_update",
-            "from": "agent",
-            "sent_at": Int64(Date().timeIntervalSince1970 * 1000),
-            "data": [
-                "state": state,
-                "grant": grantObject,
-            ],
-        ]
-        guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: data, encoding: .utf8) else {
-            return
-        }
+        guard let text = RelayMessageCodec.shortcutGrantUpdate(
+            state: state,
+            grant: grant,
+            sentAt: Int64(Date().timeIntervalSince1970 * 1000)
+        ) else { return }
         sendRelayText(text)
     }
 
