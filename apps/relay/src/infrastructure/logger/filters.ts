@@ -3,6 +3,8 @@
  * Provides data filtering and sanitization for logs
  */
 
+import type { LogEntry } from './types';
+
 /**
  * Sensitive data filter
  * Filters out sensitive information from log context
@@ -38,7 +40,7 @@ export class SensitiveDataFilter {
   /**
    * Filter sensitive information from an object
    */
-  static filter(obj: any): any {
+  static filter<T>(obj: T): T {
     if (obj === null || obj === undefined) {
       return obj;
     }
@@ -48,10 +50,10 @@ export class SensitiveDataFilter {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => this.filter(item));
+      return obj.map(item => this.filter(item)) as T;
     }
 
-    const filtered: any = {};
+    const filtered: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       const lowerKey = key.toLowerCase();
       const isSensitive = this.SENSITIVE_FIELDS.some(field =>
@@ -67,7 +69,7 @@ export class SensitiveDataFilter {
       }
     }
 
-    return filtered;
+    return filtered as T;
   }
 
   /**
@@ -95,22 +97,25 @@ export class TagFilter {
   /**
    * Filter logs by tag
    */
-  static filterByTag(logs: any[], tag: string): any[] {
+  static filterByTag(logs: LogEntry[], tag: string): LogEntry[] {
     return logs.filter(entry => entry.tags && entry.tags.includes(tag));
   }
 
   /**
    * Filter logs by multiple tags (OR logic)
    */
-  static filterByAnyTag(logs: any[], tags: string[]): any[] {
-    return logs.filter(entry => entry.tags && entry.tags.some((t: string) => tags.includes(t)));
+  static filterByAnyTag(logs: LogEntry[], tags: string[]): LogEntry[] {
+    return logs.filter(entry => entry.tags && entry.tags.some(tag => tags.includes(tag)));
   }
 
   /**
    * Filter logs by multiple tags (AND logic)
    */
-  static filterByAllTags(logs: any[], tags: string[]): any[] {
-    return logs.filter(entry => entry.tags && tags.every((t: string) => entry.tags.includes(t)));
+  static filterByAllTags(logs: LogEntry[], tags: string[]): LogEntry[] {
+    return logs.filter(entry => {
+      const entryTags = entry.tags;
+      return entryTags !== undefined && tags.every(tag => entryTags.includes(tag));
+    });
   }
 }
 
@@ -122,14 +127,14 @@ export class TimeRangeFilter {
   /**
    * Filter logs within a time range
    */
-  static filterByTimeRange(logs: any[], startTime: number, endTime: number): any[] {
+  static filterByTimeRange(logs: LogEntry[], startTime: number, endTime: number): LogEntry[] {
     return logs.filter(entry => entry.timestamp >= startTime && entry.timestamp <= endTime);
   }
 
   /**
    * Filter logs from last N minutes
    */
-  static filterLastMinutes(logs: any[], minutes: number): any[] {
+  static filterLastMinutes(logs: LogEntry[], minutes: number): LogEntry[] {
     const now = Date.now();
     const startTime = now - minutes * 60 * 1000;
     return this.filterByTimeRange(logs, startTime, now);
@@ -138,7 +143,7 @@ export class TimeRangeFilter {
   /**
    * Filter logs from last N hours
    */
-  static filterLastHours(logs: any[], hours: number): any[] {
+  static filterLastHours(logs: LogEntry[], hours: number): LogEntry[] {
     const now = Date.now();
     const startTime = now - hours * 60 * 60 * 1000;
     return this.filterByTimeRange(logs, startTime, now);
@@ -153,14 +158,14 @@ export class LevelFilter {
   /**
    * Filter logs by level
    */
-  static filterByLevel(logs: any[], level: string): any[] {
+  static filterByLevel(logs: LogEntry[], level: string): LogEntry[] {
     return logs.filter(entry => entry.level === level);
   }
 
   /**
    * Filter logs by minimum level
    */
-  static filterByMinLevel(logs: any[], minLevel: string): any[] {
+  static filterByMinLevel(logs: LogEntry[], minLevel: string): LogEntry[] {
     const levelOrder = ['debug', 'info', 'warn', 'error'];
     const minIndex = levelOrder.indexOf(minLevel.toLowerCase());
 

@@ -5,6 +5,7 @@
 
 import type { LogLevel } from '../../types';
 import { JsonFormatter, TextFormatter, ColorConsoleFormatter } from './formatters';
+import type { LogFormatter } from './formatters';
 import { SensitiveDataFilter } from './filters';
 import {
   LOG_LEVEL,
@@ -21,7 +22,7 @@ import { redactSensitiveText, sanitizeError } from '../../utils/sensitive-error'
  * Provides structured logging with filtering and formatting
  */
 export class Logger {
-  private formatter: any;
+  private formatter: LogFormatter;
   private minLevel: NormalizedLevel;
   private enableConsole: boolean;
   private enableDebug: boolean;
@@ -105,7 +106,7 @@ export class Logger {
     level: LogLevel,
     message: string,
     options: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       error?: Error;
@@ -126,7 +127,7 @@ export class Logger {
   debug(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       tags?: string[];
@@ -142,7 +143,7 @@ export class Logger {
   info(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       tags?: string[];
@@ -158,7 +159,7 @@ export class Logger {
   warn(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       error?: Error;
@@ -175,7 +176,7 @@ export class Logger {
   error(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       error?: Error;
@@ -192,7 +193,7 @@ export class Logger {
   success(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       tags?: string[];
@@ -200,13 +201,6 @@ export class Logger {
   ): void {
     const entry = this.createLogEntry('success' as LogLevel, message, options);
     this.log(entry);
-  }
-
-  /**
-   * Log debug details (compatibility method)
-   */
-  private logDebugDetails(_entry: any): void {
-    // No-op for compatibility with legacy Logger interface
   }
 
   /**
@@ -262,7 +256,7 @@ export class Logger {
   /**
    * Log WebSocket event
    */
-  logWebSocketEvent(event: string, deviceId: string, context?: Record<string, any>): void {
+  logWebSocketEvent(event: string, deviceId: string, context?: Record<string, unknown>): void {
     this.info(`WebSocket ${event}`, {
       deviceId,
       context,
@@ -275,7 +269,7 @@ export class Logger {
    */
   logSecurityEvent(
     event: string,
-    details: Record<string, any>,
+    details: Record<string, unknown>,
     severity: 'low' | 'medium' | 'high' = 'medium'
   ): void {
     const level =

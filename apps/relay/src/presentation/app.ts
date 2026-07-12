@@ -103,7 +103,7 @@ export class CicadaRelayApp {
     }
 
     // Router middleware
-    pipeline.use(this.router.createMiddleware() as any);
+    pipeline.use(this.router.createMiddleware());
 
     return pipeline;
   }
@@ -120,7 +120,7 @@ export class CicadaRelayApp {
       request,
       env,
       requestId,
-      logger: this.logger as any,
+      logger: this.logger,
       timestamp: Date.now(),
       url,
       method: request.method,
@@ -140,7 +140,7 @@ export class CicadaRelayApp {
         tags: ['request', 'start'],
       });
 
-      const pipelineResponse = await this.pipeline.execute(context as any);
+      const pipelineResponse = await this.pipeline.execute(context);
       const response = enforcePublicServerErrorResponse(pipelineResponse, context.requestId);
 
       // WebSocket 升级响应（101）不可变，跳过日志记录

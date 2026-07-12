@@ -3,7 +3,7 @@
  * Route matching and dispatching logic
  */
 
-import type { MiddlewareContext } from '../types';
+import type { Middleware, MiddlewareContext } from '../types';
 import {
   handleWebSocketRoute,
   handleStatusRoute,
@@ -56,8 +56,8 @@ export class Router {
   /**
    * Create router middleware
    */
-  createMiddleware() {
-    return async (context: MiddlewareContext, _next: () => Promise<any>) => {
+  createMiddleware(): Middleware {
+    return async context => {
       const { request } = context;
       const url = new URL(request.url);
       const { pathname, method } = { pathname: url.pathname, method: request.method };

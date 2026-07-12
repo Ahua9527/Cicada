@@ -17,7 +17,7 @@ export interface LogFormatter {
  */
 export class JsonFormatter implements LogFormatter {
   format(entry: LogEntry): string {
-    const logData: any = {
+    const logData: Record<string, unknown> = {
       level: entry.level,
       timestamp: entry.timestamp,
       message: entry.message,

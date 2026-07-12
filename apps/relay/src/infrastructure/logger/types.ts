@@ -3,6 +3,7 @@
  */
 
 import type { LogLevel } from '../../types';
+import type { LogFormatter } from './formatters';
 
 export type NormalizedLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -13,7 +14,7 @@ export interface LogEntry {
   level: LogLevel;
   timestamp: number;
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   requestId?: string;
   deviceId?: string;
   error?: Error;
@@ -24,13 +25,19 @@ export interface LogEntry {
  * Logger options
  */
 export interface LoggerOptions {
-  formatter?: any; // LogFormatter
+  formatter?: LogFormatter;
   minLevel?: LogLevel;
   enableConsole?: boolean;
   enableDebug?: boolean;
   enableStructured?: boolean;
   maxLogs?: number;
-  env?: any;
+  env?: LoggerEnvironment;
+}
+
+export interface LoggerEnvironment {
+  DEBUG_MODE?: string;
+  NODE_ENV?: string;
+  LOG_LEVEL?: string;
 }
 
 /**
