@@ -23,6 +23,12 @@ import {
   copyDurableObjectResponse,
   toDurableObjectRequest,
 } from '../../cloudflare/worker-fetch-adapter';
+import {
+  methodNotAllowed,
+  normalizeShortcutCommands,
+  readJsonObject,
+  shortcutFailureStatus,
+} from './session-manager.logic';
 
 type PendingConnection = {
   timestamp: number;
@@ -701,7 +707,7 @@ export class SessionManagerDO {
       error: typeof data?.error === 'string' ? data.error : undefined,
       timestamp: Date.now(),
     };
-    const status = ok ? 200 : this.shortcutFailureStatus(body.code);
+    const status = ok ? 200 : shortcutFailureStatus(body.code);
     pending.resolve(this.jsonResponse(body, { status }));
   }
 
@@ -712,7 +718,7 @@ export class SessionManagerDO {
         this.shortcutError(
           code,
           error,
-          this.shortcutFailureStatus(code),
+          shortcutFailureStatus(code),
           pending.clientRequestId,
           pending.command
         )
@@ -939,36 +945,6 @@ export class SessionManagerDO {
     return Response.json(body, init);
   }
 
-  private shortcutFailureStatus(code?: string): number {
-    switch (code) {
-      case 'grant_expired':
-      case 'grant_revoked':
-      case 'command_not_allowed':
-        return 403;
-      case 'agent_unavailable':
-        return 503;
-      case 'command_timeout':
-        return 504;
-      default:
-        return 400;
-    }
-  }
-
-  private methodNotAllowed(allowed: string[]): Response {
-    return this.jsonResponse(
-      {
-        success: false,
-        error: 'Method not allowed',
-      },
-      {
-        status: 405,
-        headers: {
-          Allow: allowed.join(', '),
-        },
-      }
-    );
-  }
-
   private createWebSocketResponse(webSocket: WebSocket): Response {
     try {
       return new Response(null, { status: 101, webSocket });
@@ -982,10 +958,10 @@ export class SessionManagerDO {
 
   private async handleRoomShortcutCommand(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
-    const payload = await this.readJsonObject(request);
+    const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
         'invalid_shortcut_command',
@@ -1085,7 +1061,7 @@ export class SessionManagerDO {
 
   private async handleRegistryAgentOnline(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as {
@@ -1215,7 +1191,7 @@ export class SessionManagerDO {
 
   private async handleRegistryAgentOffline(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as { deviceId?: string; sessionId?: string };
@@ -1238,7 +1214,7 @@ export class SessionManagerDO {
 
   private async handleRegistryShortcutGrantUpdate(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as {
@@ -1328,7 +1304,7 @@ export class SessionManagerDO {
 
   private async handleShortcutCommand(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const token = this.extractShortcutToken(request);
@@ -1336,7 +1312,7 @@ export class SessionManagerDO {
       return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
     }
 
-    const payload = await this.readJsonObject(request);
+    const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
         'invalid_shortcut_command',
@@ -1421,7 +1397,7 @@ export class SessionManagerDO {
     const name = typeof value.name === 'string' ? value.name.trim() : '';
     const tokenHash = typeof value.tokenHash === 'string' ? value.tokenHash.trim() : '';
     const tokenPreview = typeof value.tokenPreview === 'string' ? value.tokenPreview.trim() : '';
-    const allowedCommands = this.normalizeShortcutCommands(value.allowedCommands);
+    const allowedCommands = normalizeShortcutCommands(value.allowedCommands);
     const expiresAt = typeof value.expiresAt === 'number' ? value.expiresAt : 0;
     const createdAt = typeof value.createdAt === 'number' ? value.createdAt : Date.now();
     const updatedAt = typeof value.updatedAt === 'number' ? value.updatedAt : Date.now();
@@ -1440,20 +1416,6 @@ export class SessionManagerDO {
       createdAt,
       updatedAt,
     };
-  }
-
-  private normalizeShortcutCommands(value?: string[]): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-    return Array.from(
-      new Set(
-        value
-          .filter(command => typeof command === 'string')
-          .map(command => command.trim())
-          .filter(Boolean)
-      )
-    );
   }
 
   private extractShortcutToken(request: Request): string | undefined {
@@ -1492,18 +1454,6 @@ export class SessionManagerDO {
       if (now >= expiresAt) {
         this.usedRegistrationNonces.delete(nonce);
       }
-    }
-  }
-
-  private async readJsonObject(request: Request): Promise<Record<string, unknown> | undefined> {
-    try {
-      const payload = await request.json();
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-        return undefined;
-      }
-      return payload as Record<string, unknown>;
-    } catch {
-      return undefined;
     }
   }
 
@@ -1607,7 +1557,7 @@ export class SessionManagerDO {
 
   private handleRegistryDevices(request: Request): Response {
     if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+      return methodNotAllowed(['GET']);
     }
 
     const now = Date.now();
@@ -1632,7 +1582,7 @@ export class SessionManagerDO {
 
   private handleRegistryStatus(request: Request): Response {
     if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+      return methodNotAllowed(['GET']);
     }
 
     const devices = Array.from(this.registryDevices.values());
