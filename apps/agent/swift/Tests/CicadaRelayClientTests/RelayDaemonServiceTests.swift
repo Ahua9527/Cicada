@@ -28,6 +28,94 @@ private final class MockNotifier: NotifierSending {
 }
 
 final class RelayDaemonServiceTests: XCTestCase {
+    func testConnectionLifecycleChoosesStopOrReconnect() {
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: true,
+                autoConnect: true,
+                enableAutoReconnect: true
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: false,
+                enableAutoReconnect: true
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: true,
+                enableAutoReconnect: false
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: true,
+                enableAutoReconnect: true
+            ),
+            .reconnect
+        )
+    }
+
+    func testReconnectPolicyPreservesAttemptLimitsAndDelayBounds() {
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 0,
+                maxAttempts: 10,
+                reconnectIntervalMs: 500
+            ),
+            .reconnect(attempt: 1, delayMs: 1_000)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 2,
+                maxAttempts: 0,
+                reconnectIntervalMs: 5_000
+            ),
+            .reconnect(attempt: 3, delayMs: 15_000)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 10,
+                maxAttempts: 10,
+                reconnectIntervalMs: 5_000
+            ),
+            .stop(attempt: 11)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 9,
+                maxAttempts: 0,
+                reconnectIntervalMs: 10_000
+            ),
+            .reconnect(attempt: 10, delayMs: 60_000)
+        )
+    }
+
+    func testPongTimeoutPolicyPreservesStrictThreshold() {
+        let lastPong = Date(timeIntervalSince1970: 10)
+        XCTAssertFalse(
+            RelayConnectionLifecycle.isPongTimedOut(
+                lastPongAt: lastPong,
+                now: Date(timeIntervalSince1970: 12),
+                timeoutMs: 2_000
+            )
+        )
+        XCTAssertTrue(
+            RelayConnectionLifecycle.isPongTimedOut(
+                lastPongAt: lastPong,
+                now: Date(timeIntervalSince1970: 12.001),
+                timeoutMs: 2_000
+            )
+        )
+    }
+
     func testRelayMessageCodecRecognizesIncomingMessages() {
         XCTAssertTrue(RelayMessageCodec.isPong("{\"type\":\"pong\"}"))
         XCTAssertFalse(RelayMessageCodec.isPong("{\"type\":\"ping\"}"))

@@ -370,39 +370,41 @@ public final class RelayDaemonService: NSObject {
         session?.invalidateAndCancel()
         session = nil
 
-        if isStopping {
+        switch RelayConnectionLifecycle.disconnectionAction(
+            isStopping: isStopping,
+            autoConnect: config.autoConnect,
+            enableAutoReconnect: config.enableAutoReconnect
+        ) {
+        case .stop:
             transition(to: .stopped, reason: reason)
-            return
-        }
-
-        if config.autoConnect && config.enableAutoReconnect {
+        case .reconnect:
             scheduleReconnect(reason: reason)
-            return
         }
-
-        transition(to: .stopped, reason: reason)
     }
 
     private func scheduleReconnect(reason: String) {
         guard !isStopping else { return }
         reconnectWorkItem?.cancel()
-        reconnectAttempts += 1
-        if reconnectAttempts > config.maxReconnectAttempts && config.maxReconnectAttempts > 0 {
-            Logger.error("RelayDaemon", "reconnect attempts exceeded", data: ["attempts": String(reconnectAttempts)])
+        switch RelayConnectionLifecycle.reconnectDecision(
+            currentAttempts: reconnectAttempts,
+            maxAttempts: config.maxReconnectAttempts,
+            reconnectIntervalMs: config.reconnectInterval
+        ) {
+        case let .stop(attempt):
+            reconnectAttempts = attempt
+            Logger.error("RelayDaemon", "reconnect attempts exceeded", data: ["attempts": String(attempt)])
             transition(to: .stopped, reason: "reconnect_attempts_exceeded")
-            return
-        }
+        case let .reconnect(attempt, delayMs):
+            reconnectAttempts = attempt
+            transition(to: .reconnectWait, reason: reason)
+            Logger.warn("RelayDaemon", "schedule reconnect", data: ["delayMs": String(delayMs), "attempt": String(attempt)])
 
-        let baseDelay = max(1_000, config.reconnectInterval)
-        let computed = min(baseDelay * reconnectAttempts, 60_000)
-        transition(to: .reconnectWait, reason: reason)
-        Logger.warn("RelayDaemon", "schedule reconnect", data: ["delayMs": String(computed), "attempt": String(reconnectAttempts)])
-
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.connect()
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.connect()
+            }
+            reconnectWorkItem = workItem
+            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(delayMs), execute: workItem)
         }
-        reconnectWorkItem = workItem
-        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(computed), execute: workItem)
     }
 
     private func startPingLoop() {
@@ -466,10 +468,15 @@ public final class RelayDaemonService: NSObject {
     private func checkConnectionHealth(now: Date = Date()) {
         guard connectionState == .connected else { return }
 
-        let elapsedMs = now.timeIntervalSince(lastPongAt) * 1000
-        if elapsedMs <= Double(config.connectionTimeout) {
+        if !RelayConnectionLifecycle.isPongTimedOut(
+            lastPongAt: lastPongAt,
+            now: now,
+            timeoutMs: config.connectionTimeout
+        ) {
             return
         }
+
+        let elapsedMs = now.timeIntervalSince(lastPongAt) * 1000
 
         Logger.warn(
             "RelayDaemon",
