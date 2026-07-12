@@ -287,6 +287,11 @@ describe('Middleware', () => {
   });
 
   describe('rateLimitMiddleware', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+
     it('adds headers and returns the existing response', async () => {
       const response = new Response('ok');
       const middleware = rateLimitMiddleware({ windowMs: 1_000, maxRequests: 2 });
@@ -348,10 +353,12 @@ describe('Middleware', () => {
     });
 
     it('resets an expired key and preserves upgrade responses', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(1_000);
       const middleware = rateLimitMiddleware({ windowMs: 100, maxRequests: 1 });
       const context = createContext({ deviceId: 'expiring' });
       await middleware(context, async () => new Response('ok'));
-      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 101);
+      jest.setSystemTime(1_101);
 
       await expect(middleware(context, async () => new Response('fresh'))).resolves.toBeInstanceOf(
         Response
@@ -361,6 +368,110 @@ describe('Middleware', () => {
       await expect(
         rateLimitMiddleware({ windowMs: 100, maxRequests: 1 })(createContext(), async () => upgrade)
       ).resolves.toBe(upgrade);
+    });
+
+    it('waits for the cleanup interval when the store remains small', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(1_000);
+
+      const entriesSpy = jest.spyOn(Map.prototype, 'entries');
+      const middleware = rateLimitMiddleware({
+        windowMs: 120_000,
+        maxRequests: 2,
+        keyGenerator: context => context.deviceId ?? 'unknown',
+      });
+
+      await middleware(createContext({ deviceId: 'one' }), async () => new Response('ok'));
+      jest.setSystemTime(60_999);
+      await middleware(createContext({ deviceId: 'two' }), async () => new Response('ok'));
+
+      expect(entriesSpy).not.toHaveBeenCalled();
+
+      jest.setSystemTime(61_000);
+      await middleware(createContext({ deviceId: 'three' }), async () => new Response('ok'));
+      expect(entriesSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('scans at most 100 stored keys per request under high cardinality', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(1_000);
+
+      const middleware = rateLimitMiddleware({
+        windowMs: 120_000,
+        maxRequests: 2,
+        keyGenerator: context => context.deviceId ?? 'unknown',
+      });
+
+      for (let index = 0; index <= 1_000; index++) {
+        await middleware(createContext({ deviceId: `device-${index}` }), async () =>
+          new Response('ok')
+        );
+      }
+
+      const originalEntries = Map.prototype.entries;
+      let scanned = 0;
+      jest.spyOn(Map.prototype, 'entries').mockImplementation(function <K, V>(this: Map<K, V>) {
+        const iterator = originalEntries.call(this);
+        return {
+          next() {
+            scanned++;
+            return iterator.next();
+          },
+          [Symbol.iterator]() {
+            return this;
+          },
+        } as MapIterator<[K, V]>;
+      });
+
+      await middleware(createContext({ deviceId: 'overflow' }), async () => new Response('ok'));
+
+      expect(scanned).toBe(100);
+    });
+
+    it('eventually reclaims expired high-cardinality entries in bounded batches', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(1_000);
+
+      const middleware = rateLimitMiddleware({
+        windowMs: 100,
+        maxRequests: 1,
+        keyGenerator: context => context.deviceId ?? 'unknown',
+      });
+
+      for (let index = 0; index <= 1_000; index++) {
+        await middleware(createContext({ deviceId: `expired-${index}` }), async () =>
+          new Response('ok')
+        );
+      }
+
+      jest.setSystemTime(1_101);
+      const originalEntries = Map.prototype.entries;
+      let scanned = 0;
+      jest.spyOn(Map.prototype, 'entries').mockImplementation(function <K, V>(this: Map<K, V>) {
+        const iterator = originalEntries.call(this);
+        return {
+          next() {
+            scanned++;
+            return iterator.next();
+          },
+          [Symbol.iterator]() {
+            return this;
+          },
+        } as MapIterator<[K, V]>;
+      });
+
+      for (let index = 0; index < 12; index++) {
+        await middleware(createContext({ deviceId: `fresh-${index}` }), async () =>
+          new Response('ok')
+        );
+      }
+
+      expect(scanned).toBeLessThanOrEqual(1_200);
+      expect(scanned).toBeGreaterThanOrEqual(1_001);
+
+      const scannedAfterCleanup = scanned;
+      await middleware(createContext({ deviceId: 'post-cleanup' }), async () => new Response('ok'));
+      expect(scanned).toBe(scannedAfterCleanup);
     });
   });
 
