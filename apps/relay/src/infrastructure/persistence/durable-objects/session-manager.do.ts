@@ -164,8 +164,10 @@ export class SessionManagerDO {
       const sessions = Array.from(this.sessionInfo.values()).map(info =>
         this.normalizeSessionInfo(info.deviceId ?? this.state.id.toString(), info)
       );
-      await this.state.storage.put(SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS, sessions);
-      await this.state.storage.put(SESSION_CONSTANTS.STORAGE_KEYS.NONCES, Array.from(this.nonces));
+      await this.state.storage.put({
+        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: sessions,
+        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: Array.from(this.nonces),
+      });
     } catch (error) {
       console.error('Failed to save session data:', error);
     }

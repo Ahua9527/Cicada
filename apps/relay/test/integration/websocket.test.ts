@@ -423,12 +423,11 @@ describe('WebSocket Integration Tests', () => {
 
       await sessionManager.markNonceUsed('nonce-one');
 
-      expect(put).toHaveBeenCalledTimes(2);
-      expect(put).toHaveBeenNthCalledWith(
-        2,
-        SESSION_CONSTANTS.STORAGE_KEYS.NONCES,
-        ['nonce-one']
-      );
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(put).toHaveBeenCalledWith({
+        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [],
+        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: ['nonce-one'],
+      });
     });
 
     it('should trim and persist the nonce cache exactly once', async () => {
@@ -443,12 +442,11 @@ describe('WebSocket Integration Tests', () => {
       put.mockClear();
       await sessionManager.markNonceUsed('nonce-three');
 
-      expect(put).toHaveBeenCalledTimes(2);
-      expect(put).toHaveBeenNthCalledWith(
-        2,
-        SESSION_CONSTANTS.STORAGE_KEYS.NONCES,
-        ['nonce-three']
-      );
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(put).toHaveBeenCalledWith({
+        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [],
+        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: ['nonce-three'],
+      });
       expect(sessionManager.isNonceUsed('nonce-one')).toBe(false);
       expect(sessionManager.isNonceUsed('nonce-three')).toBe(true);
     });
