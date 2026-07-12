@@ -19,6 +19,22 @@ Use these batches in order, but do not combine them:
 
 Do not remove `ws`: Relay diagnostic scripts use it. Do not cross multiple major-version boundaries merely to make `pnpm outdated` empty.
 
+### Compatibility snapshot (2026-07-12)
+
+The repository CI baseline is Node 24. The Cloudflare batch is intentionally pinned to
+`wrangler@4.107.0` with `@cloudflare/workers-types@4.20260702.1`: Wrangler 4.108 and
+newer require Workers types 5, so advancing further is a separate compatibility review
+rather than a patch update.
+
+| Ecosystem | Current | Candidate reviewed | Compatibility result | Migration work before upgrade |
+| --- | --- | --- | --- | --- |
+| TypeScript / lint | TypeScript 5.9.3, ESLint 8.57, typescript-eslint 6.21 | TypeScript 6.0.3, ESLint 10.7, `@eslint/js` 10.0.1, typescript-eslint 8.63 | Node 24 satisfies all engine ranges. typescript-eslint 8.63 supports ESLint 10 and TypeScript `<6.1`, so TypeScript 6 is the highest compatible target. TypeScript 7.0.2 is not yet supported. | Upgrade all lint packages together, review flat-config rule and default changes, run TypeScript 6 migration checks, and resolve new diagnostics without weakening rules. Keep TypeScript 7 deferred until the parser explicitly supports it. |
+| Jest | Jest 29.7, `ts-jest` 29.4.11, `@types/jest` 29.5 | Jest 30.4.2, `ts-jest` 29.4.11, `@types/jest` 30.0.0 | Node 24 is supported and `ts-jest` 29.4.11 declares Jest 30 peers, but Jest 30 and its type package are still a major runtime, transform, and typing change. | Upgrade Jest and its types together, verify ESM and `ts-jest` transform behavior, review changed matcher/type semantics, and compare all 22 suites, 356 tests, and coverage thresholds before and after. |
+
+These major migrations are deliberately deferred from routine dependency maintenance.
+Each requires its own pull request and can proceed only after the peer matrix above is
+still current and the complete validation matrix passes.
+
 For every batch, run and record:
 
 ```bash
