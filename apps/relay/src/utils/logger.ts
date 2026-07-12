@@ -6,6 +6,7 @@
 
 import type { Env, LogLevel } from '../types';
 import { ColorConsoleFormatter, DebugLogger } from './debug-formatters';
+import { redactSensitiveText, sanitizeError } from './sensitive-error';
 
 type NormalizedLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -235,6 +236,12 @@ export class Logger {
    * 记录日志条目
    */
   private log(entry: LogEntry): void {
+    entry = {
+      ...entry,
+      message: redactSensitiveText(entry.message),
+      error: entry.error ? sanitizeError(entry.error) : undefined,
+    };
+
     // 过滤敏感信息
     if (entry.context) {
       entry.context = SensitiveDataFilter.filter(entry.context) as Record<string, unknown>;

@@ -11,6 +11,12 @@ import {
   RELAY_CLOSE_CODES,
 } from '../../../types';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
+import {
+  createPublicServerErrorResponse,
+  enforcePublicServerErrorResponse,
+  generateRequestId,
+} from '../../../presentation/public-error-response';
+import { sanitizeError } from '../../../utils/sensitive-error';
 
 type PendingConnection = {
   timestamp: number;
@@ -1652,7 +1658,7 @@ export class SessionManagerDO {
     return new Response(null, { status: 204 });
   }
 
-  private async handleWebSocketUpgrade(request: Request): Promise<Response> {
+  private async handleWebSocketUpgrade(request: Request, requestId: string): Promise<Response> {
     try {
       // Create WebSocketPair in Durable Object
       // eslint-disable-next-line no-undef
@@ -1691,20 +1697,14 @@ export class SessionManagerDO {
       // Return the client WebSocket to the original requester
       return this.createWebSocketResponse(client);
     } catch (error) {
-      console.error('[DO ERROR] WebSocket upgrade failed:', error);
-      return this.jsonResponse(
-        {
-          success: false,
-          error: 'WebSocket upgrade failed',
-          details: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 }
-      );
+      this.logServerError('WebSocket upgrade failed', requestId, error);
+      return createPublicServerErrorResponse(requestId);
     }
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    const requestId = request.headers.get('X-Request-ID') ?? generateRequestId();
 
     if (request.method === 'OPTIONS') {
       return this.handleOptions();
@@ -1723,27 +1723,35 @@ export class SessionManagerDO {
           { status: 404 }
         );
       }
-      return await this.handleWebSocketUpgrade(request);
+      return await this.handleWebSocketUpgrade(request, requestId);
     }
 
     try {
+      let response: Response;
       switch (url.pathname) {
         case '/shortcut/command':
-          return await this.handleRoomShortcutCommand(request);
+          response = await this.handleRoomShortcutCommand(request);
+          break;
         case '/registry/agent-online':
-          return await this.handleRegistryAgentOnline(request);
+          response = await this.handleRegistryAgentOnline(request);
+          break;
         case '/registry/agent-offline':
-          return await this.handleRegistryAgentOffline(request);
+          response = await this.handleRegistryAgentOffline(request);
+          break;
         case '/registry/shortcut-grant-update':
-          return await this.handleRegistryShortcutGrantUpdate(request);
+          response = await this.handleRegistryShortcutGrantUpdate(request);
+          break;
         case '/registry/devices':
-          return this.handleRegistryDevices(request);
+          response = this.handleRegistryDevices(request);
+          break;
         case '/registry/status':
-          return this.handleRegistryStatus(request);
+          response = this.handleRegistryStatus(request);
+          break;
         case '/v1/shortcuts/command':
-          return await this.handleShortcutCommand(request);
+          response = await this.handleShortcutCommand(request);
+          break;
         default:
-          return this.jsonResponse(
+          response = this.jsonResponse(
             {
               success: false,
               error: 'Not found',
@@ -1752,16 +1760,28 @@ export class SessionManagerDO {
             { status: 404 }
           );
       }
+      return enforcePublicServerErrorResponse(response, requestId);
     } catch (error) {
-      console.error('SessionManagerDO fetch error:', error);
-      return this.jsonResponse(
-        {
-          success: false,
-          error: 'Internal server error',
-        },
-        { status: 500 }
-      );
+      this.logServerError('SessionManagerDO fetch error', requestId, error);
+      return createPublicServerErrorResponse(requestId);
     }
+  }
+
+  private logServerError(message: string, requestId: string, error: unknown): void {
+    const normalizedError = error instanceof Error ? error : new Error(String(error));
+    const sanitizedError = sanitizeError(normalizedError);
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message,
+        request_id: requestId,
+        error: {
+          name: sanitizedError.name,
+          message: sanitizedError.message,
+          stack: sanitizedError.stack,
+        },
+      })
+    );
   }
 
   /**

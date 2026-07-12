@@ -4,6 +4,7 @@
 
 import type { MiddlewareContext, Middleware, MiddlewareResult } from './types';
 import { extractResponse } from './types';
+import { createPublicServerErrorResponse } from '../../presentation/public-error-response';
 
 /**
  * 中间件管道类
@@ -68,16 +69,7 @@ export class MiddlewarePipeline {
           error: error as Error,
           tags: ['websocket', 'error', 'ignored'],
         });
-        // 返回 500 而不是 101，因为 101 不在有效范围内
-        // 如果 WebSocket 已成功升级，客户端不会看到此响应
-        return Response.json(
-          {
-            ok: false,
-            error: 'WebSocket upgrade error',
-            message: error instanceof Error ? error.message : 'Unknown error',
-          },
-          { status: 500 }
-        );
+        return createPublicServerErrorResponse(context.requestId);
       }
 
       context.logger.error('Pipeline error occurred', {
@@ -86,15 +78,7 @@ export class MiddlewarePipeline {
         tags: ['middleware', 'error'],
       });
 
-      // 简化的错误响应
-      const errorResponse = {
-        ok: false,
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        request_id: context.requestId,
-      };
-
-      return Response.json(errorResponse, { status: 500 });
+      return createPublicServerErrorResponse(context.requestId);
     }
   }
 }

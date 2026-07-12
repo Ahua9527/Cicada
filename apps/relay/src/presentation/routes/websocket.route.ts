@@ -5,6 +5,7 @@
 
 import type { MiddlewareContext } from '../../types';
 import { SessionController } from '../controllers';
+import { createPublicServerErrorResponse } from '../public-error-response';
 
 /**
  * WebSocket route handler
@@ -18,15 +19,7 @@ export async function handleWebSocketRoute(context: MiddlewareContext): Promise<
       error: error as Error,
       tags: ['websocket', 'error'],
     });
-    return Response.json(
-      {
-        ok: false,
-        error: 'WebSocket route handler exception',
-        details: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-      { status: 500 }
-    );
+    return createPublicServerErrorResponse(context.requestId);
   }
 }
 

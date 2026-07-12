@@ -440,8 +440,8 @@ describe('Shortcuts-only relay transport', () => {
     expect(response.status).toBe(504);
     expect((await response.json()) as any).toMatchObject({
       ok: false,
-      request_id: 'req-timeout',
-      code: 'command_timeout',
+      error: 'Internal server error',
+      request_id: expect.any(String),
     });
   });
 
@@ -525,6 +525,10 @@ describe('Shortcuts-only relay transport', () => {
     expect(((await (await post('token-hash', 'lock')).json()) as any).code).toBe('command_not_allowed');
     const offline = await post('token-hash');
     expect(offline.status).toBe(503);
-    expect(((await offline.json()) as any).code).toBe('agent_unavailable');
+    expect((await offline.json()) as any).toMatchObject({
+      ok: false,
+      error: 'Internal server error',
+      request_id: expect.any(String),
+    });
   });
 });
