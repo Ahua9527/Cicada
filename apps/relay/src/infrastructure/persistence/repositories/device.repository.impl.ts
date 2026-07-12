@@ -7,18 +7,20 @@ import type { DeviceRepository, DeviceResult } from '../../../domain/device/devi
 import { DeviceRepositoryError } from '../../../domain/device/device.repository';
 import {
   Device,
+  DeviceCapability,
   DeviceConnectionStatus,
   type DeviceMetadata,
 } from '../../../domain/device/device.entity';
 import type { DeviceId } from '@cicada/shared/types/common.types';
 import type { DeviceType, DeviceStatus } from '@cicada/shared/types/device.types';
+import type { DurableObjectStorage } from '@cloudflare/workers-types';
 
 export class DeviceRepositoryImpl implements DeviceRepository {
-  constructor(private storage: any) {}
+  constructor(private readonly storage: DurableObjectStorage) {}
 
   async findById(deviceId: DeviceId): Promise<DeviceResult<Device | null>> {
     try {
-      const deviceData = await this.storage.get(`device:${deviceId}`);
+      const deviceData = await this.storage.get<PersistedDevice>(`device:${deviceId}`);
 
       if (!deviceData) {
         return { success: true, data: null };
@@ -63,7 +65,7 @@ export class DeviceRepositoryImpl implements DeviceRepository {
 
   async listConnected(): Promise<DeviceResult<Device[]>> {
     try {
-      const allDevices = await this.storage.list({ prefix: 'device:' });
+      const allDevices = await this.storage.list<PersistedDevice>({ prefix: 'device:' });
       const devices: Device[] = [];
 
       for (const [, deviceData] of allDevices) {
@@ -84,7 +86,7 @@ export class DeviceRepositoryImpl implements DeviceRepository {
 
   async listAll(): Promise<DeviceResult<Device[]>> {
     try {
-      const allDevices = await this.storage.list({ prefix: 'device:' });
+      const allDevices = await this.storage.list<PersistedDevice>({ prefix: 'device:' });
       const devices: Device[] = [];
 
       for (const [, deviceData] of allDevices) {
@@ -110,7 +112,7 @@ export class DeviceRepositoryImpl implements DeviceRepository {
       platform: data.platform,
       version: data.version,
       deviceType: data.deviceType,
-      capabilities: data.capabilities as any,
+      capabilities: this.parseCapabilities(data.capabilities),
       metadata: data.metadata,
       connectionStatus: data.connectionStatus,
       connectedAt: data.connectedAt ?? undefined,
@@ -121,6 +123,14 @@ export class DeviceRepositoryImpl implements DeviceRepository {
       uptime: data.uptime ?? undefined,
       sessionId: data.sessionId ?? undefined,
     });
+  }
+
+  private parseCapabilities(values: string[]): DeviceCapability[] {
+    const supported = new Set<string>(Object.values(DeviceCapability));
+    if (!values.every(value => supported.has(value))) {
+      throw new DeviceRepositoryError('Persisted device has invalid capabilities');
+    }
+    return values as DeviceCapability[];
   }
 
   private toPersisted(device: Device): PersistedDevice {

@@ -10,6 +10,7 @@ import {
   RelayTransportMessage,
   RELAY_CLOSE_CODES,
   ShortcutGrantRecord,
+  Env,
 } from '../../../types';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 import {
@@ -18,6 +19,10 @@ import {
   generateRequestId,
 } from '../../../presentation/public-error-response';
 import { sanitizeError } from '../../../utils/sensitive-error';
+import {
+  copyDurableObjectResponse,
+  toDurableObjectRequest,
+} from '../../cloudflare/worker-fetch-adapter';
 
 type PendingConnection = {
   timestamp: number;
@@ -81,7 +86,7 @@ export class SessionManagerDO {
 
   constructor(
     private state: DurableObjectState,
-    private env: any,
+    private env: Env,
     options: SessionManagerOptions = {}
   ) {
     this.options = {
@@ -763,11 +768,11 @@ export class SessionManagerDO {
         this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
       );
       const response = await registry.fetch(
-        new Request('http://registry/registry/agent-online', {
+        toDurableObjectRequest(new Request('http://registry/registry/agent-online', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        })
+        }))
       );
       const body = (await response.json()) as { ok?: boolean; error?: string; code?: string };
       if (!response.ok || body.ok === false) {
@@ -815,11 +820,11 @@ export class SessionManagerDO {
         this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
       );
       const response = await registry.fetch(
-        new Request('http://registry/registry/shortcut-grant-update', {
+        toDurableObjectRequest(new Request('http://registry/registry/shortcut-grant-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        })
+        }))
       );
       const body = (await response.json()) as {
         ok?: boolean;
@@ -859,11 +864,11 @@ export class SessionManagerDO {
       this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
     );
     await registry.fetch(
-      new Request('http://registry/registry/agent-offline', {
+      toDurableObjectRequest(new Request('http://registry/registry/agent-offline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, sessionId }),
-      })
+      }))
     );
   }
 
@@ -1391,7 +1396,7 @@ export class SessionManagerDO {
       this.env.CICADA_SESSIONS.idFromName(record.liveSessionId)
     );
     const response = await sessionRoom.fetch(
-      new Request('http://session/shortcut/command', {
+      toDurableObjectRequest(new Request('http://session/shortcut/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1400,12 +1405,9 @@ export class SessionManagerDO {
           grantId: grant.grantId,
           command,
         }),
-      })
+      }))
     );
-    return new Response(response.body as any, {
-      status: response.status,
-      headers: response.headers as any,
-    });
+    return copyDurableObjectResponse(response);
   }
 
   private normalizeShortcutGrant(
