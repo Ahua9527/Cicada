@@ -414,16 +414,41 @@ describe('WebSocket Integration Tests', () => {
       expect(result.errors[0]).toContain('device-two');
     });
 
-    it('should trim the nonce cache when it exceeds its configured size', async () => {
+    it('should persist a nonce exactly once without trimming', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv, {
         nonceCacheSize: 2,
         nonceRetentionSize: 1,
       });
+      const put = mockState.storage.put as jest.Mock;
+
+      await sessionManager.markNonceUsed('nonce-one');
+
+      expect(put).toHaveBeenCalledTimes(2);
+      expect(put).toHaveBeenNthCalledWith(
+        2,
+        SESSION_CONSTANTS.STORAGE_KEYS.NONCES,
+        ['nonce-one']
+      );
+    });
+
+    it('should trim and persist the nonce cache exactly once', async () => {
+      const sessionManager = new SessionManagerDO(mockState, mockEnv, {
+        nonceCacheSize: 2,
+        nonceRetentionSize: 1,
+      });
+      const put = mockState.storage.put as jest.Mock;
 
       await sessionManager.markNonceUsed('nonce-one');
       await sessionManager.markNonceUsed('nonce-two');
+      put.mockClear();
       await sessionManager.markNonceUsed('nonce-three');
 
+      expect(put).toHaveBeenCalledTimes(2);
+      expect(put).toHaveBeenNthCalledWith(
+        2,
+        SESSION_CONSTANTS.STORAGE_KEYS.NONCES,
+        ['nonce-three']
+      );
       expect(sessionManager.isNonceUsed('nonce-one')).toBe(false);
       expect(sessionManager.isNonceUsed('nonce-three')).toBe(true);
     });

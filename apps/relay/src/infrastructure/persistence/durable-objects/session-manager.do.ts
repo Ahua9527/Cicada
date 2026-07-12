@@ -431,15 +431,15 @@ export class SessionManagerDO {
    */
   async markNonceUsed(nonce: string): Promise<void> {
     this.nonces.add(nonce);
-    await this.saveSessions();
 
     // Manage nonce cache
     if (this.nonces.size > this.options.nonceCacheSize) {
       const nonceArray = Array.from(this.nonces);
       const toKeep = nonceArray.slice(-this.options.nonceRetentionSize);
       this.nonces = new Set(toKeep);
-      await this.saveSessions();
     }
+
+    await this.saveSessions();
   }
 
   /**
