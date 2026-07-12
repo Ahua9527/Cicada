@@ -19,8 +19,9 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
 ```
 
-Do not run `pnpm run build:agent` as a routine check; it installs binaries into
-`~/.cicada/bin`.
+`pnpm run build:agent` produces the release CLI, daemon, and SleepHold artifacts, then embeds
+them in the release `Cicada.app` under `Contents/Helpers`. It does not install into
+`~/.cicada/bin` or replace `/Applications/Cicada.app`.
 
 ## Deploy
 
