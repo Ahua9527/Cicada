@@ -3,6 +3,7 @@ import { CicadaError, ErrorCode, ErrorSeverity } from '@cicada/shared/errors';
 import type { SessionId, DeviceId } from '@cicada/shared/types/common.types';
 import { Session } from '../../domain/session/session.entity';
 import type { SessionRepository } from '../../domain/session/session.repository';
+import { requireJsonObject } from '../../utils/json-value';
 
 export interface SessionServiceDeps {
   sessionRepository: SessionRepository;
@@ -33,9 +34,10 @@ export class SessionService {
       }
 
       // Create new session
+      const sessionMetadata = requireJsonObject(metadata, 'Session metadata');
       const session = Session.create({
         deviceId,
-        metadata: metadata as any,
+        metadata: sessionMetadata,
       });
 
       // Save to repository

@@ -93,6 +93,31 @@ describe('SessionService', () => {
       expect(mockRepository.save).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      { invalid: undefined },
+      { invalid: () => true },
+      { invalid: Symbol('invalid') },
+      { invalid: Number.POSITIVE_INFINITY },
+    ])('should reject non-JSON metadata %#', async metadata => {
+      mockRepository.findActiveByDeviceId.mockResolvedValue({ success: true, data: null });
+
+      const result = await service.createSession(DEVICE_ID, metadata);
+
+      expect(result.success).toBe(false);
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject cyclic metadata', async () => {
+      mockRepository.findActiveByDeviceId.mockResolvedValue({ success: true, data: null });
+      const metadata: Record<string, unknown> = {};
+      metadata.self = metadata;
+
+      const result = await service.createSession(DEVICE_ID, metadata);
+
+      expect(result.success).toBe(false);
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
     it('should return a save failure', async () => {
       mockRepository.findActiveByDeviceId.mockResolvedValue({ success: true, data: null });
       mockRepository.save.mockResolvedValue({ success: false, error: repositoryError });

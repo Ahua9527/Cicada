@@ -170,6 +170,24 @@ describe('CommandService', () => {
 
       expect(result.success).toBe(false);
     });
+
+    it.each([undefined, () => true, Symbol('invalid'), Number.NaN])(
+      'should reject non-JSON command results (%p)',
+      async invalidResult => {
+        const command = Command.create({
+          deviceId: DEVICE_ID,
+          type: 'SYSTEM_INFO' as CommandType,
+        });
+        command.markQueued();
+        command.markExecuting();
+        mockQueue.find.mockResolvedValue({ success: true, data: command });
+
+        const result = await service.completeCommand(COMMAND_ID, invalidResult);
+
+        expect(result.success).toBe(false);
+        expect(command.status).toBe('executing');
+      }
+    );
   });
 
   describe('failCommand', () => {
