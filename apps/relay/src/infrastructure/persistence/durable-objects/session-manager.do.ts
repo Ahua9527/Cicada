@@ -25,8 +25,11 @@ import {
 } from '../../cloudflare/worker-fetch-adapter';
 import {
   methodNotAllowed,
-  normalizeShortcutCommands,
+  extractShortcutToken,
+  normalizeShortcutGrant,
+  parseShortcutCommandPayload,
   readJsonObject,
+  shortcutErrorResponse,
   shortcutFailureStatus,
 } from './session-manager.logic';
 
@@ -1271,7 +1274,7 @@ export class SessionManagerDO {
       });
     }
 
-    const grant = this.normalizeShortcutGrant(payload.deviceId, payload.grant);
+    const grant = normalizeShortcutGrant(payload.deviceId, payload.grant, now);
     if (!grant) {
       return this.jsonResponse(
         {
@@ -1307,7 +1310,7 @@ export class SessionManagerDO {
       return methodNotAllowed(['POST']);
     }
 
-    const token = this.extractShortcutToken(request);
+    const token = extractShortcutToken(request);
     if (!token) {
       return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
     }
@@ -1320,12 +1323,10 @@ export class SessionManagerDO {
         400
       );
     }
-    const deviceId = typeof payload.device_id === 'string' ? payload.device_id.trim() : '';
-    const command = typeof payload.command === 'string' ? payload.command.trim() : '';
-    const requestId =
-      typeof payload.request_id === 'string' && payload.request_id.trim()
-        ? payload.request_id.trim()
-        : `shortcut-${this.createRandomToken(12)}`;
+    const { deviceId, command, requestId } = parseShortcutCommandPayload(
+      payload,
+      `shortcut-${this.createRandomToken(12)}`
+    );
 
     if (!deviceId || !command) {
       return this.shortcutError(
@@ -1386,44 +1387,6 @@ export class SessionManagerDO {
     return copyDurableObjectResponse(response);
   }
 
-  private normalizeShortcutGrant(
-    deviceId: string,
-    value?: Partial<ShortcutGrantRecord>
-  ): ShortcutGrantRecord | undefined {
-    if (!value || typeof value !== 'object') {
-      return undefined;
-    }
-    const grantId = typeof value.grantId === 'string' ? value.grantId.trim() : '';
-    const name = typeof value.name === 'string' ? value.name.trim() : '';
-    const tokenHash = typeof value.tokenHash === 'string' ? value.tokenHash.trim() : '';
-    const tokenPreview = typeof value.tokenPreview === 'string' ? value.tokenPreview.trim() : '';
-    const allowedCommands = normalizeShortcutCommands(value.allowedCommands);
-    const expiresAt = typeof value.expiresAt === 'number' ? value.expiresAt : 0;
-    const createdAt = typeof value.createdAt === 'number' ? value.createdAt : Date.now();
-    const updatedAt = typeof value.updatedAt === 'number' ? value.updatedAt : Date.now();
-    if (!grantId || !name || !tokenHash || !tokenPreview || allowedCommands.length === 0 || expiresAt <= Date.now()) {
-      return undefined;
-    }
-    return {
-      grantId,
-      deviceId,
-      name,
-      tokenHash,
-      tokenPreview,
-      allowedCommands,
-      expiresAt,
-      revokedAt: typeof value.revokedAt === 'number' ? value.revokedAt : undefined,
-      createdAt,
-      updatedAt,
-    };
-  }
-
-  private extractShortcutToken(request: Request): string | undefined {
-    const auth = request.headers.get('Authorization') ?? request.headers.get('authorization') ?? '';
-    const match = auth.match(/^Bearer\s+(cicada_sc_[A-Za-z0-9_-]+)$/);
-    return match?.[1];
-  }
-
   private async hashShortcutToken(token: string): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
     return this.base64UrlEncode(new Uint8Array(digest));
@@ -1436,17 +1399,7 @@ export class SessionManagerDO {
     requestId = '',
     command = ''
   ): Response {
-    return this.jsonResponse(
-      {
-        ok: false,
-        request_id: requestId,
-        command,
-        code,
-        error,
-        timestamp: Date.now(),
-      },
-      { status }
-    );
+    return shortcutErrorResponse(code, error, status, Date.now(), requestId, command);
   }
 
   private pruneUsedRegistrationNonces(now: number): void {
