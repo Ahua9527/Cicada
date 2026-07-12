@@ -1,6 +1,41 @@
 import Foundation
 import CicadaCore
 
+enum CLICommandRoute: Equatable {
+    case setup([String])
+    case start
+    case stop
+    case restart
+    case status([String])
+    case shortcut([String])
+    case run([String])
+    case advanced([String])
+    case help
+    case unknown(String)
+}
+
+enum CLICommandRouter {
+    static func route(arguments: [String]) -> CLICommandRoute {
+        guard let command = arguments.first else {
+            return .help
+        }
+
+        let remaining = Array(arguments.dropFirst())
+        switch command {
+        case "setup": return .setup(remaining)
+        case "start": return .start
+        case "stop": return .stop
+        case "restart": return .restart
+        case "status": return .status(remaining)
+        case "shortcut": return .shortcut(remaining)
+        case "run": return .run(remaining)
+        case "advanced": return .advanced(remaining)
+        case "--help", "-h", "help": return .help
+        default: return .unknown(command)
+        }
+    }
+}
+
 struct ShortcutCreateArguments: Equatable {
     let name: String
     let commands: [String]

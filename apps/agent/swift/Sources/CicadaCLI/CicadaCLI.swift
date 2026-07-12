@@ -115,31 +115,26 @@ public final class CicadaCLI {
     }
 
     public func run(arguments: [String]) -> CLIResult {
-        guard let command = arguments.first else {
-            return .success(usageText)
-        }
-
-        let args = Array(arguments.dropFirst())
-        switch command {
-        case "setup":
+        switch CLICommandRouter.route(arguments: arguments) {
+        case let .setup(args):
             return handleSetup(args)
-        case "start":
+        case .start:
             return handleStart()
-        case "stop":
+        case .stop:
             return handleStop()
-        case "restart":
+        case .restart:
             return handleRestart()
-        case "status":
+        case let .status(args):
             return handleStatus(args)
-        case "shortcut":
+        case let .shortcut(args):
             return handleShortcut(args)
-        case "run":
+        case let .run(args):
             return handleRun(args)
-        case "advanced":
+        case let .advanced(args):
             return handleAdvanced(args)
-        case "--help", "-h", "help":
+        case .help:
             return .success(usageText)
-        default:
+        case let .unknown(command):
             return .failure("未知命令: \(command)\n\n\(usageText)")
         }
     }

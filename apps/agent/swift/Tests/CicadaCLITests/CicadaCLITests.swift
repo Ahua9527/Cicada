@@ -184,6 +184,22 @@ private final class FakeCommandExecutor: LocalCommandExecuting {
 }
 
 final class CicadaCLITests: XCTestCase {
+    func testTopLevelCommandRouterPreservesRoutesAndArguments() {
+        XCTAssertEqual(CLICommandRouter.route(arguments: []), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["--help"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["-h"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["help"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["setup", "--relay-url", "url"]), .setup(["--relay-url", "url"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["start"]), .start)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["stop"]), .stop)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["restart"]), .restart)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["status", "--json"]), .status(["--json"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["shortcut", "list"]), .shortcut(["list"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["run", "ping"]), .run(["ping"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["advanced", "doctor"]), .advanced(["doctor"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["bogus", "ignored"]), .unknown("bogus"))
+    }
+
     func testShortcutCreateParserPreservesFlagSemantics() throws {
         let parsed = try CLIArgumentParser.shortcutCreate([
             "--name", "Desk",
