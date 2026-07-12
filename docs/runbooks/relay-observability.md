@@ -13,6 +13,7 @@ Relay emits JSON logs to the Cloudflare Workers runtime. Request events use thes
 | `duration_ms` | Worker-side request duration in milliseconds. |
 | `do_operation` | Durable Object operation reached by the public route. |
 | `websocket_outcome` | `upgraded` or `upgrade_failed`. |
+| `security_event` | Stable security decision name; currently `agent_registration_replayed`. |
 
 The logger filters credential-like keys recursively. Do not add raw request bodies, Authorization
 headers, session secrets, nonces, signatures, token hashes, or complete Shortcuts payloads to log
@@ -27,8 +28,8 @@ pnpm --filter @cicada/relay exec wrangler tail --format json
 ```
 
 In Workers Observability or the Logpush destination, filter `request_id` first, then inspect
-`route`, `status`, `error_type`, `do_operation`, and `websocket_outcome`. A healthy HTTP request has
-one completion event. A successful agent upgrade has `status=101` and
+`route`, `status`, `error_type`, `do_operation`, `websocket_outcome`, and `security_event`. A healthy
+HTTP request has one completion event. A successful agent upgrade has `status=101` and
 `websocket_outcome=upgraded`.
 
 ## Alert definitions
@@ -41,7 +42,7 @@ Logpush destination. Use five-minute rolling windows:
 | Relay 5xx | At least 20 requests with `status >= 500`, and more than 1% of requests. |
 | WebSocket upgrade failures | At least 20 events with `websocket_outcome=upgrade_failed`, and more than 5% of WebSocket upgrade attempts. |
 | Durable Object exceptions | More than 5 error events with `do_operation` present. |
-| Replay rejection spike | Replay/nonce rejection count is at least 3 times the same weekday/time baseline. |
+| Replay rejection spike | `security_event=agent_registration_replayed` count is at least 3 times the same weekday/time baseline. |
 | Rate-limit spike | `status=429` count is at least 3 times the same weekday/time baseline. |
 
 Route alerts to the normal on-call destination. Keep event definitions fixed for the first seven

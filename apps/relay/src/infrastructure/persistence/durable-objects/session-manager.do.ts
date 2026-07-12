@@ -1062,7 +1062,7 @@ export class SessionManagerDO {
     });
   }
 
-  private async handleRegistryAgentOnline(request: Request): Promise<Response> {
+  private async handleRegistryAgentOnline(request: Request, requestId: string): Promise<Response> {
     if (request.method !== 'POST') {
       return methodNotAllowed(['POST']);
     }
@@ -1132,6 +1132,16 @@ export class SessionManagerDO {
       this.pruneUsedRegistrationNonces(now);
       const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
       if (this.usedRegistrationNonces.has(nonceKey)) {
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            message: 'Agent registration replay rejected',
+            request_id: requestId,
+            security_event: 'agent_registration_replayed',
+            status: 409,
+            do_operation: 'registry_agent_online',
+          })
+        );
         return this.jsonResponse(
           {
             ok: false,
@@ -1628,7 +1638,7 @@ export class SessionManagerDO {
           response = await this.handleRoomShortcutCommand(request);
           break;
         case '/registry/agent-online':
-          response = await this.handleRegistryAgentOnline(request);
+          response = await this.handleRegistryAgentOnline(request, requestId);
           break;
         case '/registry/agent-offline':
           response = await this.handleRegistryAgentOffline(request);
