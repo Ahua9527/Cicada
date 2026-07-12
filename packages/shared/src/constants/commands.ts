@@ -8,7 +8,8 @@
  * @see ../validators/command.validator.ts
  */
 
-import type { CommandType } from '../types/command.types';
+import { COMMANDS } from '../protocol/commands.js';
+import type { CommandType } from '../types/command.types.js';
 
 /**
  * 权威命令列表（数组形式）
@@ -18,24 +19,9 @@ import type { CommandType } from '../types/command.types';
  * - 生成命令选项列表
  * - 文档生成
  * 
- * 注意：此列表必须与 CommandType 和 SUPPORTED_COMMANDS 保持一致
+ * 此别名保留现有 API；唯一列表位于 protocol/commands.ts。
  */
-export const AUTHORITATIVE_COMMANDS: readonly CommandType[] = [
-  'lock',
-  'bt_toggle',
-  'ping',
-  'volume_mute',
-  'sleep',
-  'sleep_displays',
-  'caffeinate',
-  'decaffeinate',
-  'status',
-  'sentry_start',
-  'sentry_stop',
-  'sentry_status',
-  'sentry_unlock',
-  'sentry_open',
-] as const;
+export const AUTHORITATIVE_COMMANDS = COMMANDS;
 
 /**
  * 命令数量

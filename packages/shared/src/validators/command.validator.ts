@@ -1,36 +1,14 @@
 import type { CommandRequest, CommandType } from '../types/command.types.js';
 import type { JsonValue } from '../types/common.types.js';
+import { COMMANDS } from '../protocol/commands.js';
 import { BaseValidator } from './base.validator.js';
 
 /**
  * 支持的命令集合（权威列表）
  *
- * 这是系统中唯一的命令验证列表（Single Source of Truth）。
- * 必须与 types/command.types.ts 中的 CommandType 保持完全一致。
- *
- * 注意：
- * - 此列表用于运行时验证
- * - CommandType 用于编译时类型检查
- * - 两者必须同步更新
- *
- * @see ../types/command.types.ts
+ * 运行时集合从 protocol/commands.ts 的唯一列表派生。
  */
-export const SUPPORTED_COMMANDS: ReadonlySet<CommandType | string> = new Set([
-  'lock',
-  'bt_toggle',
-  'ping',
-  'volume_mute',
-  'sleep',
-  'sleep_displays',
-  'caffeinate',
-  'decaffeinate',
-  'status',
-  'sentry_start',
-  'sentry_stop',
-  'sentry_status',
-  'sentry_unlock',
-  'sentry_open',
-]);
+export const SUPPORTED_COMMANDS: ReadonlySet<string> = new Set(COMMANDS);
 
 /**
  * Device ID 格式验证正则表达式
@@ -248,5 +226,5 @@ export function isCommandSupported(cmd: string): cmd is CommandType {
  * @returns 支持的命令数组
  */
 export function getSupportedCommands(): CommandType[] {
-  return Array.from(SUPPORTED_COMMANDS) as CommandType[];
+  return [...COMMANDS];
 }

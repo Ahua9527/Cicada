@@ -20,6 +20,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Protocol Contract Drift
+        run: pnpm run protocol:check
       - run: pnpm run build:relay
       - run: pnpm run lint:relay
       - run: pnpm run test:relay
