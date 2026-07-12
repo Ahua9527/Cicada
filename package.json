@@ -13,6 +13,7 @@
     "test:relay": "pnpm --filter @cicada/relay run test",
     "protocol:generate": "pnpm --filter @cicada/shared run build && node tools/generate-command-contract.mjs",
     "protocol:check": "pnpm run protocol:generate && git diff --exit-code -- packages/shared/protocol/command-contract.json",
+    "vendor:audit": "bash apps/agent/scripts/audit-vendored.sh",
     "deploy:relay:dry-run": "pnpm --filter @cicada/relay exec wrangler deploy --dry-run",
     "build:agent": "bash apps/agent/scripts/build.sh",
     "lint:agent": "bash apps/agent/scripts/lint.sh",
