@@ -41,7 +41,7 @@ For every batch, run and record:
 pnpm run lint
 pnpm run build
 pnpm run test
-pnpm --filter @cicada/relay run test:coverage -- --runInBand --silent
+pnpm --filter @cicada/relay exec jest --coverage --runInBand --silent
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
 pnpm run deploy:relay:dry-run
 pnpm run protocol:check
