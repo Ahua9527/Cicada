@@ -5,7 +5,6 @@
 
 import type { Env, MiddlewareContext } from '../types';
 import { getLogger, type Logger } from '../infrastructure/logger';
-import { ErrorHandler } from '../utils/errors';
 import {
   MiddlewarePipeline,
   requestIdMiddleware,
@@ -18,6 +17,11 @@ import {
 import { Router } from './router';
 import { sanitizeRequestUrl } from './request-url-sanitizer';
 import { API_CONSTANTS } from '../config/constants';
+import {
+  createPublicServerErrorResponse,
+  enforcePublicServerErrorResponse,
+  generateRequestId,
+} from './public-error-response';
 
 /**
  * CicadaRelay App
@@ -25,7 +29,6 @@ import { API_CONSTANTS } from '../config/constants';
 export class CicadaRelayApp {
   private pipeline: MiddlewarePipeline;
   private logger: Logger;
-  private errorHandler: ErrorHandler;
   private router: Router;
   private env?: Env;
 
@@ -38,7 +41,6 @@ export class CicadaRelayApp {
       env: env,
     });
 
-    this.errorHandler = new ErrorHandler(this.logger as any);
     this.router = new Router();
     this.router.registerRoutes({
       handleRoot: this.handleRoot.bind(this),
@@ -112,7 +114,7 @@ export class CicadaRelayApp {
   // eslint-disable-next-line no-undef
   async handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    const requestId = this.generateRequestId();
+    const requestId = generateRequestId();
 
     const context: MiddlewareContext = {
       request,
@@ -138,12 +140,13 @@ export class CicadaRelayApp {
         tags: ['request', 'start'],
       });
 
-      const response = await this.pipeline.execute(context as any);
+      const pipelineResponse = await this.pipeline.execute(context as any);
+      const response = enforcePublicServerErrorResponse(pipelineResponse, context.requestId);
 
       // WebSocket 升级响应（101）不可变，跳过日志记录
       if (response.status !== 101) {
         this.logger.info('Request completed', {
-          requestId,
+          requestId: context.requestId,
           context: {
             status: response.status,
             duration: Date.now() - context.timestamp,
@@ -155,19 +158,14 @@ export class CicadaRelayApp {
       return response;
     } catch (error) {
       this.logger.error('Request handling failed', {
-        requestId,
+        requestId: context.requestId,
         error: error as Error,
         context: { method: request.method, url: this.sanitizeUrl(request.url) },
         tags: ['request', 'error'],
       });
 
-      const errorResponse = this.errorHandler.handleError(error, requestId);
-      return Response.json(errorResponse, { status: 500 });
+      return createPublicServerErrorResponse(context.requestId);
     }
-  }
-
-  private generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private async handleRoot(_context: MiddlewareContext): Promise<Response> {

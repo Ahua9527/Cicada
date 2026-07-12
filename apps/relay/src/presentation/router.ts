@@ -12,6 +12,7 @@ import {
   handleShortcutCommandRoute,
 } from './routes';
 import { sanitizeRequestUrl } from './request-url-sanitizer';
+import { createPublicServerErrorResponse } from './public-error-response';
 
 export interface Route {
   pattern: RegExp;
@@ -97,15 +98,7 @@ export class Router {
 
         return {
           continue: false,
-          response: Response.json(
-            {
-              ok: false,
-              error: 'Route handler failed',
-              message: error instanceof Error ? error.message : 'Unknown error',
-              request_id: context.requestId,
-            },
-            { status: 500 }
-          ),
+          response: createPublicServerErrorResponse(context.requestId),
         };
       }
     };

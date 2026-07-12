@@ -5,6 +5,7 @@
 
 import type { MiddlewareContext } from '../../types';
 import { SESSION_CONSTANTS } from '../../config/constants';
+import { createPublicServerErrorResponse } from '../public-error-response';
 
 /**
  * Session Controller
@@ -65,6 +66,7 @@ export class SessionController {
       headers.set('X-Session-ID', sessionId);
       headers.set('Upgrade', 'websocket');
       headers.set('Connection', 'Upgrade');
+      headers.set('X-Request-ID', requestId);
 
       const deviceId = request.headers.get('x-device-id');
       const publicKey = request.headers.get('x-agent-identity-public-key');
@@ -99,14 +101,7 @@ export class SessionController {
         error: error as Error,
         tags: ['relay', 'websocket', 'error'],
       });
-      return Response.json(
-        {
-          ok: false,
-          error: 'Relay transport connection failed',
-          details: error instanceof Error ? error.message : String(error),
-        },
-        { status: 500 }
-      );
+      return createPublicServerErrorResponse(requestId);
     }
   }
 
@@ -123,10 +118,12 @@ export class SessionController {
     try {
       const registry = this.getRegistryStub(env);
       const body = await request.text();
+      const headers = new Headers(request.headers);
+      headers.set('X-Request-ID', requestId);
       const response = await registry.fetch(
         new Request(`http://registry${pathname}`, {
           method: request.method,
-          headers: request.headers,
+          headers,
           body,
         }) as any
       );
@@ -140,13 +137,7 @@ export class SessionController {
         error: error as Error,
         tags: ['relay', 'registry', 'error'],
       });
-      return Response.json(
-        {
-          ok: false,
-          error: 'Registry request failed',
-        },
-        { status: 500 }
-      );
+      return createPublicServerErrorResponse(requestId);
     }
   }
 

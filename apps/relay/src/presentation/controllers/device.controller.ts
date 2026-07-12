@@ -5,6 +5,7 @@
 
 import type { MiddlewareContext, DeviceListResponse, SystemStatusResponse } from '../../types';
 import { API_CONSTANTS, SESSION_CONSTANTS } from '../../config/constants';
+import { createPublicServerErrorResponse } from '../public-error-response';
 
 type RegistryDeviceList = {
   success?: boolean;
@@ -63,13 +64,7 @@ export class DeviceController {
         tags: ['device', 'status', 'error'],
       });
 
-      return Response.json(
-        {
-          ok: false,
-          error: 'Failed to get device status',
-        },
-        { status: 500 }
-      );
+      return createPublicServerErrorResponse(requestId);
     }
   }
 
@@ -113,13 +108,7 @@ export class DeviceController {
         tags: ['system', 'status', 'error'],
       });
 
-      return Response.json(
-        {
-          ok: false,
-          error: 'Failed to get system status',
-        },
-        { status: 500 }
-      );
+      return createPublicServerErrorResponse(requestId);
     }
   }
 
@@ -150,13 +139,7 @@ export class DeviceController {
         tags: ['device', 'list', 'error'],
       });
 
-      return Response.json(
-        {
-          ok: false,
-          error: 'Failed to get device list',
-        },
-        { status: 500 }
-      );
+      return createPublicServerErrorResponse(requestId);
     }
   }
 
@@ -193,14 +176,7 @@ export class DeviceController {
         tags: ['health', 'error'],
       });
 
-      return Response.json(
-        {
-          ok: false,
-          status: 'unhealthy',
-          error: 'Health check failed',
-        },
-        { status: 503 }
-      );
+      return createPublicServerErrorResponse(requestId, 503);
     }
   }
 

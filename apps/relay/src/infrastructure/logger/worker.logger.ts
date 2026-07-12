@@ -14,6 +14,7 @@ import {
   type LoggerOptions,
   type NormalizedLevel,
 } from './types';
+import { redactSensitiveText, sanitizeError } from '../../utils/sensitive-error';
 
 /**
  * Logger class
@@ -49,6 +50,12 @@ export class Logger {
    * Record log entry
    */
   private log(entry: LogEntry): void {
+    entry = {
+      ...entry,
+      message: redactSensitiveText(entry.message),
+      error: entry.error ? sanitizeError(entry.error) : undefined,
+    };
+
     // Filter sensitive information
     if (entry.context) {
       entry.context = SensitiveDataFilter.filter(entry.context);
