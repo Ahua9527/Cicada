@@ -147,6 +147,26 @@ describe('Middleware', () => {
       expect(context.requestId).toMatch(/^req_/);
       expect(result).toEqual({ continue: true });
     });
+
+    it('normalizes live session routes without logging the identifier', async () => {
+      const logger = new Logger({ enableConsole: false });
+      const infoSpy = jest.spyOn(logger, 'info');
+      const request = new Request('https://example.com/relay/private-live-session?token=secret');
+
+      await requestIdMiddleware()(
+        createContext({ request, logger, url: new URL(request.url) }),
+        async () => ({ continue: true })
+      );
+
+      expect(infoSpy).toHaveBeenCalledWith(
+        'Request started: GET /relay/:liveSession',
+        expect.objectContaining({
+          context: { method: 'GET', route: '/relay/:liveSession' },
+        })
+      );
+      expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('private-live-session');
+      expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('secret');
+    });
   });
 
   describe('loggingMiddleware', () => {
@@ -168,13 +188,56 @@ describe('Middleware', () => {
       const logger = new Logger({ enableConsole: false });
       const infoSpy = jest.spyOn(logger, 'info');
       const upgrade = createUpgradeResponse();
+      const request = new Request('http://localhost/relay/live-session', {
+        headers: { Upgrade: 'websocket' },
+      });
 
-      await loggingMiddleware()(createContext({ logger }), async () => upgrade);
+      await loggingMiddleware()(
+        createContext({ request, logger, url: new URL(request.url) }),
+        async () => upgrade
+      );
 
       expect(infoSpy).toHaveBeenCalledWith(
         'WebSocket upgrade completed',
-        expect.objectContaining({ requestId: 'test-id' })
+        expect.objectContaining({
+          requestId: 'test-id',
+          context: expect.objectContaining({
+            route: '/relay/:liveSession',
+            status: 101,
+            duration_ms: expect.any(Number),
+            do_operation: 'websocket_upgrade',
+            websocket_outcome: 'upgraded',
+          }),
+        })
       );
+    });
+
+    it('logs failed WebSocket upgrades with bounded operational fields', async () => {
+      const logger = new Logger({ enableConsole: false });
+      const warnSpy = jest.spyOn(logger, 'warn');
+      const request = new Request('http://localhost/relay/private-live-session', {
+        headers: { Upgrade: 'websocket' },
+      });
+
+      await loggingMiddleware()(
+        createContext({ request, logger, url: new URL(request.url) }),
+        async () => new Response(null, { status: 500 })
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Request failed: 500',
+        expect.objectContaining({
+          context: expect.objectContaining({
+            route: '/relay/:liveSession',
+            status: 500,
+            error_type: 'server_error',
+            duration_ms: expect.any(Number),
+            do_operation: 'websocket_upgrade',
+            websocket_outcome: 'upgrade_failed',
+          }),
+        })
+      );
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('private-live-session');
     });
 
     it('warns when a stopped control result has no response', async () => {

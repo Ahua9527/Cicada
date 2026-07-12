@@ -25,13 +25,25 @@ export class JsonFormatter implements LogFormatter {
 
     // Add optional fields
     if (entry.requestId) {
-      logData.requestId = entry.requestId;
+      logData.request_id = entry.requestId;
     }
     if (entry.deviceId) {
       logData.deviceId = entry.deviceId;
     }
     if (entry.context) {
       logData.context = entry.context;
+      for (const field of [
+        'route',
+        'status',
+        'error_type',
+        'duration_ms',
+        'do_operation',
+        'websocket_outcome',
+      ] as const) {
+        if (entry.context[field] !== undefined) {
+          logData[field] = entry.context[field];
+        }
+      }
     }
     if (entry.tags && entry.tags.length > 0) {
       logData.tags = entry.tags;

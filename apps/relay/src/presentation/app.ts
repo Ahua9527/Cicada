@@ -129,38 +129,22 @@ export class CicadaRelayApp {
     };
 
     try {
-      this.logger.info('Request received', {
-        requestId,
-        context: {
-          method: request.method,
-          url: this.sanitizeUrl(request.url),
-          userAgent: request.headers.get('User-Agent'),
-          ip: request.headers.get('CF-Connecting-IP'),
-        },
-        tags: ['request', 'start'],
-      });
-
       const pipelineResponse = await this.pipeline.execute(context);
       const response = enforcePublicServerErrorResponse(pipelineResponse, context.requestId);
-
-      // WebSocket 升级响应（101）不可变，跳过日志记录
-      if (response.status !== 101) {
-        this.logger.info('Request completed', {
-          requestId: context.requestId,
-          context: {
-            status: response.status,
-            duration: Date.now() - context.timestamp,
-          },
-          tags: ['request', 'end'],
-        });
-      }
 
       return response;
     } catch (error) {
       this.logger.error('Request handling failed', {
         requestId: context.requestId,
         error: error as Error,
-        context: { method: request.method, url: this.sanitizeUrl(request.url) },
+        context: {
+          route: url.pathname.startsWith('/relay/') ? '/relay/:liveSession' : url.pathname,
+          error_type: error instanceof Error ? error.name : 'UnknownError',
+          duration_ms: Date.now() - context.timestamp,
+          ...(request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
+            ? { websocket_outcome: 'upgrade_failed' }
+            : {}),
+        },
         tags: ['request', 'error'],
       });
 

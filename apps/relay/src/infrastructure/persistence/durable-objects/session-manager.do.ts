@@ -1639,7 +1639,7 @@ export class SessionManagerDO {
       // Return the client WebSocket to the original requester
       return this.createWebSocketResponse(client);
     } catch (error) {
-      this.logServerError('WebSocket upgrade failed', requestId, error);
+      this.logServerError('WebSocket upgrade failed', requestId, 'websocket_upgrade', error);
       return createPublicServerErrorResponse(requestId);
     }
   }
@@ -1704,12 +1704,17 @@ export class SessionManagerDO {
       }
       return enforcePublicServerErrorResponse(response, requestId);
     } catch (error) {
-      this.logServerError('SessionManagerDO fetch error', requestId, error);
+      this.logServerError('SessionManagerDO fetch error', requestId, url.pathname, error);
       return createPublicServerErrorResponse(requestId);
     }
   }
 
-  private logServerError(message: string, requestId: string, error: unknown): void {
+  private logServerError(
+    message: string,
+    requestId: string,
+    operation: string,
+    error: unknown
+  ): void {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     const sanitizedError = sanitizeError(normalizedError);
     console.error(
@@ -1717,6 +1722,11 @@ export class SessionManagerDO {
         level: 'error',
         message,
         request_id: requestId,
+        error_type: sanitizedError.name,
+        do_operation: operation,
+        ...(operation === 'websocket_upgrade'
+          ? { websocket_outcome: 'upgrade_failed' }
+          : {}),
         error: {
           name: sanitizedError.name,
           message: sanitizedError.message,
