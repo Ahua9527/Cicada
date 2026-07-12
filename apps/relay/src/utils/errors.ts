@@ -35,7 +35,12 @@ export abstract class AppError extends Error {
     this.requestId = requestId;
 
     // 确保错误堆栈正确
-    Error.captureStackTrace(this, this.constructor);
+    const captureStackTrace = (
+      Error as ErrorConstructor & {
+        captureStackTrace?: (targetObject: object) => void;
+      }
+    ).captureStackTrace;
+    captureStackTrace?.(this);
   }
 
   /**
@@ -321,12 +326,6 @@ export class ErrorHandler {
     }) as T;
   }
 
-  /**
-   * 创建错误边界中间件
-   */
-  createErrorMiddleware() {
-    return async () => null;
-  }
 }
 
 /**

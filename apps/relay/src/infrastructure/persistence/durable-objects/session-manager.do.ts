@@ -9,6 +9,7 @@ import {
   Timer,
   RelayTransportMessage,
   RELAY_CLOSE_CODES,
+  ShortcutGrantRecord,
 } from '../../../types';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 import {
@@ -43,19 +44,6 @@ type RelayRoomInfo = {
   sessionId: string;
   deviceId?: string;
   agentIdentityPublicKey?: string;
-};
-
-type ShortcutGrantRecord = {
-  grantId: string;
-  deviceId: string;
-  name: string;
-  tokenHash: string;
-  tokenPreview: string;
-  allowedCommands: string[];
-  expiresAt: number;
-  revokedAt?: number;
-  createdAt: number;
-  updatedAt: number;
 };
 
 type PendingShortcutCommand = {

@@ -16,7 +16,7 @@ export function requestIdMiddleware(): Middleware {
     if (existingRequestId) {
       context.requestId = existingRequestId;
     } else {
-      context.requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      context.requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     }
 
     const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));

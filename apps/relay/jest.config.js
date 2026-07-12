@@ -49,8 +49,6 @@ export default {
     '!src/domain/**/index.ts',
     '!src/infrastructure/**/index.ts',
     '!src/presentation/**/index.ts',
-    '!src/config/index.ts',
-    '!src/diagnostics/**',
     '!src/infrastructure/crypto/**',
     '!src/infrastructure/logger/filters.ts',
     '!src/infrastructure/logger/formatters.ts',
@@ -58,9 +56,6 @@ export default {
     // compatibility branches out of the global unit coverage gate.
     '!src/infrastructure/persistence/durable-objects/session-manager.do.ts',
     '!src/infrastructure/persistence/repositories/**',
-    '!src/infrastructure/security/threat-detector.ts',
-    '!src/infrastructure/security/validators.ts',
-    '!src/infrastructure/security/rate-limiter.ts',
     '!src/infrastructure/middleware/cors.middleware.ts',
     '!src/infrastructure/middleware/logging.middleware.ts',
     '!src/infrastructure/middleware/pipeline.ts',
@@ -73,7 +68,6 @@ export default {
     '!src/utils/debug-formatters.ts',
     '!src/utils/errors.ts',
     '!src/utils/logger.ts',
-    '!src/utils/security.ts',
   ],
 
   // 覆盖率报告格式
