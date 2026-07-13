@@ -317,7 +317,7 @@ export class Logger {
   debug(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       tags?: string[];
@@ -333,7 +333,7 @@ export class Logger {
   info(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       tags?: string[];
@@ -349,7 +349,7 @@ export class Logger {
   warn(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       error?: Error;
@@ -366,7 +366,7 @@ export class Logger {
   error(
     message: string,
     options?: {
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       requestId?: string;
       deviceId?: string;
       error?: Error;
@@ -430,7 +430,7 @@ export class Logger {
   /**
    * 记录WebSocket事件
    */
-  logWebSocketEvent(event: string, deviceId: string, context?: Record<string, any>): void {
+  logWebSocketEvent(event: string, deviceId: string, context?: Record<string, unknown>): void {
     this.info(`WebSocket ${event}`, {
       deviceId,
       context,
@@ -443,7 +443,7 @@ export class Logger {
    */
   logSecurityEvent(
     event: string,
-    details: Record<string, any>,
+    details: Record<string, unknown>,
     severity: 'low' | 'medium' | 'high' = 'medium'
   ): void {
     const level =

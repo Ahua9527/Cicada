@@ -3,6 +3,7 @@ import { CicadaError, ErrorCode, ErrorSeverity } from '@cicada/shared/errors';
 import type { DeviceId } from '@cicada/shared/types/common.types';
 import type { CommandType, CommandParams } from '@cicada/shared/types/command.types';
 import { Command, CommandId, CommandPriority } from '../../domain/command/command.entity';
+import { requireJsonValue } from '../../utils/json-value';
 
 export interface CommandQueue {
   enqueue(command: Command): Promise<Result<void, CicadaError>>;
@@ -95,7 +96,7 @@ export class CommandService {
     }
 
     try {
-      command.markCompleted(result as any);
+      command.markCompleted(requireJsonValue(result, 'Command result'));
       return { success: true, data: undefined };
     } catch (error) {
       return {

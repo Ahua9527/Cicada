@@ -184,6 +184,56 @@ private final class FakeCommandExecutor: LocalCommandExecuting {
 }
 
 final class CicadaCLITests: XCTestCase {
+    func testTopLevelCommandRouterPreservesRoutesAndArguments() {
+        XCTAssertEqual(CLICommandRouter.route(arguments: []), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["--help"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["-h"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["help"]), .help)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["setup", "--relay-url", "url"]), .setup(["--relay-url", "url"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["start"]), .start)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["stop"]), .stop)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["restart"]), .restart)
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["status", "--json"]), .status(["--json"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["shortcut", "list"]), .shortcut(["list"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["run", "ping"]), .run(["ping"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["advanced", "doctor"]), .advanced(["doctor"]))
+        XCTAssertEqual(CLICommandRouter.route(arguments: ["bogus", "ignored"]), .unknown("bogus"))
+    }
+
+    func testShortcutCreateParserPreservesFlagSemantics() throws {
+        let parsed = try CLIArgumentParser.shortcutCreate([
+            "--name", "Desk",
+            "--commands", " ping,status,ping ",
+            "--ttl", "2h",
+        ])
+
+        XCTAssertEqual(parsed.name, "Desk")
+        XCTAssertEqual(parsed.commands, ["ping", "status"])
+        XCTAssertEqual(parsed.ttlMs, 2 * 60 * 60 * 1000)
+    }
+
+    func testShortcutCreateParserPreservesArgumentErrors() {
+        for (arguments, message) in [
+            (["--name"], "--name 需要值"),
+            (["--commands"], "--commands 需要值"),
+            (["--ttl"], "--ttl 需要值"),
+            (["--unknown"], "未知参数: --unknown"),
+        ] {
+            XCTAssertThrowsError(try CLIArgumentParser.shortcutCreate(arguments)) { error in
+                XCTAssertEqual(String(describing: error), message)
+            }
+        }
+    }
+
+    func testDurationParserPreservesSupportedUnitsAndFallback() {
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("2d"), 2 * 24 * 60 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("3h"), 3 * 60 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("4m"), 4 * 60 * 1000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("5000"), 5000)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds(nil), ShortcutGrantStore.defaultTtlMs)
+        XCTAssertEqual(CLIArgumentParser.durationMilliseconds("invalid"), ShortcutGrantStore.defaultTtlMs)
+    }
+
     func testDefaultHelpShowsOnlyUserFacingCommands() {
         let fixture = CLIFixture()
 

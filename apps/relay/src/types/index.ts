@@ -50,7 +50,7 @@ export type { LogEntry } from '../utils/logger';
 
 // 重新导出枚举（必须作为值导出才能在运行时使用）
 export type { LogLevel } from './models';
-export { ErrorType, DeviceConnectionStatus, DeviceCapability, SupportedCommands } from './models';
+export { ErrorType, DeviceConnectionStatus, DeviceCapability } from './models';
 
 // 重新导出类型
 export type {

@@ -16,13 +16,14 @@ import {
 } from '../../../domain/session/session.repository';
 import type { SessionId, DeviceId as DeviceIdentifier } from '@cicada/shared/types/common.types';
 import type { SessionInfo } from '@cicada/shared/types/session.types';
+import type { DurableObjectStorage } from '@cloudflare/workers-types';
 
 export class SessionRepositoryImpl implements SessionRepository {
-  constructor(private storage: any) {}
+  constructor(private readonly storage: DurableObjectStorage) {}
 
   async findById(sessionId: SessionId): Promise<SessionResult<Session | null>> {
     try {
-      const sessionData = await this.storage.get(`session:${sessionId}`);
+      const sessionData = await this.storage.get<SessionInfo>(`session:${sessionId}`);
 
       if (!sessionData) {
         return { success: true, data: null };
@@ -80,7 +81,7 @@ export class SessionRepositoryImpl implements SessionRepository {
     deviceId: DeviceIdentifier | DeviceId
   ): Promise<SessionResult<Session | null>> {
     try {
-      const allSessions = await this.storage.list({ prefix: 'session:' });
+      const allSessions = await this.storage.list<SessionInfo>({ prefix: 'session:' });
 
       for (const [, sessionData] of allSessions) {
         if (sessionData.deviceId === deviceId && sessionData.isActive) {
@@ -102,7 +103,7 @@ export class SessionRepositoryImpl implements SessionRepository {
 
   async listActive(): Promise<SessionResult<Session[]>> {
     try {
-      const allSessions = await this.storage.list({ prefix: 'session:' });
+      const allSessions = await this.storage.list<SessionInfo>({ prefix: 'session:' });
       const sessions: Session[] = [];
 
       for (const [, sessionData] of allSessions) {

@@ -28,6 +28,138 @@ private final class MockNotifier: NotifierSending {
 }
 
 final class RelayDaemonServiceTests: XCTestCase {
+    func testConnectionLifecycleChoosesStopOrReconnect() {
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: true,
+                autoConnect: true,
+                enableAutoReconnect: true
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: false,
+                enableAutoReconnect: true
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: true,
+                enableAutoReconnect: false
+            ),
+            .stop
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.disconnectionAction(
+                isStopping: false,
+                autoConnect: true,
+                enableAutoReconnect: true
+            ),
+            .reconnect
+        )
+    }
+
+    func testReconnectPolicyPreservesAttemptLimitsAndDelayBounds() {
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 0,
+                maxAttempts: 10,
+                reconnectIntervalMs: 500
+            ),
+            .reconnect(attempt: 1, delayMs: 1_000)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 2,
+                maxAttempts: 0,
+                reconnectIntervalMs: 5_000
+            ),
+            .reconnect(attempt: 3, delayMs: 15_000)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 10,
+                maxAttempts: 10,
+                reconnectIntervalMs: 5_000
+            ),
+            .stop(attempt: 11)
+        )
+        XCTAssertEqual(
+            RelayConnectionLifecycle.reconnectDecision(
+                currentAttempts: 9,
+                maxAttempts: 0,
+                reconnectIntervalMs: 10_000
+            ),
+            .reconnect(attempt: 10, delayMs: 60_000)
+        )
+    }
+
+    func testPongTimeoutPolicyPreservesStrictThreshold() {
+        let lastPong = Date(timeIntervalSince1970: 10)
+        XCTAssertFalse(
+            RelayConnectionLifecycle.isPongTimedOut(
+                lastPongAt: lastPong,
+                now: Date(timeIntervalSince1970: 12),
+                timeoutMs: 2_000
+            )
+        )
+        XCTAssertTrue(
+            RelayConnectionLifecycle.isPongTimedOut(
+                lastPongAt: lastPong,
+                now: Date(timeIntervalSince1970: 12.001),
+                timeoutMs: 2_000
+            )
+        )
+    }
+
+    func testRelayMessageCodecRecognizesIncomingMessages() {
+        XCTAssertTrue(RelayMessageCodec.isPong("{\"type\":\"pong\"}"))
+        XCTAssertFalse(RelayMessageCodec.isPong("{\"type\":\"ping\"}"))
+        XCTAssertEqual(
+            RelayMessageCodec.shortcutGrantUpdateAcknowledgement(
+                "{\"type\":\"shortcut_grant_update_ack\",\"ok\":false,\"code\":\"rejected\"}"
+            ),
+            ShortcutGrantUpdateAcknowledgement(accepted: false, code: "rejected")
+        )
+        XCTAssertEqual(
+            RelayMessageCodec.shortcutCommand(
+                "{\"type\":\"shortcut_command\",\"id\":\"fallback\",\"data\":{\"grantId\":\"grant-1\",\"command\":\"ping\"}}"
+            ),
+            ShortcutRelayCommand(requestId: "fallback", grantId: "grant-1", command: "ping")
+        )
+    }
+
+    func testRelayMessageCodecPreservesOutgoingWireShape() throws {
+        let ping = try XCTUnwrap(RelayMessageCodec.ping(timestamp: 123))
+        let pingObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(ping.utf8)) as? [String: Any]
+        )
+        XCTAssertEqual(pingObject["type"] as? String, "ping")
+        XCTAssertEqual(pingObject["timestamp"] as? String, "123")
+
+        let result = try XCTUnwrap(RelayMessageCodec.shortcutResult(
+            requestId: "req-1",
+            command: "ping",
+            ok: true,
+            success: true,
+            message: "ok",
+            data: ["value": "ready"],
+            sentAt: 456
+        ))
+        let resultObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(result.utf8)) as? [String: Any]
+        )
+        let resultData = try XCTUnwrap(resultObject["data"] as? [String: Any])
+        XCTAssertEqual(resultObject["type"] as? String, "shortcut_result")
+        XCTAssertEqual(resultObject["sent_at"] as? Int64, 456)
+        XCTAssertEqual(resultData["requestId"] as? String, "req-1")
+        XCTAssertEqual(resultData["success"] as? Bool, true)
+    }
+
     func testStartStaysIdleWhenAutoConnectDisabled() {
         let config = makeConfig(autoConnect: false)
         let commandGateway = MockCommandGateway()

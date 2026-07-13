@@ -10,6 +10,8 @@ CicadaRelay 调试和测试工具集。
 - `debug-logs.sh` - 日志监控和分析
 - `debug-tools.sh` - 工具集（签名、性能测试等）
 
+WebSocket 诊断由这些脚本直接使用开发依赖 `ws`，该依赖属于诊断工具运行时的一部分。
+
 ## 使用示例
 
 ```bash
@@ -31,4 +33,3 @@ CICADA_RELAY_URL=https://cicada-relay.ahua.space \
 API_KEY=your-api-key \
 ./scripts/debug-api.sh health
 ```
-

@@ -5,6 +5,11 @@
 
 import type { MiddlewareContext } from '../../types';
 import { SESSION_CONSTANTS } from '../../config/constants';
+import {
+  copyDurableObjectResponse,
+  toDurableObjectRequest,
+  toWorkerResponse,
+} from '../../infrastructure/cloudflare/worker-fetch-adapter';
 import { createPublicServerErrorResponse } from '../public-error-response';
 
 /**
@@ -93,8 +98,12 @@ export class SessionController {
         }
       }
 
-      const response = await sessionManager.fetch(new Request(request as any, { headers }) as any);
-      return response as any;
+      const forwardedRequest = new Request(request.url, {
+        method: request.method,
+        headers,
+      });
+      const response = await sessionManager.fetch(toDurableObjectRequest(forwardedRequest));
+      return toWorkerResponse(response);
     } catch (error) {
       logger.error('Relay transport connection failed', {
         requestId,
@@ -121,16 +130,15 @@ export class SessionController {
       const headers = new Headers(request.headers);
       headers.set('X-Request-ID', requestId);
       const response = await registry.fetch(
-        new Request(`http://registry${pathname}`, {
-          method: request.method,
-          headers,
-          body,
-        }) as any
+        toDurableObjectRequest(
+          new Request(`http://registry${pathname}`, {
+            method: request.method,
+            headers,
+            body,
+          })
+        )
       );
-      return new Response(response.body as any, {
-        status: response.status,
-        headers: response.headers as any,
-      });
+      return copyDurableObjectResponse(response);
     } catch (error) {
       logger.error('Registry JSON route failed', {
         requestId,

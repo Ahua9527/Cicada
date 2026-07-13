@@ -9,6 +9,8 @@ import {
   Timer,
   RelayTransportMessage,
   RELAY_CLOSE_CODES,
+  ShortcutGrantRecord,
+  Env,
 } from '../../../types';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 import {
@@ -17,6 +19,19 @@ import {
   generateRequestId,
 } from '../../../presentation/public-error-response';
 import { sanitizeError } from '../../../utils/sensitive-error';
+import {
+  copyDurableObjectResponse,
+  toDurableObjectRequest,
+} from '../../cloudflare/worker-fetch-adapter';
+import {
+  methodNotAllowed,
+  extractShortcutToken,
+  normalizeShortcutGrant,
+  parseShortcutCommandPayload,
+  readJsonObject,
+  shortcutErrorResponse,
+  shortcutFailureStatus,
+} from './session-manager.logic';
 
 type PendingConnection = {
   timestamp: number;
@@ -43,19 +58,6 @@ type RelayRoomInfo = {
   sessionId: string;
   deviceId?: string;
   agentIdentityPublicKey?: string;
-};
-
-type ShortcutGrantRecord = {
-  grantId: string;
-  deviceId: string;
-  name: string;
-  tokenHash: string;
-  tokenPreview: string;
-  allowedCommands: string[];
-  expiresAt: number;
-  revokedAt?: number;
-  createdAt: number;
-  updatedAt: number;
 };
 
 type PendingShortcutCommand = {
@@ -93,7 +95,7 @@ export class SessionManagerDO {
 
   constructor(
     private state: DurableObjectState,
-    private env: any,
+    private env: Env,
     options: SessionManagerOptions = {}
   ) {
     this.options = {
@@ -708,7 +710,7 @@ export class SessionManagerDO {
       error: typeof data?.error === 'string' ? data.error : undefined,
       timestamp: Date.now(),
     };
-    const status = ok ? 200 : this.shortcutFailureStatus(body.code);
+    const status = ok ? 200 : shortcutFailureStatus(body.code);
     pending.resolve(this.jsonResponse(body, { status }));
   }
 
@@ -719,7 +721,7 @@ export class SessionManagerDO {
         this.shortcutError(
           code,
           error,
-          this.shortcutFailureStatus(code),
+          shortcutFailureStatus(code),
           pending.clientRequestId,
           pending.command
         )
@@ -775,11 +777,11 @@ export class SessionManagerDO {
         this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
       );
       const response = await registry.fetch(
-        new Request('http://registry/registry/agent-online', {
+        toDurableObjectRequest(new Request('http://registry/registry/agent-online', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        })
+        }))
       );
       const body = (await response.json()) as { ok?: boolean; error?: string; code?: string };
       if (!response.ok || body.ok === false) {
@@ -827,11 +829,11 @@ export class SessionManagerDO {
         this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
       );
       const response = await registry.fetch(
-        new Request('http://registry/registry/shortcut-grant-update', {
+        toDurableObjectRequest(new Request('http://registry/registry/shortcut-grant-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        })
+        }))
       );
       const body = (await response.json()) as {
         ok?: boolean;
@@ -871,11 +873,11 @@ export class SessionManagerDO {
       this.env.CICADA_SESSIONS.idFromName(SESSION_CONSTANTS.REGISTRY_DO_NAME)
     );
     await registry.fetch(
-      new Request('http://registry/registry/agent-offline', {
+      toDurableObjectRequest(new Request('http://registry/registry/agent-offline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, sessionId }),
-      })
+      }))
     );
   }
 
@@ -946,36 +948,6 @@ export class SessionManagerDO {
     return Response.json(body, init);
   }
 
-  private shortcutFailureStatus(code?: string): number {
-    switch (code) {
-      case 'grant_expired':
-      case 'grant_revoked':
-      case 'command_not_allowed':
-        return 403;
-      case 'agent_unavailable':
-        return 503;
-      case 'command_timeout':
-        return 504;
-      default:
-        return 400;
-    }
-  }
-
-  private methodNotAllowed(allowed: string[]): Response {
-    return this.jsonResponse(
-      {
-        success: false,
-        error: 'Method not allowed',
-      },
-      {
-        status: 405,
-        headers: {
-          Allow: allowed.join(', '),
-        },
-      }
-    );
-  }
-
   private createWebSocketResponse(webSocket: WebSocket): Response {
     try {
       return new Response(null, { status: 101, webSocket });
@@ -989,10 +961,10 @@ export class SessionManagerDO {
 
   private async handleRoomShortcutCommand(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
-    const payload = await this.readJsonObject(request);
+    const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
         'invalid_shortcut_command',
@@ -1090,9 +1062,9 @@ export class SessionManagerDO {
     });
   }
 
-  private async handleRegistryAgentOnline(request: Request): Promise<Response> {
+  private async handleRegistryAgentOnline(request: Request, requestId: string): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as {
@@ -1160,6 +1132,16 @@ export class SessionManagerDO {
       this.pruneUsedRegistrationNonces(now);
       const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
       if (this.usedRegistrationNonces.has(nonceKey)) {
+        console.warn(
+          JSON.stringify({
+            level: 'warn',
+            message: 'Agent registration replay rejected',
+            request_id: requestId,
+            security_event: 'agent_registration_replayed',
+            status: 409,
+            do_operation: 'registry_agent_online',
+          })
+        );
         return this.jsonResponse(
           {
             ok: false,
@@ -1222,7 +1204,7 @@ export class SessionManagerDO {
 
   private async handleRegistryAgentOffline(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as { deviceId?: string; sessionId?: string };
@@ -1245,7 +1227,7 @@ export class SessionManagerDO {
 
   private async handleRegistryShortcutGrantUpdate(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
     const payload = (await request.json()) as {
@@ -1302,7 +1284,7 @@ export class SessionManagerDO {
       });
     }
 
-    const grant = this.normalizeShortcutGrant(payload.deviceId, payload.grant);
+    const grant = normalizeShortcutGrant(payload.deviceId, payload.grant, now);
     if (!grant) {
       return this.jsonResponse(
         {
@@ -1335,15 +1317,15 @@ export class SessionManagerDO {
 
   private async handleShortcutCommand(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
-      return this.methodNotAllowed(['POST']);
+      return methodNotAllowed(['POST']);
     }
 
-    const token = this.extractShortcutToken(request);
+    const token = extractShortcutToken(request);
     if (!token) {
       return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
     }
 
-    const payload = await this.readJsonObject(request);
+    const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
         'invalid_shortcut_command',
@@ -1351,12 +1333,10 @@ export class SessionManagerDO {
         400
       );
     }
-    const deviceId = typeof payload.device_id === 'string' ? payload.device_id.trim() : '';
-    const command = typeof payload.command === 'string' ? payload.command.trim() : '';
-    const requestId =
-      typeof payload.request_id === 'string' && payload.request_id.trim()
-        ? payload.request_id.trim()
-        : `shortcut-${this.createRandomToken(12)}`;
+    const { deviceId, command, requestId } = parseShortcutCommandPayload(
+      payload,
+      `shortcut-${this.createRandomToken(12)}`
+    );
 
     if (!deviceId || !command) {
       return this.shortcutError(
@@ -1403,7 +1383,7 @@ export class SessionManagerDO {
       this.env.CICADA_SESSIONS.idFromName(record.liveSessionId)
     );
     const response = await sessionRoom.fetch(
-      new Request('http://session/shortcut/command', {
+      toDurableObjectRequest(new Request('http://session/shortcut/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1412,64 +1392,9 @@ export class SessionManagerDO {
           grantId: grant.grantId,
           command,
         }),
-      })
+      }))
     );
-    return new Response(response.body as any, {
-      status: response.status,
-      headers: response.headers as any,
-    });
-  }
-
-  private normalizeShortcutGrant(
-    deviceId: string,
-    value?: Partial<ShortcutGrantRecord>
-  ): ShortcutGrantRecord | undefined {
-    if (!value || typeof value !== 'object') {
-      return undefined;
-    }
-    const grantId = typeof value.grantId === 'string' ? value.grantId.trim() : '';
-    const name = typeof value.name === 'string' ? value.name.trim() : '';
-    const tokenHash = typeof value.tokenHash === 'string' ? value.tokenHash.trim() : '';
-    const tokenPreview = typeof value.tokenPreview === 'string' ? value.tokenPreview.trim() : '';
-    const allowedCommands = this.normalizeShortcutCommands(value.allowedCommands);
-    const expiresAt = typeof value.expiresAt === 'number' ? value.expiresAt : 0;
-    const createdAt = typeof value.createdAt === 'number' ? value.createdAt : Date.now();
-    const updatedAt = typeof value.updatedAt === 'number' ? value.updatedAt : Date.now();
-    if (!grantId || !name || !tokenHash || !tokenPreview || allowedCommands.length === 0 || expiresAt <= Date.now()) {
-      return undefined;
-    }
-    return {
-      grantId,
-      deviceId,
-      name,
-      tokenHash,
-      tokenPreview,
-      allowedCommands,
-      expiresAt,
-      revokedAt: typeof value.revokedAt === 'number' ? value.revokedAt : undefined,
-      createdAt,
-      updatedAt,
-    };
-  }
-
-  private normalizeShortcutCommands(value?: string[]): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-    return Array.from(
-      new Set(
-        value
-          .filter(command => typeof command === 'string')
-          .map(command => command.trim())
-          .filter(Boolean)
-      )
-    );
-  }
-
-  private extractShortcutToken(request: Request): string | undefined {
-    const auth = request.headers.get('Authorization') ?? request.headers.get('authorization') ?? '';
-    const match = auth.match(/^Bearer\s+(cicada_sc_[A-Za-z0-9_-]+)$/);
-    return match?.[1];
+    return copyDurableObjectResponse(response);
   }
 
   private async hashShortcutToken(token: string): Promise<string> {
@@ -1484,17 +1409,7 @@ export class SessionManagerDO {
     requestId = '',
     command = ''
   ): Response {
-    return this.jsonResponse(
-      {
-        ok: false,
-        request_id: requestId,
-        command,
-        code,
-        error,
-        timestamp: Date.now(),
-      },
-      { status }
-    );
+    return shortcutErrorResponse(code, error, status, Date.now(), requestId, command);
   }
 
   private pruneUsedRegistrationNonces(now: number): void {
@@ -1502,18 +1417,6 @@ export class SessionManagerDO {
       if (now >= expiresAt) {
         this.usedRegistrationNonces.delete(nonce);
       }
-    }
-  }
-
-  private async readJsonObject(request: Request): Promise<Record<string, unknown> | undefined> {
-    try {
-      const payload = await request.json();
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-        return undefined;
-      }
-      return payload as Record<string, unknown>;
-    } catch {
-      return undefined;
     }
   }
 
@@ -1617,7 +1520,7 @@ export class SessionManagerDO {
 
   private handleRegistryDevices(request: Request): Response {
     if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+      return methodNotAllowed(['GET']);
     }
 
     const now = Date.now();
@@ -1642,7 +1545,7 @@ export class SessionManagerDO {
 
   private handleRegistryStatus(request: Request): Response {
     if (request.method !== 'GET') {
-      return this.methodNotAllowed(['GET']);
+      return methodNotAllowed(['GET']);
     }
 
     const devices = Array.from(this.registryDevices.values());
@@ -1699,7 +1602,7 @@ export class SessionManagerDO {
       // Return the client WebSocket to the original requester
       return this.createWebSocketResponse(client);
     } catch (error) {
-      this.logServerError('WebSocket upgrade failed', requestId, error);
+      this.logServerError('WebSocket upgrade failed', requestId, 'websocket_upgrade', error);
       return createPublicServerErrorResponse(requestId);
     }
   }
@@ -1735,7 +1638,7 @@ export class SessionManagerDO {
           response = await this.handleRoomShortcutCommand(request);
           break;
         case '/registry/agent-online':
-          response = await this.handleRegistryAgentOnline(request);
+          response = await this.handleRegistryAgentOnline(request, requestId);
           break;
         case '/registry/agent-offline':
           response = await this.handleRegistryAgentOffline(request);
@@ -1764,12 +1667,17 @@ export class SessionManagerDO {
       }
       return enforcePublicServerErrorResponse(response, requestId);
     } catch (error) {
-      this.logServerError('SessionManagerDO fetch error', requestId, error);
+      this.logServerError('SessionManagerDO fetch error', requestId, url.pathname, error);
       return createPublicServerErrorResponse(requestId);
     }
   }
 
-  private logServerError(message: string, requestId: string, error: unknown): void {
+  private logServerError(
+    message: string,
+    requestId: string,
+    operation: string,
+    error: unknown
+  ): void {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     const sanitizedError = sanitizeError(normalizedError);
     console.error(
@@ -1777,6 +1685,11 @@ export class SessionManagerDO {
         level: 'error',
         message,
         request_id: requestId,
+        error_type: sanitizedError.name,
+        do_operation: operation,
+        ...(operation === 'websocket_upgrade'
+          ? { websocket_outcome: 'upgrade_failed' }
+          : {}),
         error: {
           name: sanitizedError.name,
           message: sanitizedError.message,

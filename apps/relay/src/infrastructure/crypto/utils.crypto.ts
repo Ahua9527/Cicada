@@ -9,7 +9,7 @@ export function hexToArray(hex: string): ArrayBuffer {
   const result = new ArrayBuffer(hex.length / 2);
   const view = new Uint8Array(result);
   for (let i = 0; i < hex.length; i += 2) {
-    view[i / 2] = parseInt(hex.substr(i, 2), 16);
+    view[i / 2] = parseInt(hex.slice(i, i + 2), 16);
   }
   return result;
 }

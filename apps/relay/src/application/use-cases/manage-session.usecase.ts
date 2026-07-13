@@ -3,6 +3,7 @@ import { CicadaError, ErrorCode, ErrorSeverity } from '@cicada/shared/errors';
 import type { DeviceId, SessionId } from '@cicada/shared/types/common.types';
 import type { SessionService } from '../services/session.service';
 import type { DeviceService } from '../services/device.service';
+import { requireJsonObject } from '../../utils/json-value';
 
 export interface CreateSessionRequest {
   deviceId: DeviceId;
@@ -32,12 +33,26 @@ export class ManageSessionUseCase {
   async createSession(
     request: CreateSessionRequest
   ): Promise<Result<CreateSessionResponse, CicadaError>> {
+    let metadata;
+    try {
+      metadata = requireJsonObject(request.metadata, 'Device metadata');
+    } catch (error) {
+      return {
+        success: false,
+        error: new CicadaError(
+          error instanceof Error ? error.message : 'Invalid device metadata',
+          ErrorCode.VALIDATION_ERROR,
+          { severity: ErrorSeverity.MEDIUM }
+        ),
+      };
+    }
+
     // 1. Register or update device
     const deviceResult = await this.deps.deviceService.registerDevice(
       request.deviceId,
       request.platform,
       request.version,
-      request.metadata as any // TODO: Fix type mismatch
+      metadata
     );
 
     if (!deviceResult.success) {
@@ -47,7 +62,7 @@ export class ManageSessionUseCase {
     // 2. Create session
     const sessionResult = await this.deps.sessionService.createSession(
       request.deviceId,
-      request.metadata
+      metadata
     );
 
     if (!sessionResult.success) {
