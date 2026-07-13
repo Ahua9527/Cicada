@@ -428,7 +428,7 @@ class IntegrationTestRunner {
    * 创建测试设备
    */
   async createTestDevice() {
-    const deviceId = `test-device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const deviceId = `test-device-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
     const device = {
       id: deviceId,

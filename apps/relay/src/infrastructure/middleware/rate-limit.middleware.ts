@@ -11,22 +11,59 @@ export interface RateLimitOptions {
   keyGenerator?: (context: MiddlewareContext) => string;
 }
 
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const CLEANUP_INTERVAL_MS = 60_000;
+const CLEANUP_SIZE_THRESHOLD = 1_000;
+const CLEANUP_BATCH_SIZE = 100;
+
 /**
  * 限流中间件
  */
 export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
   const { windowMs, maxRequests, keyGenerator } = options;
-  const requests = new Map<string, { count: number; resetTime: number }>();
+  const requests = new Map<string, RateLimitEntry>();
+  let lastCleanupAt = Date.now();
+  let cleanupCursor: IterableIterator<[string, RateLimitEntry]> | undefined;
+
+  const cleanupExpiredEntries = (now: number): void => {
+    cleanupCursor ??= requests.entries();
+
+    for (let scanned = 0; scanned < CLEANUP_BATCH_SIZE; scanned++) {
+      const nextEntry = cleanupCursor.next();
+      if (nextEntry.done) {
+        cleanupCursor = undefined;
+        lastCleanupAt = now;
+        return;
+      }
+
+      const [entryKey, entry] = nextEntry.value;
+      if (now > entry.resetTime) {
+        requests.delete(entryKey);
+      }
+    }
+  };
 
   return async (context, next) => {
     const key = keyGenerator ? keyGenerator(context) : getClientIdentifier(context);
     const now = Date.now();
 
-    // 清理过期的记录
-    for (const [k, v] of requests.entries()) {
-      if (now > v.resetTime) {
-        requests.delete(k);
-      }
+    // 当前 key 始终惰性过期，避免旧窗口错误限流。
+    const existing = requests.get(key);
+    if (existing && now > existing.resetTime) {
+      requests.delete(key);
+    }
+
+    // 全局清理按批次推进，单个请求最多扫描固定数量的记录。
+    if (
+      cleanupCursor !== undefined ||
+      now - lastCleanupAt >= CLEANUP_INTERVAL_MS ||
+      requests.size > CLEANUP_SIZE_THRESHOLD
+    ) {
+      cleanupExpiredEntries(now);
     }
 
     // 检查当前请求

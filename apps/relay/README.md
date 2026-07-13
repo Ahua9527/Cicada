@@ -32,8 +32,15 @@ Optional:
 | `ALLOWED_ORIGINS` | local dev origins | Comma-separated allow list when CORS is enabled. |
 | `DEBUG_MODE` | `false` | Enables debug-level structured logs. |
 
+For local development, copy `.dev.vars.example` to the ignored `.dev.vars` file. The
+`CICADA_SESSIONS` Durable Object binding comes from `wrangler.toml` and must not be copied into the
+variables file.
+
 Do not commit `.env`, `.dev.vars`, secrets, Wrangler state, coverage output,
 build output, or local `.cicada` state.
+
+Production logging, alert definitions, and request-ID diagnosis are documented in
+[`docs/runbooks/relay-observability.md`](../../docs/runbooks/relay-observability.md).
 
 ## Agent WebSocket
 

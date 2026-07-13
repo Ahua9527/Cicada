@@ -115,31 +115,26 @@ public final class CicadaCLI {
     }
 
     public func run(arguments: [String]) -> CLIResult {
-        guard let command = arguments.first else {
-            return .success(usageText)
-        }
-
-        let args = Array(arguments.dropFirst())
-        switch command {
-        case "setup":
+        switch CLICommandRouter.route(arguments: arguments) {
+        case let .setup(args):
             return handleSetup(args)
-        case "start":
+        case .start:
             return handleStart()
-        case "stop":
+        case .stop:
             return handleStop()
-        case "restart":
+        case .restart:
             return handleRestart()
-        case "status":
+        case let .status(args):
             return handleStatus(args)
-        case "shortcut":
+        case let .shortcut(args):
             return handleShortcut(args)
-        case "run":
+        case let .run(args):
             return handleRun(args)
-        case "advanced":
+        case let .advanced(args):
             return handleAdvanced(args)
-        case "--help", "-h", "help":
+        case .help:
             return .success(usageText)
-        default:
+        case let .unknown(command):
             return .failure("未知命令: \(command)\n\n\(usageText)")
         }
     }
@@ -184,12 +179,12 @@ public final class CicadaCLI {
     private func handleSetup(_ args: [String]) -> CLIResult {
         let relayURL: String?
         do {
-            relayURL = try parseOptionalValue(args, flag: "--relay-url")
+            relayURL = try CLIArgumentParser.optionalValue(args, flag: "--relay-url")
         } catch {
             return .failure(String(describing: error))
         }
 
-        if let unknown = firstUnknownFlag(args, allowed: ["--relay-url"]) {
+        if let unknown = CLIArgumentParser.firstUnknownFlag(args, allowed: ["--relay-url"]) {
             return .failure("未知参数: \(unknown)")
         }
 
@@ -266,7 +261,7 @@ public final class CicadaCLI {
         let json = args.contains("--json")
         let report = statusReport()
         if json {
-            return .success(formatJSON(report))
+            return .success(CLIOutputFormatter.json(report))
         }
 
         let health = report["health"] as? String ?? "unknown"
@@ -320,36 +315,18 @@ public final class CicadaCLI {
             return .failure("daemon 未运行。请先运行: cicada start")
         }
 
-        var name = "Shortcut"
-        var commands = ["ping", "status"]
-        var ttl: String?
-        var index = 0
-        while index < args.count {
-            switch args[index] {
-            case "--name":
-                guard index + 1 < args.count else { return .failure("--name 需要值") }
-                name = args[index + 1]
-                index += 2
-            case "--commands":
-                guard index + 1 < args.count else { return .failure("--commands 需要值") }
-                commands = ShortcutGrantStore.normalizeCommands(
-                    args[index + 1].split(separator: ",").map(String.init)
-                )
-                index += 2
-            case "--ttl":
-                guard index + 1 < args.count else { return .failure("--ttl 需要值") }
-                ttl = args[index + 1]
-                index += 2
-            default:
-                return .failure("未知参数: \(args[index])")
-            }
+        let parsed: ShortcutCreateArguments
+        do {
+            parsed = try CLIArgumentParser.shortcutCreate(args)
+        } catch {
+            return .failure(String(describing: error))
         }
 
         do {
             let response = try daemonControlClient.shortcutGrantCreate(
-                name: name,
-                commands: commands,
-                ttlMs: parseDurationMs(ttl)
+                name: parsed.name,
+                commands: parsed.commands,
+                ttlMs: parsed.ttlMs
             )
             guard response.ok, let token = response.shortcutToken, let grant = response.shortcutGrant else {
                 return .failure(response.error ?? "shortcut create 失败")
@@ -471,7 +448,7 @@ public final class CicadaCLI {
             guard subArgs.isEmpty || subArgs == ["--json"] else {
                 return .failure("用法: cicada advanced doctor --json")
             }
-            return .success(formatJSON(statusReport()))
+            return .success(CLIOutputFormatter.json(statusReport()))
         default:
             return .failure("未知 advanced 命令: \(action)\n\n\(advancedUsageText)")
         }
@@ -488,7 +465,7 @@ public final class CicadaCLI {
                 if args.count >= 2 {
                     return .success(try configStore.getValue(key: args[1]))
                 }
-                return .success(formatJSON(effectiveConfig(config)))
+                return .success(CLIOutputFormatter.json(effectiveConfig(config)))
             case "set":
                 guard args.count >= 3 else {
                     return .failure("用法: cicada advanced config set <key> <value>")
@@ -527,7 +504,7 @@ public final class CicadaCLI {
                 try daemonManager.restart()
                 return .success("daemon 已重启")
             case "status":
-                return .success(formatJSON(daemonObject(daemonManager.status())))
+                return .success(CLIOutputFormatter.json(daemonObject(daemonManager.status())))
             case "uninstall":
                 daemonManager.uninstall()
                 return .success("daemon 已卸载")
@@ -554,7 +531,7 @@ public final class CicadaCLI {
                 sleepHoldManager.uninstall()
                 return .success("SleepHold service 已卸载")
             case "status":
-                return .success(formatJSON(sleepHoldObject(sleepHoldManager.status())))
+                return .success(CLIOutputFormatter.json(sleepHoldObject(sleepHoldManager.status())))
             case "ping":
                 let response = try sleepHoldManager.ping()
                 guard response.ok else {
@@ -656,7 +633,7 @@ public final class CicadaCLI {
         } else {
             body = ["success": result.success, "message": result.message]
         }
-        return CLIResult(exitCode: result.success ? 0 : 1, stdout: formatJSON(body))
+        return CLIResult(exitCode: result.success ? 0 : 1, stdout: CLIOutputFormatter.json(body))
     }
 
     private func effectiveConfig(_ config: CicadaConfig?) -> [String: Any] {
@@ -705,7 +682,7 @@ public final class CicadaCLI {
         guard response.ok else {
             return .failure(response.error ?? "SleepHold 操作失败")
         }
-        return .success(formatJSON(sleepResponseObject(response)))
+        return .success(CLIOutputFormatter.json(sleepResponseObject(response)))
     }
 
     private func sleepResponseObject(_ response: SleepHoldControlResponse) -> [String: Any] {
@@ -715,53 +692,6 @@ public final class CicadaCLI {
         if let status = response.status { object["status"] = status.rawValue }
         if let activeSessions = response.activeSessions { object["activeSessions"] = activeSessions }
         return object
-    }
-
-    private func parseDurationMs(_ raw: String?) -> Int64 {
-        guard let raw, !raw.isEmpty else {
-            return ShortcutGrantStore.defaultTtlMs
-        }
-        if let days = Int64(String(raw.dropLast())), raw.hasSuffix("d") {
-            return days * 24 * 60 * 60 * 1000
-        }
-        if let hours = Int64(String(raw.dropLast())), raw.hasSuffix("h") {
-            return hours * 60 * 60 * 1000
-        }
-        if let minutes = Int64(String(raw.dropLast())), raw.hasSuffix("m") {
-            return minutes * 60 * 1000
-        }
-        return Int64(raw) ?? ShortcutGrantStore.defaultTtlMs
-    }
-
-    private func parseOptionalValue(_ args: [String], flag: String) throws -> String? {
-        guard let index = args.firstIndex(of: flag) else { return nil }
-        guard index + 1 < args.count else {
-            throw CLIArgumentError.message("\(flag) 需要值")
-        }
-        return args[index + 1]
-    }
-
-    private func firstUnknownFlag(_ args: [String], allowed: Set<String>) -> String? {
-        var index = 0
-        while index < args.count {
-            let item = args[index]
-            if item.hasPrefix("--") {
-                if !allowed.contains(item) { return item }
-                index += 2
-            } else {
-                return item
-            }
-        }
-        return nil
-    }
-
-    private func formatJSON(_ object: Any) -> String {
-        guard JSONSerialization.isValidJSONObject(object),
-              let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
-              let text = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-        return text
     }
 
     private func boolText(_ value: Bool?) -> String {
@@ -780,17 +710,6 @@ public final class CicadaCLI {
             return nil
         }
         return object
-    }
-}
-
-private enum CLIArgumentError: Error, CustomStringConvertible {
-    case message(String)
-
-    var description: String {
-        switch self {
-        case let .message(message):
-            return message
-        }
     }
 }
 

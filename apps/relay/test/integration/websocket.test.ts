@@ -608,6 +608,66 @@ describe('WebSocket Integration Tests', () => {
       expect(badMethod.status).toBe(405);
     });
 
+    it('should log replay rejection as a stable event without sensitive registration data', async () => {
+      const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), mockEnv);
+      const deviceId = 'MAC_REPLAY_SECRET_DEVICE';
+      const nonce = 'nonce-replay-secret';
+      const signature = 'signature-replay-secret';
+      const requestId = 'req-replay-test';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const firstSeen = await registry.fetch(
+        new Request('http://session/registry/agent-online', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceId,
+            sessionId: 'session-first-seen',
+            agentIdentityPublicKey: 'agent-public-key',
+          }),
+        })
+      );
+      expect(firstSeen.status).toBe(200);
+
+      const replayCache = (
+        registry as unknown as { usedRegistrationNonces: Map<string, number> }
+      ).usedRegistrationNonces;
+      replayCache.set(
+        `${deviceId}|agent|${nonce}`,
+        Date.now() + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+      );
+
+      const replay = await registry.fetch(
+        new Request('http://session/registry/agent-online', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId },
+          body: JSON.stringify({
+            deviceId,
+            sessionId: 'session-replay',
+            agentIdentityPublicKey: 'agent-public-key',
+            registrationTimestamp: Date.now(),
+            registrationNonce: nonce,
+            registrationSignature: signature,
+          }),
+        })
+      );
+
+      expect(replay.status).toBe(409);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const eventText = String(warn.mock.calls[0]?.[0]);
+      expect(JSON.parse(eventText)).toEqual({
+        level: 'warn',
+        message: 'Agent registration replay rejected',
+        request_id: requestId,
+        security_event: 'agent_registration_replayed',
+        status: 409,
+        do_operation: 'registry_agent_online',
+      });
+      expect(eventText).not.toContain(deviceId);
+      expect(eventText).not.toContain(nonce);
+      expect(eventText).not.toContain(signature);
+    });
+
     it('should reject WebSocket upgrades outside /relay', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
 

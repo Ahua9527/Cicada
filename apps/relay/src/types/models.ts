@@ -11,16 +11,6 @@ export { DeviceCapability, DeviceConnectionStatus, ErrorCode as ErrorType } from
 
 export type { LogLevel, DeviceType } from '@cicada/shared';
 
-export enum SupportedCommands {
-  LOCK = 'lock',
-  BLUETOOTH_ON = 'bt_on',
-  BLUETOOTH_OFF = 'bt_off',
-  SLEEP_HOLD = 'sleep_hold',
-  SLEEP_RELEASE = 'sleep_release',
-  PING = 'ping',
-  STATUS = 'status',
-}
-
 export interface DurableObjectStorage {
   get<T = unknown>(key: string): Promise<T | undefined>;
   get<T = unknown>(keys: string[]): Promise<Map<string, T>>;

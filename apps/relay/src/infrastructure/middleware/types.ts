@@ -3,8 +3,8 @@
  */
 
 import type { Env } from '@/types';
-import type { Logger } from '@cicada/shared/logger';
 import type { CommandRequest } from '@cicada/shared';
+import type { Logger } from '../logger';
 
 /**
  * 中间件上下文

@@ -143,8 +143,38 @@ describe('Logger Module', () => {
 
       expect(parsed.level).toBe('info');
       expect(parsed.message).toBe('test message');
-      expect(parsed.requestId).toBe('test-id');
+      expect(parsed.request_id).toBe('test-id');
       expect(parsed.context).toEqual({ key: 'value' });
+    });
+
+    it('promotes operational fields for Cloudflare log queries', () => {
+      const formatter = new JsonFormatter();
+      const formatted = formatter.format({
+        level: 'error',
+        timestamp: Date.now(),
+        message: 'request failed',
+        requestId: 'req-observability',
+        context: {
+          route: '/relay/:liveSession',
+          status: 500,
+          error_type: 'server_error',
+          duration_ms: 12,
+          do_operation: 'websocket_upgrade',
+          websocket_outcome: 'upgrade_failed',
+        },
+      });
+
+      expect(JSON.parse(formatted)).toEqual(
+        expect.objectContaining({
+          request_id: 'req-observability',
+          route: '/relay/:liveSession',
+          status: 500,
+          error_type: 'server_error',
+          duration_ms: 12,
+          do_operation: 'websocket_upgrade',
+          websocket_outcome: 'upgrade_failed',
+        })
+      );
     });
   });
 

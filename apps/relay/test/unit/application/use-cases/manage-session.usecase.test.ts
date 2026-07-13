@@ -146,6 +146,22 @@ describe('ManageSessionUseCase', () => {
       expect(result.success).toBe(false);
       expect(mockDeviceService.connectDevice).not.toHaveBeenCalled();
     });
+
+    it('should reject non-JSON metadata before calling services', async () => {
+      const result = await useCase.createSession({
+        deviceId: DEVICE_ID,
+        platform: 'macOS',
+        version: '1.0.0',
+        metadata: { invalid: () => true },
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      }
+      expect(mockDeviceService.registerDevice).not.toHaveBeenCalled();
+      expect(mockSessionService.createSession).not.toHaveBeenCalled();
+    });
   });
 
   describe('closeSession', () => {
