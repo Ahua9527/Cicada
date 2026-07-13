@@ -5,11 +5,7 @@ import SwiftUI
 
 enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
     case overview
-    case relay
-    case alarms
-    case notifications
-    case recordings
-    case notchDrop
+    case settings
     case maintenance
 
     var id: Self { self }
@@ -18,16 +14,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return String(localized: "Overview")
-        case .relay:
-            return String(localized: "Relay")
-        case .alarms:
-            return String(localized: "Alarms")
-        case .notifications:
-            return String(localized: "Notifications")
-        case .recordings:
-            return String(localized: "Recordings")
-        case .notchDrop:
-            return String(localized: "NotchDrop")
+        case .settings:
+            return String(localized: "Settings")
         case .maintenance:
             return String(localized: "Maintenance")
         }
@@ -37,16 +25,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return String(localized: "Status and readiness")
-        case .relay:
-            return String(localized: "Relay address configuration")
-        case .alarms:
-            return String(localized: "Trigger conditions")
-        case .notifications:
-            return String(localized: "Sound and Bark alerts")
-        case .recordings:
-            return String(localized: "Camera capture")
-        case .notchDrop:
-            return String(localized: "Tray behavior")
+        case .settings:
+            return String(localized: "Connection, protection, alerts, recording, and NotchDrop.")
         case .maintenance:
             return String(localized: "Folders, sleep hold session, diagnostics")
         }
@@ -56,16 +36,8 @@ enum SentryControlSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview:
             return "eye"
-        case .relay:
-            return "network"
-        case .alarms:
-            return "light.beacon.max"
-        case .notifications:
-            return "app.badge"
-        case .recordings:
-            return "camera"
-        case .notchDrop:
-            return "tray"
+        case .settings:
+            return "slider.horizontal.3"
         case .maintenance:
             return "wrench.and.screwdriver"
         }
@@ -138,16 +110,8 @@ struct SentryControlCenterView: View {
                 viewModel: viewModel,
                 startupDiagnostics: appDelegate.startupDiagnostics
             )
-        case .relay:
-            SentryRelaySettingsPane()
-        case .alarms:
-            SentryAlarmSettingsPane(config: config)
-        case .notifications:
-            SentryNotificationSettingsPane(config: config)
-        case .recordings:
-            SentryRecordingSettingsPane(config: config)
-        case .notchDrop:
-            NotchDropSettingsPane()
+        case .settings:
+            SentrySettingsPane(config: config)
         case .maintenance:
             SentryMaintenancePane(
                 config: config,
@@ -161,16 +125,8 @@ struct SentryControlCenterView: View {
         switch section {
         case .overview:
             return controller.localizedStatusTitle
-        case .relay:
-            return String(localized: "Relay URL")
-        case .alarms:
-            return config.hasTriggerEnabled ? String(localized: "Configured") : String(localized: "Required")
-        case .notifications:
-            return config.hasNotificationEnabled ? String(localized: "Configured") : String(localized: "Required")
-        case .recordings:
-            return config.hasRecordingEnabled ? String(localized: "Enabled") : String(localized: "Off")
-        case .notchDrop:
-            return String(localized: "Tray settings")
+        case .settings:
+            return config.canActivate ? String(localized: "Ready") : String(localized: "Required")
         case .maintenance:
             return config.hasSleepHoldSession ? String(localized: "Sleep hold active") : String(localized: "Sleep hold idle")
         }
@@ -351,7 +307,24 @@ private struct SentryOverviewPane: View {
     }
 }
 
-struct SentryRelaySettingsPane: View {
+private struct SentrySettingsPane: View {
+    @ObservedObject var config: SentryConfigurationManager
+
+    var body: some View {
+        SentryPane(
+            title: String(localized: "Settings"),
+            subtitle: String(localized: "Connection, protection, alerts, recording, and NotchDrop.")
+        ) {
+            SentryRelaySettingsSection()
+            SentryAlarmSettingsSection(config: config)
+            SentryNotificationSettingsSection(config: config)
+            SentryRecordingSettingsSection(config: config)
+            NotchDropSettingsSection()
+        }
+    }
+}
+
+private struct SentryRelaySettingsSection: View {
     private let store: CicadaRelayConfigStore
     @State private var relayURL = ""
     @State private var statusMessage: String?
@@ -362,35 +335,30 @@ struct SentryRelaySettingsPane: View {
     }
 
     var body: some View {
-        SentryPane(
-            title: String(localized: "Relay"),
-            subtitle: String(localized: "Configure the Cicada Relay address.")
-        ) {
-            GroupBox(String(localized: "Connection")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    LabeledContent(String(localized: "Cicada Relay Address")) {
-                        TextField(String(localized: "Cicada Relay Address"), text: $relayURL)
-                            .textFieldStyle(.roundedBorder)
-                            .autocorrectionDisabled()
-                            .onSubmit(save)
-                    }
-
-                    HStack {
-                        Spacer()
-                        Button(String(localized: "Reload"), action: reload)
-                        Button(String(localized: "Save"), action: save)
-                            .keyboardShortcut(.defaultAction)
-                    }
-
-                    if let statusMessage {
-                        Text(statusMessage)
-                            .font(.footnote)
-                            .foregroundStyle(statusTint)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        GroupBox(String(localized: "Connection")) {
+            VStack(alignment: .leading, spacing: 12) {
+                LabeledContent(String(localized: "Cicada Relay Address")) {
+                    TextField(String(localized: "Cicada Relay Address"), text: $relayURL)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .onSubmit(save)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack {
+                    Spacer()
+                    Button(String(localized: "Reload"), action: reload)
+                    Button(String(localized: "Save"), action: save)
+                        .keyboardShortcut(.defaultAction)
+                }
+
+                if let statusMessage {
+                    Text(statusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(statusTint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
             load(showSuccess: false)
@@ -435,85 +403,76 @@ struct SentryRelaySettingsPane: View {
     }
 }
 
-private struct SentryAlarmSettingsPane: View {
+private struct SentryAlarmSettingsSection: View {
     @ObservedObject var config: SentryConfigurationManager
 
     var body: some View {
-        SentryPane(
-            title: String(localized: "Alarms"),
-            subtitle: String(localized: "Choose which system changes trigger Cicada.")
-        ) {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(String(localized: "Alarm triggers fire when configured conditions are met."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        GroupBox(String(localized: "Protection")) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(String(localized: "Alarm triggers fire when configured conditions are met."))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Divider()
+                Toggle(String(localized: "Closing Lid"), isOn: $config.cfg.sentryTriggersLidEnabled)
+                Toggle(String(localized: "Disconnected from Internet"), isOn: $config.cfg.sentryTriggersInternetEnabled)
+                Toggle(String(localized: "Disconnected from Power Adapter"), isOn: $config.cfg.sentryTriggersPowerEnabled)
 
-                    Toggle(String(localized: "Closing Lid"), isOn: $config.cfg.sentryTriggersLidEnabled)
-                    Toggle(String(localized: "Disconnected from Internet"), isOn: $config.cfg.sentryTriggersInternetEnabled)
-                    Toggle(String(localized: "Disconnected from Power Adapter"), isOn: $config.cfg.sentryTriggersPowerEnabled)
+                Divider()
+
+                Text(String(localized: "Auto Sleep"))
+                    .font(.headline)
+
+                Text(String(localized: "While Cicada is monitoring, it asks SleepHold to prevent sleep so alarm triggers stay reliable. If that hold is unavailable or blocked by system policy, disable automatic sleep in macOS."))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button(String(localized: "Learn More")) {
+                    NSWorkspace.shared.open(
+                        URL(string: "https://github.com/Lakr233/Sentry?tab=readme-ov-file#system-requirements")!
+                    )
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            GroupBox(String(localized: "Auto Sleep")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(String(localized: "While Cicada is monitoring, it asks SleepHold to prevent sleep so alarm triggers stay reliable. If that hold is unavailable or blocked by system policy, disable automatic sleep in macOS."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(String(localized: "Learn More")) {
-                        NSWorkspace.shared.open(
-                            URL(string: "https://github.com/Lakr233/Sentry?tab=readme-ov-file#system-requirements")!
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
 
-private struct SentryNotificationSettingsPane: View {
+private struct SentryNotificationSettingsSection: View {
     @ObservedObject var config: SentryConfigurationManager
 
     var body: some View {
-        SentryPane(
-            title: String(localized: "Notifications"),
-            subtitle: String(localized: "Configure local sound and Bark alerts.")
-        ) {
-            GroupBox(String(localized: "Sound")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(String(localized: "Playing sound is the quickest local warning when an alarm fires."))
-                        .foregroundStyle(.secondary)
-                    Toggle(String(localized: "Play Sound"), isOn: $config.cfg.sentryAlarmsSoundsEnabled)
+        GroupBox(String(localized: "Alerts")) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(String(localized: "Sound"))
+                    .font(.headline)
+                Text(String(localized: "Playing sound is the quickest local warning when an alarm fires."))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(String(localized: "Play Sound"), isOn: $config.cfg.sentryAlarmsSoundsEnabled)
+
+                Divider()
+
+                Text(String(localized: "Bark"))
+                    .font(.headline)
+                Text(String(localized: "Connect Bark if you want alarm notifications on your phone."))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Toggle(isOn: barkEnabledBinding) {
+                    Text(String(localized: "Use Bark"))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            GroupBox(String(localized: "Bark")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(String(localized: "Connect Bark if you want alarm notifications on your phone."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Toggle(isOn: barkEnabledBinding) {
-                        Text(String(localized: "Use Bark"))
-                    }
-
-                    LabeledContent(String(localized: "Endpoint")) {
-                        TextField(String(localized: "Server Endpoint"), text: $config.cfg.sentryNotificationConfigBark.endpoint)
-                            .textFieldStyle(.roundedBorder)
-                            .autocorrectionDisabled()
-                            .onChange(of: config.cfg.sentryNotificationConfigBark.endpoint) { newValue in
-                                normalizeBarkEndpoint(newValue)
-                            }
-                    }
-                    .disabled(config.cfg.sentryAlarmsNotificationType != .bark)
+                LabeledContent(String(localized: "Endpoint")) {
+                    TextField(String(localized: "Server Endpoint"), text: $config.cfg.sentryNotificationConfigBark.endpoint)
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .onChange(of: config.cfg.sentryNotificationConfigBark.endpoint) { newValue in
+                            normalizeBarkEndpoint(newValue)
+                        }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(config.cfg.sentryAlarmsNotificationType != .bark)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -538,36 +497,28 @@ private struct SentryNotificationSettingsPane: View {
     }
 }
 
-private struct SentryRecordingSettingsPane: View {
+private struct SentryRecordingSettingsSection: View {
     @ObservedObject var config: SentryConfigurationManager
     @StateObject private var cameraManager = CameraManager()
 
     var body: some View {
-        SentryPane(
-            title: String(localized: "Recordings"),
-            subtitle: String(localized: "Capture camera clips when Cicada is activated.")
-        ) {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle(String(localized: "Enable Camera Recording"), isOn: $config.cfg.sentryRecordingEnabled)
+        GroupBox(String(localized: "Recordings")) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(String(localized: "Enable Camera Recording"), isOn: $config.cfg.sentryRecordingEnabled)
 
-                    cameraContent
+                cameraContent
 
-                    HStack {
-                        Button(String(localized: "Open Saved Clips")) {
-                            SentinelController.shared.openSavedClips()
-                        }
-                        Spacer()
-                        Text(String(localized: "Respect the privacy of others."))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                HStack {
+                    Button(String(localized: "Open Saved Clips")) {
+                        SentinelController.shared.openSavedClips()
                     }
+                    Spacer()
+                    Text(String(localized: "Respect the privacy of others."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .onAppear {
-            cameraManager.requestPermission()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -620,13 +571,21 @@ private struct SentryRecordingSettingsPane: View {
                     Text(cameraAccessStatusText)
                         .font(.caption)
                         .foregroundStyle(.white)
+
+                    if cameraManager.authorizationStatus == .notDetermined {
+                        Button(String(localized: "Allow Camera Access")) {
+                            cameraManager.requestPermission()
+                        }
+                    }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var cameraAccessStatusText: String {
-        cameraManager.authorizationStatus == .denied ? String(localized: "Camera Access Denied") : String(localized: "Requesting Camera Access...")
+        cameraManager.authorizationStatus == .notDetermined
+            ? String(localized: "Camera Access Required")
+            : String(localized: "Camera Access Denied")
     }
 }
 
@@ -639,7 +598,7 @@ private final class NotchDropSettingsStore: ObservableObject {
     var hapticFeedback: Bool
 }
 
-private struct NotchDropSettingsPane: View {
+private struct NotchDropSettingsSection: View {
     @StateObject private var settings = NotchDropSettingsStore()
     @StateObject private var tray = TrayDrop.shared
     private let numberFormatter: NumberFormatter = {
@@ -649,54 +608,52 @@ private struct NotchDropSettingsPane: View {
     }()
 
     var body: some View {
-        SentryPane(
-            title: String(localized: "NotchDrop"),
-            subtitle: String(localized: "Configure tray behavior and storage from the same control center.")
-        ) {
-            GroupBox(String(localized: "General")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Picker(String(localized: "Language"), selection: $settings.selectedLanguage) {
-                        ForEach(Language.allCases) { language in
-                            Text(language.localized).tag(language)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: settings.selectedLanguage) { newValue in
-                        newValue.apply()
-                    }
+        GroupBox(String(localized: "NotchDrop")) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(String(localized: "General"))
+                    .font(.headline)
 
-                    Toggle(String(localized: "Haptic Feedback"), isOn: $settings.hapticFeedback)
+                Picker(String(localized: "Language"), selection: $settings.selectedLanguage) {
+                    ForEach(Language.allCases) { language in
+                        Text(language.localized).tag(language)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                .pickerStyle(.menu)
+                .onChange(of: settings.selectedLanguage) { newValue in
+                    newValue.apply()
+                }
 
-            GroupBox(String(localized: "File Storage")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Picker(String(localized: "Keep Files"), selection: $tray.selectedFileStorageTime) {
-                        ForEach(TrayDrop.FileStorageTime.allCases) { time in
-                            Text(time.localized).tag(time)
-                        }
+                Toggle(String(localized: "Haptic Feedback"), isOn: $settings.hapticFeedback)
+
+                Divider()
+
+                Text(String(localized: "File Storage"))
+                    .font(.headline)
+
+                Picker(String(localized: "Keep Files"), selection: $tray.selectedFileStorageTime) {
+                    ForEach(TrayDrop.FileStorageTime.allCases) { time in
+                        Text(time.localized).tag(time)
                     }
-                    .pickerStyle(.menu)
+                }
+                .pickerStyle(.menu)
 
-                    if tray.selectedFileStorageTime == .custom {
-                        HStack {
-                            TextField(String(localized: "Value"), value: $tray.customStorageTime, formatter: numberFormatter)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 72)
+                if tray.selectedFileStorageTime == .custom {
+                    HStack {
+                        TextField(String(localized: "Value"), value: $tray.customStorageTime, formatter: numberFormatter)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
 
-                            Picker(String(localized: "Unit"), selection: $tray.customStorageTimeUnit) {
-                                ForEach(TrayDrop.CustomstorageTimeUnit.allCases) { unit in
-                                    Text(unit.localized).tag(unit)
-                                }
+                        Picker(String(localized: "Unit"), selection: $tray.customStorageTimeUnit) {
+                            ForEach(TrayDrop.CustomstorageTimeUnit.allCases) { unit in
+                                Text(unit.localized).tag(unit)
                             }
-                            .pickerStyle(.menu)
-                            .frame(width: 180)
                         }
+                        .pickerStyle(.menu)
+                        .frame(width: 180)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

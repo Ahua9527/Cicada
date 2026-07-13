@@ -30,24 +30,12 @@ struct App: SwiftUI.App {
 
                 Divider()
 
-                Button(String(localized: "Relay")) {
-                    _ = SentryControlCenterRouter.shared.open(.relay)
+                Button(String(localized: "Overview")) {
+                    _ = SentryControlCenterRouter.shared.open(.overview)
                 }
 
-                Button(String(localized: "Alarm Settings")) {
-                    _ = SentryControlCenterRouter.shared.open(.alarms)
-                }
-
-                Button(String(localized: "Notification Settings")) {
-                    _ = SentryControlCenterRouter.shared.open(.notifications)
-                }
-
-                Button(String(localized: "Recording Settings")) {
-                    _ = SentryControlCenterRouter.shared.open(.recordings)
-                }
-
-                Button(String(localized: "NotchDrop Settings")) {
-                    _ = SentryControlCenterRouter.shared.open(.notchDrop)
+                Button(String(localized: "Settings")) {
+                    _ = SentryControlCenterRouter.shared.open(.settings)
                 }
 
                 Button(String(localized: "Maintenance")) {
