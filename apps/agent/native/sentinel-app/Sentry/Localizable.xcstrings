@@ -429,6 +429,16 @@
         }
       }
     },
+    "Allow Camera Access": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许访问摄像头"
+          }
+        }
+      }
+    },
     "Camera": {
       "localizations": {
         "zh-Hans": {
@@ -445,6 +455,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法访问相机"
+          }
+        }
+      }
+    },
+    "Camera Access Required": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要摄像头访问权限"
           }
         }
       }
@@ -1233,16 +1253,6 @@
         }
       }
     },
-    "Requesting Camera Access...": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请求访问相机中…"
-          }
-        }
-      }
-    },
     "Runtime": {
       "localizations": {
         "en": {
@@ -1711,6 +1721,22 @@
         }
       }
     },
+    "Alerts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alerts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "告警"
+          }
+        }
+      }
+    },
     "An alarm is active until it is unlocked or stopped.": {
       "localizations": {
         "zh-Hans": {
@@ -1945,6 +1971,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "连接"
+          }
+        }
+      }
+    },
+    "Connection, protection, alerts, recording, and NotchDrop.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection, protection, alerts, recording, and NotchDrop."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接、防护、告警、录制和 NotchDrop。"
           }
         }
       }
@@ -2395,6 +2437,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "报警触发时，播放声音是最快的本机警示方式。"
+          }
+        }
+      }
+    },
+    "Protection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Protection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "防护"
           }
         }
       }

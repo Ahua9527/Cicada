@@ -97,7 +97,7 @@ class NotchViewModel: NSObject, ObservableObject {
     func showSettings() {
         notchClose()
         Task { @MainActor in
-            _ = SentryControlCenterRouter.shared.open(.notchDrop)
+            _ = SentryControlCenterRouter.shared.open(.settings)
         }
     }
 

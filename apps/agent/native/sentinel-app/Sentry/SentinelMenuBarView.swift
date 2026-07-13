@@ -10,20 +10,11 @@ struct SentinelMenuBarView: View {
         }
 
         Menu(String(localized: "Settings")) {
-            Button(String(localized: "Relay")) {
-                _ = SentryControlCenterRouter.shared.open(.relay)
+            Button(String(localized: "Overview")) {
+                _ = SentryControlCenterRouter.shared.open(.overview)
             }
-            Button(String(localized: "Alarms")) {
-                _ = SentryControlCenterRouter.shared.open(.alarms)
-            }
-            Button(String(localized: "Notifications")) {
-                _ = SentryControlCenterRouter.shared.open(.notifications)
-            }
-            Button(String(localized: "Recordings")) {
-                _ = SentryControlCenterRouter.shared.open(.recordings)
-            }
-            Button(String(localized: "NotchDrop")) {
-                _ = SentryControlCenterRouter.shared.open(.notchDrop)
+            Button(String(localized: "Settings")) {
+                _ = SentryControlCenterRouter.shared.open(.settings)
             }
             Button(String(localized: "Maintenance")) {
                 _ = SentryControlCenterRouter.shared.open(.maintenance)
