@@ -1,0 +1,98 @@
+classDiagram
+    class AppModel {
+        +@Published sentinels: SentinelsModel
+        +@Published config: ConfigModel
+        +@Published sleepHold: SleepHoldModel
+        +@Published alarm: AlarmModel
+        -pollTask: Task?
+        +startPolling()
+        +stopPolling()
+        +refreshAll() async
+    }
+    class AlarmModel {
+        +@Published isActive: Bool
+        +@Published reason: String
+        +weak delegate: AlarmEngineDelegate?
+        +activate(reason: String)
+        +stop() async
+    }
+    class AlarmEngineDelegate {
+        <<protocol>>
+        +alarmDidStop() async
+    }
+    class Sentry {
+        +@Published isAlraming: Bool
+        +configuration: SentryConfiguration
+        +onAlarmingActivaty: (String)->Void
+        +run()
+        +stop()
+        +unlockAlarm()
+    }
+    class SentinelController {
+        -sentryFactory: (()->Sentry)?
+        +start() SentinelCommandResult
+        +stop() SentinelCommandResult
+        -makeSentry() Sentry
+    }
+    class NotchViewModel {
+        +@Published status: Status
+        +@Published contentType: ContentType
+        +cornerRadius: CGFloat
+        +spacing: CGFloat
+        +notchOpen(reason)
+        +notchClose()
+        +showSettings()
+        +cycleInteractiveContent()
+    }
+    class NotchDropDelegate {
+        <<protocol>>
+        +loadTray(providers)
+        +clearTray()
+        +airDrop(providers)
+        +airDrop(urls)
+        +openTrayPicker()
+        +close()
+        +showSettings()
+        +openGitHub()
+        +openSponsor()
+    }
+    class TrayDrop {
+        +static shared: TrayDrop
+        +items: OrderedSet~DropItem~
+        +load(providers)
+        +removeAll()
+    }
+    class AirDrop {
+        +files: [URL]
+        +begin()
+    }
+    class SentryView {
+        +@StateObject sentry: Sentry
+        +@ObservedObject appModel: AppModel
+    }
+    class AlarmOverlayContent {
+        +reason: String
+        +onStop: ()->Void
+    }
+    class NotchPanel~Delegate~ {
+        +@ObservedObject delegate: Delegate
+        +cornerRadius: CGFloat
+        +spacing: CGFloat
+    }
+    class NotchMenu~Delegate~ {
+        +@ObservedObject delegate: Delegate
+    }
+
+    AppModel *-- AlarmModel
+    AlarmModel ..> AlarmEngineDelegate : weak delegate
+    Sentry ..|> AlarmEngineDelegate : P4 extension
+    SentinelController ..> Sentry : creates via makeSentry()
+    SentinelController ..> AppModel : AppModel.shared.alarm
+    Sentry ..> AppModel : AppModel.shared (makeDefaultWindowController)
+    NotchViewModel ..|> NotchDropDelegate : P4 extension
+    NotchViewModel ..> TrayDrop : TrayDrop.shared
+    NotchViewModel ..> AirDrop : creates
+    SentryView ..> AppModel : @ObservedObject
+    SentryView ..> AlarmOverlayContent : contains
+    NotchPanel~Delegate~ ..> NotchDropDelegate : Delegate constrained to
+    NotchMenu~Delegate~ ..> NotchDropDelegate : Delegate constrained to
