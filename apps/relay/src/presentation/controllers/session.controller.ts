@@ -5,12 +5,18 @@
 
 import type { MiddlewareContext } from '../../types';
 import { SESSION_CONSTANTS } from '../../config/constants';
+import { isValidDeviceId } from '@cicada/shared';
 import {
   copyDurableObjectResponse,
   toDurableObjectRequest,
   toWorkerResponse,
 } from '../../infrastructure/cloudflare/worker-fetch-adapter';
 import { createPublicServerErrorResponse } from '../public-error-response';
+
+/**
+ * M10: relay 边界允许的最大 sessionId 长度，防止超长标识符打满 DO storage。
+ */
+const MAX_SESSION_ID_LENGTH = 256;
 
 /**
  * Session Controller
@@ -64,6 +70,18 @@ export class SessionController {
       );
     }
 
+    // M10: 在转发到 DO 前复用 shared 校验，避免非法 deviceId/sessionId 进入 DO 存储。
+    if (target.length > MAX_SESSION_ID_LENGTH) {
+      return Response.json(
+        {
+          ok: false,
+          error: 'Relay target session id is too long.',
+          code: 'invalid_relay_connection',
+        },
+        { status: 400 }
+      );
+    }
+
     try {
       const sessionId = target;
       const sessionManager = env.CICADA_SESSIONS.get(env.CICADA_SESSIONS.idFromName(sessionId));
@@ -81,6 +99,16 @@ export class SessionController {
             ok: false,
             error: 'Agent relay connection requires x-device-id and x-agent-identity-public-key',
             code: 'missing_agent_identity',
+          },
+          { status: 400 }
+        );
+      }
+      if (!isValidDeviceId(deviceId)) {
+        return Response.json(
+          {
+            ok: false,
+            error: 'Agent relay connection has invalid x-device-id format.',
+            code: 'invalid_agent_identity',
           },
           { status: 400 }
         );

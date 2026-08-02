@@ -13,5 +13,14 @@ export enum ErrorCode {
   PROTOCOL_ERROR = 'protocol_error',
   WEBSOCKET_ERROR = 'websocket_error',
   UNKNOWN_ERROR = 'unknown_error',
+  // Shortcut gateway error codes (DO → shared alignment, M13)
+  INVALID_TOKEN = 'invalid_token',
+  GRANT_REVOKED = 'grant_revoked',
+  GRANT_EXPIRED = 'grant_expired',
+  COMMAND_NOT_ALLOWED = 'command_not_allowed',
+  AGENT_UNAVAILABLE = 'agent_unavailable',
+  COMMAND_TIMEOUT = 'command_timeout',
+  INVALID_SHORTCUT_COMMAND = 'invalid_shortcut_command',
+  DEVICE_UNAVAILABLE = 'device_unavailable',
 }
 

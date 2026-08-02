@@ -150,14 +150,31 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
 
 /**
  * 获取客户端标识符
+ *
+ * H7: 优先使用已校验的 deviceId；其次使用 Cloudflare 可信的
+ * cf-connecting-ip（由 Cloudflare 边缘注入，不可被客户端伪造）；
+ * x-forwarded-for 仅在 cf-connecting-ip 缺失时作为兜底（不可信但仍优于
+ * 'unknown'，可避免同源 IP 共用 unknown 桶）。若都缺失才退化到 'unknown'。
  */
 function getClientIdentifier(context: MiddlewareContext): string {
-  // 优先使用设备ID
+  // 优先使用已校验的设备ID
   if (context.deviceId) {
     return `device:${context.deviceId}`;
   }
 
-  // 使用IP地址
-  const ip = context.headers['x-forwarded-for'] || context.headers['cf-connecting-ip'] || 'unknown';
-  return `ip:${ip}`;
+  // 优先使用 Cloudflare 边缘注入的 cf-connecting-ip
+  const cfIp =
+    context.headers['cf-connecting-ip'] ??
+    (context.request.cf as { clientIp?: string } | undefined)?.clientIp;
+  if (cfIp) {
+    return `ip:${cfIp}`;
+  }
+
+  // 兜底：x-forwarded-for（不可信，但优于 unknown）
+  const forwarded = context.headers['x-forwarded-for'];
+  if (forwarded) {
+    return `ip:${forwarded}`;
+  }
+
+  return 'ip:unknown';
 }

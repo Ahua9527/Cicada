@@ -308,7 +308,6 @@ describe('Middleware', () => {
     });
 
     it.each([
-      [[], 'https://caller.example'],
       [['*'], '*'],
       [['https://caller.example'], 'https://caller.example'],
     ])('adds allowed origin headers for %j', async (allowedOrigins, expectedOrigin) => {
@@ -324,6 +323,19 @@ describe('Middleware', () => {
 
       expect(result).not.toBe(response);
       expect(result.headers.get('Access-Control-Allow-Origin')).toBe(expectedOrigin);
+    });
+
+    it('does not add CORS headers when allowedOrigins is empty (secure default)', async () => {
+      const request = new Request('http://localhost/test', {
+        headers: { Origin: 'https://caller.example' },
+      });
+
+      const result = (await corsMiddleware({ allowedOrigins: [] })(
+        createContext({ request }),
+        async () => new Response('ok')
+      )) as Response;
+
+      expect(result.headers.has('Access-Control-Allow-Origin')).toBe(false);
     });
 
     it('does not add headers for a rejected origin', async () => {

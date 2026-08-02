@@ -5,6 +5,27 @@
 import type { Middleware, MiddlewareResult } from './types';
 import { extractResponse } from './types';
 import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
+import { isValidDeviceId } from '@cicada/shared';
+
+/**
+ * 设备上下文中间件
+ *
+ * H7: 在路由前从 x-device-id 头提取并校验 deviceId 格式，写入
+ * context.deviceId，让速率限制中间件可优先按 deviceId 计量。仅在
+ * /relay/ 路径（WebSocket 升级）上启用，避免公开端点被任意
+ * x-device-id 绕过 IP 维度的限流。完整签名校验仍在 DO 内完成。
+ */
+export function deviceContextMiddleware(): Middleware {
+  return async (context, next) => {
+    if (context.url.pathname.startsWith('/relay/')) {
+      const rawDeviceId = context.request.headers.get('x-device-id');
+      if (rawDeviceId && isValidDeviceId(rawDeviceId)) {
+        context.deviceId = rawDeviceId;
+      }
+    }
+    return next();
+  };
+}
 
 /**
  * 安全头中间件
@@ -37,6 +58,11 @@ export function securityHeadersMiddleware(): Middleware {
 
 /**
  * 请求体大小限制中间件
+ *
+ * M11: 不再仅依赖 content-length 头（可被绕过）。对携带请求体但缺失
+ * content-length 的请求（含 transfer-encoding: chunked），改为流式
+ * 累计字节数，超限即中断并返回 413；未超限则用缓冲重建 request 供下游
+ * 消费。
  */
 export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): Middleware {
   const maxSize = options.maxSize ?? 10 * 1024; // 默认 10KB
@@ -46,9 +72,9 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
     if (context.method === 'POST' || context.method === 'PUT' || context.method === 'PATCH') {
       const contentLength = context.request.headers.get('content-length');
 
-      if (contentLength) {
-        const size = parseInt(contentLength);
-        if (size > maxSize) {
+      if (contentLength !== null) {
+        const size = parseInt(contentLength, 10);
+        if (Number.isFinite(size) && size > maxSize) {
           const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));
           context.logger.warn('Request body too large', {
             requestId: context.requestId,
@@ -76,6 +102,61 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
             ),
           };
         }
+      } else if (context.request.body) {
+        // 缺失 content-length（含 chunked）：流式累计，超限中断
+        const reader = context.request.body.getReader();
+        const chunks: BlobPart[] = [];
+        let total = 0;
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+            if (value) {
+              total += value.byteLength;
+              if (total > maxSize) {
+                await reader.cancel();
+                const sanitizedUrl = new URL(sanitizeRequestUrl(context.url));
+                context.logger.warn('Request body exceeded limit (streamed)', {
+                  requestId: context.requestId,
+                  context: {
+                    size: total,
+                    maxSize,
+                    method: context.method,
+                    path: sanitizedUrl.pathname,
+                  },
+                  tags: ['security', 'request-size'],
+                });
+                return {
+                  continue: false,
+                  response: Response.json(
+                    {
+                      ok: false,
+                      error: '请求体过大',
+                      details: {
+                        maxSize,
+                        receivedSize: total,
+                      },
+                    },
+                    { status: 413 }
+                  ),
+                };
+              }
+              chunks.push(value as unknown as BlobPart);
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+
+        // 用缓冲重建 request，下游可再次读取 body
+        const rebuiltBody = new Blob(chunks);
+        context.request = new Request(context.request.url, {
+          method: context.request.method,
+          headers: context.request.headers,
+          body: rebuiltBody,
+        });
       }
     }
 

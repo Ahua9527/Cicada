@@ -8,6 +8,23 @@ export function generateRandomString(length: number): string {
   return result;
 }
 
+/**
+ * 恒定时间字符串比较（防时序侧信道，M9）
+ *
+ * 逐字符异或并 OR 累积，最终结果为 0 才相等。长度差异会提前返回，
+ * 因为 tokenHash 等摘要的长度本身不是敏感信息。
+ */
+export function constantTimeStringEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 // 生成设备ID（使用加密安全的随机数）
 export function generateDeviceId(): string {
   try {

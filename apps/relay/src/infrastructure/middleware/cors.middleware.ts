@@ -71,6 +71,9 @@ export function corsMiddleware(options: CorsOptions = {}): Middleware {
 
 /**
  * 获取CORS响应头
+ *
+ * M12: allowedOrigins 为空时默认拒绝（不返回 CORS 头），只有显式配置
+ * allowedOrigins（含 '*'）才放行。这是更安全的默认值。
  */
 function getCorsHeaders(
   origin: string,
@@ -81,12 +84,12 @@ function getCorsHeaders(
 ): Record<string, string> {
   const headers: Record<string, string> = {};
 
+  if (allowedOrigins.length === 0) {
+    return headers;
+  }
+
   // 检查是否允许该源
-  if (
-    allowedOrigins.length === 0 ||
-    allowedOrigins.includes('*') ||
-    allowedOrigins.includes(origin)
-  ) {
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = allowedOrigins.includes('*') ? '*' : origin;
     headers['Access-Control-Allow-Methods'] = allowedMethods.join(', ');
     headers['Access-Control-Allow-Headers'] = allowedHeaders.join(', ');
