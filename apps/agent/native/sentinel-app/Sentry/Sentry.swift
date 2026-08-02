@@ -9,6 +9,7 @@ import AppKit
 import AVFAudio
 import AVFoundation
 import AVKit
+import CicadaUI
 import Foundation
 import SkyLightWindow
 import SwiftUI
@@ -213,20 +214,22 @@ final class Sentry: NSObject, ObservableObject {
     }
 
     private func makeBarkRequest(message: String) -> URLRequest? {
-        guard let initialURL = URL(string: configuration.sentryNotificationConfigBark.endpoint) else {
+        guard var comps = URLComponents(string: configuration.sentryNotificationConfigBark.endpoint) else {
             return nil
         }
-        let newURL = initialURL
-            .appendingPathComponent(String(localized: "Cicada - Mac"))
-            .appendingPathComponent(message)
-        guard var comps = URLComponents(url: newURL, resolvingAgainstBaseURL: false) else { return nil }
+        // 路径段需 percent-encoding，避免 message 含 `/` `?` `#` 空格 中文时 URL 畸形。
+        let brand = String(localized: "Cicada - Mac")
+        let brandSegment = brand.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? brand
+        let messageSegment = message.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? message
+        comps.path = comps.path
+            + (comps.path.hasSuffix("/") ? "" : "/")
+            + brandSegment + "/" + messageSegment
         comps.queryItems = [
             .init(name: "level", value: "critical"),
             .init(name: "volume", value: "5"),
             .init(name: "group", value: String(localized: "Cicada - Mac")),
             .init(name: "isArchive", value: "1"),
             .init(name: "call", value: "1"),
-            .init(name: "icon", value: "https://github.com/Lakr233/Sentry/blob/main/Sentry/Assets.xcassets/icon-512.imageset/icon-512@2x.png?raw=true"),
         ]
         guard let url = comps.url else { return nil }
         var request = URLRequest(url: url)
@@ -385,9 +388,12 @@ final class Sentry: NSObject, ObservableObject {
     }
 
     nonisolated private static func makeDefaultWindowController(for sentry: Sentry) -> NSWindowController? {
-        SkyLightOperator.shared.delegateView(
-            AnyView(SentryView(sentry: sentry)),
-            toScreen: .main!
+        guard let screen = NSScreen.main else { return nil }
+        return SkyLightOperator.shared.delegateView(
+            // ⭐ P4：传入 AppModel.shared，警戒窗口在 SwiftUI Scene 之外，
+            // @EnvironmentObject 不可达，故通过参数直传。
+            AnyView(SentryView(sentry: sentry, appModel: AppModel.shared)),
+            toScreen: screen
         )
     }
 

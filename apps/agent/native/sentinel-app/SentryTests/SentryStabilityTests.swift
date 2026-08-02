@@ -1,4 +1,7 @@
 import AppKit
+import CicadaCore
+import CicadaUI
+import Combine
 import Darwin
 import XCTest
 @testable import Sentry
@@ -203,13 +206,15 @@ final class SentryStabilityTests: XCTestCase {
     }
 
     @MainActor
-    func testSleepHoldThrottlesRequestsAndIgnoresLateConnect() async {
+    func testSleepHoldThrottlesRequestsAndIgnoresLateConnect() async throws {
         let client = MockSleepHoldServiceClient()
         var now = Date()
+        let (configModel, cleanup) = try makeIsolatedConfigModel()
+        defer { cleanup() }
         let manager = SentryConfigurationManager(
             sleepHoldClient: client,
             now: { now },
-            persistEngine: MemoryPersistProvider()
+            configModel: configModel
         )
 
         manager.communicateWithSleepHoldServiceIfNeeded()
@@ -238,6 +243,23 @@ final class SentryStabilityTests: XCTestCase {
         manager.communicateWithSleepHoldServiceIfNeeded()
         manager.communicateWithSleepHoldServiceIfNeeded()
         XCTAssertEqual(client.extendCallCount, 1)
+    }
+
+    @MainActor
+    func testConfigurationManagerForwardsAppConfigAndChanges() throws {
+        let (configModel, cleanup) = try makeIsolatedConfigModel()
+        defer { cleanup() }
+        let manager = SentryConfigurationManager(configModel: configModel)
+
+        manager.cfg.sentryTriggersLidEnabled = true
+        XCTAssertTrue(configModel.sentry.sentryTriggersLidEnabled)
+
+        var changeCount = 0
+        let cancellable = manager.objectWillChange.sink { changeCount += 1 }
+        configModel.sentry.sentryAlarmsSoundsEnabled = true
+        XCTAssertTrue(manager.cfg.sentryAlarmsSoundsEnabled)
+        XCTAssertGreaterThan(changeCount, 0)
+        withExtendedLifetime(cancellable) {}
     }
 
     @MainActor
@@ -461,6 +483,69 @@ final class SentryStabilityTests: XCTestCase {
     }
 
     @MainActor
+    func testAlarmStopButtonStopsControllerAndClearsNextSessionReason() async {
+        let controller = SentinelController.shared
+        controller.resetForTesting()
+        defer { controller.resetForTesting() }
+        controller.configureForTesting(
+            isMacLocked: { true },
+            makeSentry: {
+                Sentry(
+                    configuration: .init(),
+                    onAlarmingActivaty: { _ in },
+                    shouldStartRuntimeLoop: false,
+                    makeWindowController: { _ in nil },
+                    readSystemVolume: { 0.5 },
+                    setSystemVolume: { _ in }
+                )
+            }
+        )
+
+        XCTAssertTrue(controller.start().ok)
+        AppModel.shared.alarm.activate(reason: "电源断开")
+        await AppModel.shared.alarm.stop()
+
+        XCTAssertNil(controller.sentry)
+        XCTAssertEqual(controller.viewModel.status, .completed)
+        XCTAssertFalse(AppModel.shared.alarm.isActive)
+        XCTAssertEqual(AppModel.shared.alarm.reason, "")
+
+        XCTAssertTrue(controller.start().ok)
+        XCTAssertFalse(AppModel.shared.alarm.isActive)
+        XCTAssertEqual(AppModel.shared.alarm.reason, "")
+    }
+
+    @MainActor
+    func testUnlockAlarmClearsAlarmStateAndContinuesMonitoring() {
+        let controller = SentinelController.shared
+        controller.resetForTesting()
+        defer { controller.resetForTesting() }
+        controller.configureForTesting(
+            isMacLocked: { true },
+            makeSentry: {
+                Sentry(
+                    configuration: .init(),
+                    onAlarmingActivaty: { _ in },
+                    shouldStartRuntimeLoop: false,
+                    makeWindowController: { _ in nil },
+                    readSystemVolume: { 0.5 },
+                    setSystemVolume: { _ in }
+                )
+            }
+        )
+
+        XCTAssertTrue(controller.start().ok)
+        controller.viewModel.status = .activityDetected
+        AppModel.shared.alarm.activate(reason: "网络断开")
+
+        XCTAssertTrue(controller.unlockAlarm().ok)
+        XCTAssertEqual(controller.viewModel.status, .running)
+        XCTAssertNotNil(controller.sentry)
+        XCTAssertFalse(AppModel.shared.alarm.isActive)
+        XCTAssertEqual(AppModel.shared.alarm.reason, "")
+    }
+
+    @MainActor
     func testCompletedSentinelSessionStartsNextLockWhilePreviousStopIsFinishing() {
         let controller = SentinelController.shared
         let viewModel = ViewModel.shared
@@ -531,9 +616,12 @@ final class SentryStabilityTests: XCTestCase {
         XCTAssertEqual(startCount, 1)
 
         viewModel.status = .activityDetected
+        AppModel.shared.alarm.activate(reason: "旧告警")
         isLocked = false
         controller.handleTimerTick()
         XCTAssertEqual(viewModel.status, .completed)
+        XCTAssertFalse(AppModel.shared.alarm.isActive)
+        XCTAssertEqual(AppModel.shared.alarm.reason, "")
 
         controller.handleTimerTick()
         XCTAssertEqual(viewModel.status, .welcome)
@@ -853,6 +941,24 @@ final class SentryStabilityTests: XCTestCase {
         XCTAssertTrue(extended)
         XCTAssertEqual(server.recordedActions(), ["power_assertion_start", "power_assertion_start"])
     }
+}
+
+@MainActor
+private func makeIsolatedConfigModel() throws -> (ConfigModel, () -> Void) {
+    let directory = try temporaryTestDirectory()
+    let suiteName = "com.cicada.sentry-tests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    let model = ConfigModel(
+        store: ConfigStore(path: directory.appendingPathComponent("config.json").path),
+        sentryStore: SentryConfigStore(
+            path: directory.appendingPathComponent("sentry-config.json").path,
+            legacyDefaults: defaults
+        )
+    )
+    return (model, {
+        defaults.removePersistentDomain(forName: suiteName)
+        try? FileManager.default.removeItem(at: directory)
+    })
 }
 
 private func temporaryTestDirectory() throws -> URL {

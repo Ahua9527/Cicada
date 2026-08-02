@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import CicadaUI
 import CoreAudio
 import Foundation
 import IOKit
@@ -41,6 +42,11 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
         startupDiagnostics = PendingStartupDiagnostics.consume()
+        // ⭐ P4 新增：启动 AppModel 3s 轮询（sentinels / sleepHold）
+        AppModel.shared.startPolling()
+        // ⭐ P4.2 迁移：1s 状态机驱动接线，从旧 ContentView.onAppear 迁到 AppDelegate，
+        // 一次性接线、全程生效（与 3s 轮询是两条独立链路：1s 驱动 lock 状态机，3s 拉 IPC 快照）。
+        ViewModel.shared.setTimerCallback { SentinelController.shared.handleTimerTick() }
         guard !isRunningTests else { return }
         NotchDropCoordinator.shared.start(openInitialWindow: !LaunchAtLogin.wasLaunchedAtLogin)
         SentinelIPCServer.shared.start()
@@ -49,6 +55,8 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // ⭐ P4 新增：停止 AppModel 轮询
+        AppModel.shared.stopPolling()
         SentinelNotifierServer.shared.stop()
         SentinelIPCServer.shared.stop()
         NotchDropCoordinator.shared.stop()

@@ -66,9 +66,25 @@ final class SentinelNotifierServer {
 
     private let socketPath: String
     private let queue = DispatchQueue(label: "com.cicada.sentinel.notifier", qos: .userInitiated)
-    private var fd: Int32 = -1
-    private var running = false
+    // fd/running 跨线程访问（start/stop 主线程，acceptLoop 专用 queue）需加锁保护，
+    // 否则在 Swift 内存模型下存在数据竞争。
+    private let stateLock = NSLock()
+    private var _fd: Int32 = -1
+    private var _running = false
+    // 用于 stop() 等待 acceptLoop 退出（join），避免 stop 后立即析构导致 use-after-free。
+    private let acceptExited = DispatchSemaphore(value: 0)
+    private var acceptLoopDidStart = false
     private let handlerProvider: @MainActor () -> SentinelNotifierRequestHandler
+
+    private var fd: Int32 {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _fd }
+        set { stateLock.lock(); defer { stateLock.unlock() }; _fd = newValue }
+    }
+
+    private var running: Bool {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _running }
+        set { stateLock.lock(); defer { stateLock.unlock() }; _running = newValue }
+    }
 
     init(
         socketPath: String = CicadaSentinelPaths.notifierSocketPath(),
@@ -81,7 +97,9 @@ final class SentinelNotifierServer {
     }
 
     func start() {
-        guard !running else { return }
+        stateLock.lock()
+        if _running { stateLock.unlock(); return }
+        stateLock.unlock()
 
         do {
             try FileManager.default.createDirectory(
@@ -108,10 +126,14 @@ final class SentinelNotifierServer {
             }
 
             _ = chmod(socketPath, 0o600)
-            fd = socketFd
-            running = true
+            stateLock.lock()
+            _fd = socketFd
+            _running = true
+            acceptLoopDidStart = true
+            stateLock.unlock()
             queue.async { [weak self] in
                 self?.acceptLoop()
+                self?.acceptExited.signal()
             }
         } catch {
             print("[*] failed to start sentinel notifier server: \(error)")
@@ -119,18 +141,32 @@ final class SentinelNotifierServer {
     }
 
     func stop() {
-        running = false
-        if fd >= 0 {
-            close(fd)
-            fd = -1
+        stateLock.lock()
+        let wasRunning = _running
+        let fdToShutdown = _fd
+        _running = false
+        _fd = -1
+        let didStartLoop = acceptLoopDidStart
+        acceptLoopDidStart = false
+        stateLock.unlock()
+
+        if fdToShutdown >= 0 {
+            _ = shutdown(fdToShutdown, SHUT_RDWR)
+            close(fdToShutdown)
         }
         _ = unlink(socketPath)
+
+        // join：等待 acceptLoop 退出（最长 1s，防止异常情况下死锁）。
+        if didStartLoop && wasRunning {
+            _ = acceptExited.wait(timeout: .now() + 1)
+        }
     }
 
     private func acceptLoop() {
         while running {
             let clientFd = accept(fd, nil, nil)
             if clientFd < 0 {
+                if !running { break }
                 continue
             }
             handleClient(clientFd)

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CicadaSwift",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "CicadaCore", targets: ["CicadaCore"]),
         .library(name: "CicadaIPC", targets: ["CicadaIPC"]),
@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "CicadaSleepHoldCore", targets: ["CicadaSleepHoldCore"]),
         .library(name: "CicadaRelayClient", targets: ["CicadaRelayClient"]),
         .library(name: "CicadaCLI", targets: ["CicadaCLI"]),
+        .library(name: "CicadaUI", targets: ["CicadaUI"]),
         .executable(name: "cicada", targets: ["CicadaCLIApp"]),
         .executable(name: "cicada-agent", targets: ["CicadaDaemonApp"]),
         .executable(name: "cicada-sleephold", targets: ["CicadaSleepHoldServiceApp"]),
@@ -32,6 +33,11 @@ let package = Package(
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaBluetoothBridge", "CicadaSleepHoldCore"]
         ),
         .target(name: "CicadaRelayClient", dependencies: ["CicadaCore", "CicadaIPC", "CicadaSystem"]),
+        .target(
+            name: "CicadaUI",
+            dependencies: ["CicadaCore", "CicadaIPC", "CicadaSleepHoldCore", "CicadaSystem"],
+            resources: [.process("Resources/Assets.xcassets")]
+        ),
         .target(
             name: "CicadaCLI",
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaSystem", "CicadaRelayClient", "CicadaSleepHoldCore"]
@@ -72,5 +78,9 @@ let package = Package(
             dependencies: ["CicadaCLI", "CicadaCore", "CicadaIPC", "CicadaSystem", "CicadaSleepHoldCore"]
         ),
         .testTarget(name: "CicadaRelayClientTests", dependencies: ["CicadaRelayClient", "CicadaCore"]),
+        .testTarget(
+            name: "CicadaUITests",
+            dependencies: ["CicadaUI", "CicadaCore", "CicadaIPC", "CicadaSleepHoldCore"]
+        ),
     ]
 )

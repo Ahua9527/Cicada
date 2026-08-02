@@ -5,41 +5,45 @@
 //  Created by 秋星桥 on 5/24/25.
 //
 
+import CicadaUI
 import SwiftUI
 
-struct App: SwiftUI.App {
+struct CicadaApp: SwiftUI.App {
     @NSApplicationDelegateAdaptor var appDelegate: AppDelegate
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            ContentView()
+            ControlCenterRoot()
                 .environmentObject(appDelegate)
+                .environmentObject(AppModel.shared)
+                .environmentObject(ControlCenterRouter.shared)
+                .hostMaintenanceInjections(appDelegate: appDelegate)
         }
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .appSettings) {
                 Button(String(localized: "Control Center...")) {
-                    _ = SentryControlCenterRouter.shared.open(.overview)
+                    _ = ControlCenterRouter.shared.open(.overview)
                 }
                 .keyboardShortcut(",", modifiers: [.command])
             }
             CommandMenu(String(localized: "Cicada")) {
                 Button(String(localized: "Open Control Center")) {
-                    _ = SentryControlCenterRouter.shared.open(.overview)
+                    _ = ControlCenterRouter.shared.open(.overview)
                 }
 
                 Divider()
 
                 Button(String(localized: "Overview")) {
-                    _ = SentryControlCenterRouter.shared.open(.overview)
+                    _ = ControlCenterRouter.shared.open(.overview)
                 }
 
                 Button(String(localized: "Settings")) {
-                    _ = SentryControlCenterRouter.shared.open(.settings)
+                    _ = ControlCenterRouter.shared.open(.settings)
                 }
 
                 Button(String(localized: "Maintenance")) {
-                    _ = SentryControlCenterRouter.shared.open(.maintenance)
+                    _ = ControlCenterRouter.shared.open(.maintenance)
                 }
             }
         }
@@ -47,8 +51,9 @@ struct App: SwiftUI.App {
         .windowResizability(.contentMinSize)
 
         MenuBarExtra {
-            SentinelMenuBarView()
-                .environmentObject(appDelegate)
+            MenuBarDropdown(onQuit: { NSApp.terminate(nil) })
+                .environmentObject(AppModel.shared)
+                .environmentObject(ControlCenterRouter.shared)
         } label: {
             ZStack {
                 Image(systemName: "eye")

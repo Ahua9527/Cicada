@@ -22,7 +22,7 @@ Picture this: you're vibing and coding in a coffee shop when nature calls. You h
 
 ## System Requirements
 
-- macOS 13.0+
+- macOS 14.0+
 - Camera access permission for video recording
 
 ## Installation

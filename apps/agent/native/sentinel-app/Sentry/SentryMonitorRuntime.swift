@@ -1,3 +1,4 @@
+import CicadaUI
 import Foundation
 
 struct SentryDeviceSnapshot: Equatable {

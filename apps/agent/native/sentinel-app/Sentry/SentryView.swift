@@ -3,84 +3,53 @@
 //  Sentry
 //
 //  Created by 秋星桥 on 5/24/25.
+//  P4 重构：用 CicadaUI 的 AlarmOverlayContent 组合，替换旧 texts/eye。
 //
 
+import CicadaUI
 import ColorfulX
 import SwiftUI
 
 struct SentryView: View {
     @StateObject var sentry: Sentry
+    // P4：警戒窗口由 SkyLightOperator 创建在 SwiftUI Scene 之外，@EnvironmentObject 不可达，
+    // 故通过参数直传 AppModel.shared（由 Sentry.makeDefaultWindowController 注入）。
+    @ObservedObject var appModel: AppModel
 
-    @State var globalOpacity: Double = 0
-    @State var showEye = false
+    @State private var globalOpacity: Double = 0
 
     var body: some View {
-        HStack {
-            texts
-            Spacer()
-            Divider().hidden()
-            eye
+        ZStack {
+            if sentry.isAlrming {
+                ColorfulView(color: .sunset, noise: .constant(64))
+                    .transition(.opacity)
+                    .ignoresSafeArea()
+                Rectangle().fill(.ultraThinMaterial).opacity(0.5)
+            }
+            AlarmOverlayContent(reason: appModel.alarm.reason) {
+                // 停止链路：AlarmModel.stop() → controller.stop() → finishCurrentSession()。
+                Task { await appModel.alarm.stop() }
+            }
         }
         .frame(width: 700, height: 400, alignment: .center)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                globalOpacity = 1
-                showEye = true
-            }
-        }
         .foregroundStyle(sentry.isAlrming ? .white : .primary)
-        .background(
-            ZStack {
-                if sentry.isAlrming {
-                    ColorfulView(color: .sunset, noise: .constant(64))
-                        .transition(.opacity)
-                        .ignoresSafeArea()
-                }
-            }
-        )
         .animation(.interactiveSpring(), value: sentry.isAlrming)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 32))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .opacity(globalOpacity)
         .animation(.easeInOut(duration: 1), value: globalOpacity)
-    }
-
-    var texts: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "eye.fill")
-                .bold()
-                .font(.largeTitle)
-                .opacity(0.2)
-            Spacer()
-            Text(String(localized: "Cicada Activated"))
-                .bold()
-                .font(.largeTitle)
-            Text(String(localized: "This Mac is connected to the internet and is monitoring your behavior."))
-                .bold()
-        }
-        .padding(32)
-    }
-
-    var eye: some View {
-        ZStack {
-            Rectangle()
-                .foregroundStyle(.black.opacity(0.5))
-                .frame(width: 10, height: 888)
-            if showEye {
-                EyeView()
-                    .transition(.opacity)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                globalOpacity = 1
             }
         }
-        .animation(.spring(duration: 2), value: showEye)
-        .frame(width: 200)
-        .padding(32)
     }
 }
 
 #Preview {
     let s = Sentry(configuration: .init(), onAlarmingActivaty: { _ in })
-    return SentryView(sentry: s)
+    SentryView(sentry: s, appModel: AppModel())
         .onAppear { s.isAlrming = true }
         .frame(width: 700, height: 400)
 }

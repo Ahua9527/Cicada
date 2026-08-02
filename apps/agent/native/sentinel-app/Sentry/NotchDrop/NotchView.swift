@@ -49,7 +49,12 @@ struct NotchView: View {
             Group {
                 if vm.status == .opened {
                     VStack(spacing: vm.spacing) {
-                        NotchHeaderView(vm: vm)
+                        // P4：标题行由 CicadaUI NotchPanel.notchHeader 提供（.normal），
+                        // NotchMenu 无标题（.menu）。.notification 的 NotchDropNotificationView
+                        // 只显示 payload 标题、无 app 名标题行，故通知态保留宿主 NotchHeaderView。
+                        if vm.contentType == .notification {
+                            NotchHeaderView(vm: vm)
+                        }
                         NotchContentView(vm: vm)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }

@@ -1,4 +1,5 @@
 import Cocoa
+import CicadaUI
 import Combine
 import Foundation
 import SwiftUI
@@ -97,7 +98,7 @@ class NotchViewModel: NSObject, ObservableObject {
     func showSettings() {
         notchClose()
         Task { @MainActor in
-            _ = SentryControlCenterRouter.shared.open(.settings)
+            _ = ControlCenterRouter.shared.open(.settings)
         }
     }
 

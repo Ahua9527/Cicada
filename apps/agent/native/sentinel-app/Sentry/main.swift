@@ -51,4 +51,4 @@ case let .block(message):
 let documentDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
 let videoClipDir = documentDir.appendingPathComponent("VideoClip")
 
-App.main()
+CicadaApp.main()

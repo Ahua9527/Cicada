@@ -23,6 +23,7 @@ enum Security {
 
     private static func secCall<T>(_ exec: (_ input: UnsafeMutablePointer<T?>) -> (OSStatus)) throws -> T {
         let pointer = UnsafeMutablePointer<T?>.allocate(capacity: 1)
+        defer { pointer.deallocate() }
         let err = exec(pointer)
         guard err == errSecSuccess else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(err))
@@ -52,12 +53,9 @@ enum Security {
             do {
                 typealias ptrace = @convention(c) (_ request: Int, _ pid: Int, _ addr: Int, _ data: Int) -> AnyObject
                 let open = dlopen("/usr/lib/system/libsystem_kernel.dylib", RTLD_NOW)
-                if unsafeBitCast(open, to: Int.self) > 0x1024 {
-                    let result = dlsym(open, "ptrace")
-                    if let result {
-                        let target = unsafeBitCast(result, to: ptrace.self)
-                        _ = target(0x1F, 0, 0, 0)
-                    }
+                if let open, let result = dlsym(open, "ptrace") {
+                    let target = unsafeBitCast(result, to: ptrace.self)
+                    _ = target(0x1F, 0, 0, 0)
                 }
             }
         #endif
