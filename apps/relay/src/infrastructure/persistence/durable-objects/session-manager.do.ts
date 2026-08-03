@@ -210,7 +210,8 @@ export class SessionManagerDO {
     this.cleanupTimer = setInterval(() => {
       this.cleanupInactiveSessions();
     }, this.options.cleanupInterval);
-    // L1: Cloudflare Workers 运行时无 unref，移除无效调用。
+    // Cloudflare Workers 无 unref，Node 测试运行时需要它让事件循环退出；可选调用兼容两者。
+    (this.cleanupTimer as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -244,7 +245,8 @@ export class SessionManagerDO {
       this.agentAbsentSince = null;
       this.state.waitUntil(this.syncRelayRegistryAgentOffline(deviceId, sessionId));
     }, this.options.agentAbsenceGraceMs);
-    // L1: Cloudflare Workers 运行时无 unref，移除无效调用。
+    // 同上：可选调用 unref，避免 Node 测试进程被挂起。
+    (this.agentAbsenceTimer as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -1055,7 +1057,8 @@ export class SessionManagerDO {
           )
         );
       }, this.options.shortcutCommandTimeoutMs);
-      // L1: Cloudflare Workers 运行时无 unref，移除无效调用。
+      // 同上：可选调用 unref，避免 Node 测试进程被挂起。
+      (timer as { unref?: () => void }).unref?.();
       this.pendingShortcutCommands.set(dispatchId, {
         resolve,
         timer,
