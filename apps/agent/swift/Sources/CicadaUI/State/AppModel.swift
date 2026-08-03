@@ -32,7 +32,7 @@ public final class AppModel: ObservableObject {
         )
     }
 
-    init(
+    public init(
         sentinelClient: UdsSentinelControlClient,
         sleepHoldClient: SleepHoldControlClient,
         configStore: ConfigStore,
