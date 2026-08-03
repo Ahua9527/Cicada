@@ -5,14 +5,14 @@ struct AlertsCard: View {
     @ObservedObject var model: ConfigModel
 
     var body: some View {
-        Card(title: "告警") {
+        Card(title: String(localized: "告警", bundle: .module)) {
             VStack(alignment: .leading, spacing: 0) {
-                SettingRow(title: "告警声音", desc: "警戒触发时播放提示音") {
+                SettingRow(title: String(localized: "告警声音", bundle: .module), desc: String(localized: "警戒触发时播放提示音", bundle: .module)) {
                     Toggle("", isOn: $model.sentry.sentryAlarmsSoundsEnabled)
                         .labelsHidden()
                         .tint(.cicadaAccent)
                 }
-                SettingRow(title: "Bark 推送", desc: "通过 Bark 服务推送警戒通知") {
+                SettingRow(title: String(localized: "Bark 推送", bundle: .module), desc: String(localized: "通过 Bark 服务推送警戒通知", bundle: .module)) {
                     Toggle("", isOn: barkEnabledBinding)
                         .labelsHidden()
                         .tint(.cicadaAccent)
@@ -20,7 +20,7 @@ struct AlertsCard: View {
                 CicadaTextField(
                     title: "Bark Endpoint",
                     text: $model.sentry.sentryNotificationConfigBark.endpoint,
-                    hint: "输入 Bark 服务端地址，例如 https://api.day.app/xxx"
+                    hint: String(localized: "输入 Bark 服务端地址，例如 https://api.day.app/xxx", bundle: .module)
                 )
                 .padding(.top, DesignMetrics.Spacing.s3)
             }

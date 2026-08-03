@@ -16,7 +16,7 @@ struct ReadinessCard: View {
                 .frame(width: DesignMetrics.progressRingSize, height: DesignMetrics.progressRingSize)
 
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s3) {
-                Text("就绪度")
+                Text(String(localized: "就绪度", bundle: .module))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.cicadaTextSecondary)
 

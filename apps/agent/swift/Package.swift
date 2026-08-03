@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CicadaSwift",
+    defaultLocalization: "zh-Hans",
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "CicadaCore", targets: ["CicadaCore"]),
@@ -36,7 +37,7 @@ let package = Package(
         .target(
             name: "CicadaUI",
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaSleepHoldCore", "CicadaSystem"],
-            resources: [.process("Resources/Assets.xcassets")]
+            resources: [.process("Resources")]
         ),
         .target(
             name: "CicadaCLI",

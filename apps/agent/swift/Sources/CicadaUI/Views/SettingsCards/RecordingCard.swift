@@ -14,9 +14,9 @@ struct RecordingCard: View {
     @State private var authStatus: CameraAuthorizationStatus = .authorized
 
     var body: some View {
-        Card(title: "录像") {
+        Card(title: String(localized: "录像", bundle: .module)) {
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s4) {
-                SettingRow(title: "启用录像", desc: "警戒触发时录制摄像头画面") {
+                SettingRow(title: String(localized: "启用录像", bundle: .module), desc: String(localized: "警戒触发时录制摄像头画面", bundle: .module)) {
                     Toggle("", isOn: recordingEnabledBinding)
                         .labelsHidden()
                         .tint(.cicadaAccent)
@@ -45,11 +45,11 @@ struct RecordingCard: View {
         switch authStatus {
         case .notDetermined:
             CameraPreviewPlaceholder(
-                title: "需要相机权限",
-                subtitle: "授权后警戒触发时才能录制画面"
+                title: String(localized: "需要相机权限", bundle: .module),
+                subtitle: String(localized: "授权后警戒触发时才能录制画面", bundle: .module)
             ) {
                 if requestCameraPermission != nil {
-                    Button("请求相机权限") { requestPermission() }
+                    Button(String(localized: "请求相机权限", bundle: .module)) { requestPermission() }
                         .buttonStyle(.borderedProminent)
                         .tint(.cicadaAccent)
                 }
@@ -59,8 +59,8 @@ struct RecordingCard: View {
         case .authorized:
             // 实时预览是既定观察点（见 overview-P4.2 已知限制），授权后先给中性占位。
             CameraPreviewPlaceholder(
-                title: "相机已授权",
-                subtitle: "警戒触发时将自动录制画面"
+                title: String(localized: "相机已授权", bundle: .module),
+                subtitle: String(localized: "警戒触发时将自动录制画面", bundle: .module)
             )
         }
     }

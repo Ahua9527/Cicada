@@ -16,12 +16,12 @@ private struct FolderActionsKey: EnvironmentKey {
     /// 默认 6 个占位按钮，闭包全空，保持 CicadaUI 不依赖 AppKit。
     /// 标签与图标与设计稿一致；宿主注入时替换为真实 `NSWorkspace` 行为。
     static let defaultValue: [FolderAction] = [
-        FolderAction(systemImage: "folder", label: "打开 ~/.cicada", isDanger: false, action: {}),
-        FolderAction(systemImage: "doc.text", label: "打开日志", isDanger: false, action: {}),
-        FolderAction(systemImage: "gearshape", label: "打开配置", isDanger: false, action: {}),
-        FolderAction(systemImage: "arrow.triangle.2.circlepath", label: "重启服务", isDanger: false, action: {}),
-        FolderAction(systemImage: "trash", label: "清空缓存", isDanger: false, action: {}),
-        FolderAction(systemImage: "exclamationmark.triangle", label: "重置配置", isDanger: true, action: {}),
+        FolderAction(systemImage: "folder", label: String(localized: "打开 ~/.cicada", bundle: .module), isDanger: false, action: {}),
+        FolderAction(systemImage: "doc.text", label: String(localized: "打开日志", bundle: .module), isDanger: false, action: {}),
+        FolderAction(systemImage: "gearshape", label: String(localized: "打开配置", bundle: .module), isDanger: false, action: {}),
+        FolderAction(systemImage: "arrow.triangle.2.circlepath", label: String(localized: "重启服务", bundle: .module), isDanger: false, action: {}),
+        FolderAction(systemImage: "trash", label: String(localized: "清空缓存", bundle: .module), isDanger: false, action: {}),
+        FolderAction(systemImage: "exclamationmark.triangle", label: String(localized: "重置配置", bundle: .module), isDanger: true, action: {}),
     ]
 }
 

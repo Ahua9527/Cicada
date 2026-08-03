@@ -4,28 +4,28 @@ import SwiftUI
 struct HelpSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s4) {
-            Text("Cicada 是一款 macOS 安全防护工具，通过监控合盖、断网、断电等触发器，在异常发生时启动警戒并推送通知。")
+            Text(String(localized: "Cicada 是一款 macOS 安全防护工具，通过监控合盖、断网、断电等触发器，在异常发生时启动警戒并推送通知。", bundle: .module))
                 .font(.subheadline)
                 .foregroundStyle(.cicadaTextSecondary)
 
             Divider()
 
-            HelpSection(title: "可用触发器", icon: "bolt.fill") {
+            HelpSection(title: String(localized: "可用触发器", bundle: .module), icon: "bolt.fill") {
                 HelpNumberedList(items: [
-                    "合上 Mac 盖子",
-                    "断开网络连接",
-                    "断开电源适配器",
+                    String(localized: "合上 Mac 盖子", bundle: .module),
+                    String(localized: "断开网络连接", bundle: .module),
+                    String(localized: "断开电源适配器", bundle: .module),
                 ])
             }
 
             Divider()
 
-            HelpSection(title: "注意事项", icon: "exclamationmark.triangle.fill") {
+            HelpSection(title: String(localized: "注意事项", bundle: .module), icon: "exclamationmark.triangle.fill") {
                 HelpBulletList(items: [
-                    "至少启用一个触发器和一个通知方式才能激活警戒。",
-                    "合盖触发需要屏幕处于休眠状态才会响应。",
-                    "录像功能需要授予摄像头访问权限。",
-                    "Bark 推送需要正确配置 Endpoint 地址。",
+                    String(localized: "至少启用一个触发器和一个通知方式才能激活警戒。", bundle: .module),
+                    String(localized: "合盖触发需要屏幕处于休眠状态才会响应。", bundle: .module),
+                    String(localized: "录像功能需要授予摄像头访问权限。", bundle: .module),
+                    String(localized: "Bark 推送需要正确配置 Endpoint 地址。", bundle: .module),
                 ])
             }
         }

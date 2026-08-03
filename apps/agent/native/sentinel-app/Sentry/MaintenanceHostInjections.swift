@@ -38,28 +38,28 @@ enum MaintenanceHostInjections {
     /// 另 3 个直接调 `NSWorkspace`（非 @MainActor 隔离）的闭包无需此处理。
     static func makeFolderActions() -> [FolderAction] {
         [
-            FolderAction(systemImage: "film", label: "打开录像文件夹", isDanger: false) {
+            FolderAction(systemImage: "film", label: String(localized: "Open Recording Folder"), isDanger: false) {
                 Task { @MainActor in
                     SentinelController.shared.openSavedClips()
                 }
             },
-            FolderAction(systemImage: "tray", label: "打开 NotchDrop 文件夹", isDanger: false) {
+            FolderAction(systemImage: "tray", label: String(localized: "Open NotchDrop Folder"), isDanger: false) {
                 Task { @MainActor in
                     SentinelController.shared.openNotchDropFolder()
                 }
             },
-            FolderAction(systemImage: "trash", label: "清空 NotchDrop 托盘", isDanger: true) {
+            FolderAction(systemImage: "trash", label: String(localized: "Clear NotchDrop Tray"), isDanger: true) {
                 Task { @MainActor in
                     SentinelController.shared.clearNotchDropTray()
                 }
             },
-            FolderAction(systemImage: "folder", label: "打开 ~/.cicada", isDanger: false) {
+            FolderAction(systemImage: "folder", label: String(localized: "Open ~/.cicada"), isDanger: false) {
                 openDirectory(cicadaHomeURL())
             },
-            FolderAction(systemImage: "gearshape", label: "打开配置", isDanger: false) {
+            FolderAction(systemImage: "gearshape", label: String(localized: "Open Config"), isDanger: false) {
                 revealInFinder(URL(fileURLWithPath: CicadaSentinelPaths.configPath()))
             },
-            FolderAction(systemImage: "externaldrive", label: "打开数据目录", isDanger: false) {
+            FolderAction(systemImage: "externaldrive", label: String(localized: "Open Data Directory"), isDanger: false) {
                 openDirectory(appDataDirectoryURL())
             },
         ]

@@ -1,4 +1,5 @@
 import CicadaIPC
+import Foundation
 
 /// 将 `SentinelStatusSnapshot` 映射为 UI 展示模型（ReadinessItem / SentinelState / Diagnostic）。
 enum SnapshotMapper {
@@ -31,29 +32,29 @@ enum SnapshotMapper {
         return [
             ReadinessItem(
                 key: "triggers",
-                label: "触发器",
+                label: String(localized: "触发器", bundle: .module),
                 status: triggersOn ? .ok : .off,
-                valueText: triggersOn ? "已启用" : "未启用"
+                valueText: triggersOn ? String(localized: "已启用", bundle: .module) : String(localized: "未启用", bundle: .module)
             ),
             ReadinessItem(
                 key: "notifications",
-                label: "通知",
+                label: String(localized: "通知", bundle: .module),
                 status: notifOn ? .ok : .off,
-                valueText: notifOn ? "已配置" : "未配置"
+                valueText: notifOn ? String(localized: "已配置", bundle: .module) : String(localized: "未配置", bundle: .module)
             ),
             ReadinessItem(
                 key: "camera",
-                label: "录像",
+                label: String(localized: "录像", bundle: .module),
                 status: snap.recordingEnabled ? .ok : .off,
                 // recordingEnabled 是配置开关而非运行态：空闲/完成时也常为 true，
                 // 标「录制中」会谎称正在录制，故显示「已启用」。
-                valueText: snap.recordingEnabled ? "已启用" : "关闭"
+                valueText: snap.recordingEnabled ? String(localized: "已启用", bundle: .module) : String(localized: "关闭", bundle: .module)
             ),
             ReadinessItem(
                 key: "activation",
-                label: "睡眠保持",
+                label: String(localized: "睡眠保持", bundle: .module),
                 status: snap.sleepHoldActive ? .ok : .warn,
-                valueText: snap.sleepHoldActive ? "活跃" : "空闲"
+                valueText: snap.sleepHoldActive ? String(localized: "活跃", bundle: .module) : String(localized: "空闲", bundle: .module)
             ),
         ]
     }

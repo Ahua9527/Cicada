@@ -36,7 +36,7 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
                 NotchSection(
                     delegate: delegate,
                     icon: "airplayaudio",
-                    text: "拖放以 AirDrop",
+                    text: String(localized: "拖放以 AirDrop", bundle: .module),
                     kind: .airDrop,
                     cornerRadius: cornerRadius
                 )
@@ -58,7 +58,7 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
             NotchSection(
                 delegate: delegate,
                 icon: "tray.and.arrow.down.fill",
-                text: "拖放文件到此处暂存一周",
+                text: String(localized: "拖放文件到此处暂存一周", bundle: .module),
                 kind: .tray,
                 cornerRadius: cornerRadius
             )

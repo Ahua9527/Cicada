@@ -30,7 +30,7 @@ final class SleepHoldModel: ObservableObject {
                 cells = []
                 diagnostic = Diagnostic(
                     level: .warn,
-                    message: resp.error ?? resp.message ?? "sleephold 状态请求失败"
+                    message: resp.error ?? resp.message ?? String(localized: "sleephold 状态请求失败", bundle: .module)
                 )
                 return false
             }
@@ -39,19 +39,19 @@ final class SleepHoldModel: ObservableObject {
             isActive = resp.status == .hold || activeSessions > 0
             cells = [
                 SleepHoldCellData(
-                    label: "状态",
-                    value: isActive ? "活跃" : "空闲",
+                    label: String(localized: "状态", bundle: .module),
+                    value: isActive ? String(localized: "活跃", bundle: .module) : String(localized: "空闲", bundle: .module),
                     isMono: false,
                     ok: isActive
                 ),
                 SleepHoldCellData(
-                    label: "电源",
-                    value: resp.status?.rawValue ?? "未知",
+                    label: String(localized: "电源", bundle: .module),
+                    value: resp.status?.rawValue ?? String(localized: "未知", bundle: .module),
                     isMono: false,
                     ok: resp.status == .hold
                 ),
                 SleepHoldCellData(
-                    label: "活跃会话数",
+                    label: String(localized: "活跃会话数", bundle: .module),
                     value: "\(activeSessions)",
                     isMono: true,
                     ok: activeSessions > 0
@@ -62,7 +62,7 @@ final class SleepHoldModel: ObservableObject {
         } catch {
             isActive = false
             cells = []
-            diagnostic = Diagnostic(level: .warn, message: "无法连接 sleephold: \(error.localizedDescription)")
+            diagnostic = Diagnostic(level: .warn, message: String(localized: "无法连接 sleephold", bundle: .module) + ": " + error.localizedDescription)
             return false
         }
     }

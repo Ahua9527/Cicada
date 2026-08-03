@@ -6,8 +6,8 @@ import SwiftUI
 /// `CameraPreviewView`（NSView）提供，CicadaUI 只做占位。
 /// `overlayContent` 可叠加操作按钮（如「请求相机权限」）。
 struct CameraPreviewPlaceholder<OverlayContent: View>: View {
-    var title: String = "相机预览未授权"
-    var subtitle: String = "请在系统设置中授予摄像头访问权限"
+    var title: String = String(localized: "相机预览未授权", bundle: .module)
+    var subtitle: String = String(localized: "请在系统设置中授予摄像头访问权限", bundle: .module)
     @ViewBuilder var overlayContent: OverlayContent
 
     var body: some View {
@@ -44,7 +44,7 @@ struct CameraPreviewPlaceholder<OverlayContent: View>: View {
 }
 
 extension CameraPreviewPlaceholder where OverlayContent == EmptyView {
-    init(title: String = "相机预览未授权", subtitle: String = "请在系统设置中授予摄像头访问权限") {
+    init(title: String = String(localized: "相机预览未授权", bundle: .module), subtitle: String = String(localized: "请在系统设置中授予摄像头访问权限", bundle: .module)) {
         self.init(title: title, subtitle: subtitle, overlayContent: { EmptyView() })
     }
 }

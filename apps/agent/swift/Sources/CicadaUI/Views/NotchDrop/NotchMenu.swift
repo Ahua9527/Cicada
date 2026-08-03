@@ -27,7 +27,7 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
 
     public var body: some View {
         HStack(spacing: spacing) {
-            menuButton(icon: "xmark", label: "关闭", tint: .cicadaDanger) {
+            menuButton(icon: "xmark", label: String(localized: "关闭", bundle: .module), tint: .cicadaDanger) {
                 delegate.close()
             }
             menuButton(icon: "airplayaudio", label: "AirDrop", tint: .cicadaAccent) {
@@ -37,13 +37,13 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
             menuButton(icon: "ellipsis.bubble", label: "GitHub", tint: .cicadaAccent) {
                 delegate.openGitHub()
             }
-            menuButton(icon: "heart.fill", label: "赞助", tint: .cicadaAccent) {
+            menuButton(icon: "heart.fill", label: String(localized: "赞助", bundle: .module), tint: .cicadaAccent) {
                 delegate.openSponsor()
             }
-            menuButton(icon: "gearshape", label: "设置", tint: .cicadaAccent) {
+            menuButton(icon: "gearshape", label: String(localized: "设置", bundle: .module), tint: .cicadaAccent) {
                 delegate.showSettings()
             }
-            menuButton(icon: "trash", label: "清空", tint: .cicadaDanger) {
+            menuButton(icon: "trash", label: String(localized: "清空", bundle: .module), tint: .cicadaDanger) {
                 delegate.clearTray()
             }
         }

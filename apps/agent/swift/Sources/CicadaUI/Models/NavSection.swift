@@ -15,9 +15,9 @@ public enum NavSection: String, Hashable, CaseIterable, Identifiable {
 
     public var title: String {
         switch self {
-        case .overview: return "概览"
-        case .settings: return "设置"
-        case .maintenance: return "维护"
+        case .overview: return String(localized: "概览", bundle: .module)
+        case .settings: return String(localized: "设置", bundle: .module)
+        case .maintenance: return String(localized: "维护", bundle: .module)
         }
     }
 
@@ -31,9 +31,9 @@ public enum NavSection: String, Hashable, CaseIterable, Identifiable {
 
     public var statusText: String {
         switch self {
-        case .overview: return "运行中"
-        case .settings: return "就绪"
-        case .maintenance: return "睡眠保持空闲"
+        case .overview: return String(localized: "运行中", bundle: .module)
+        case .settings: return String(localized: "就绪", bundle: .module)
+        case .maintenance: return String(localized: "睡眠保持空闲", bundle: .module)
         }
     }
 }

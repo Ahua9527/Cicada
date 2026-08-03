@@ -47,7 +47,7 @@ final class SentinelsModel: ObservableObject {
             readiness = []
             activeTriggerCount = 0
             state = .idle
-            diagnostic = Diagnostic(level: .warn, message: "无法连接 sentinel: \(error.localizedDescription)")
+            diagnostic = Diagnostic(level: .warn, message: String(localized: "无法连接 sentinel", bundle: .module) + ": " + error.localizedDescription)
             return false
         }
     }

@@ -5,15 +5,15 @@ struct ConnectionCard: View {
     @ObservedObject var model: ConfigModel
 
     var body: some View {
-        Card(title: "连接") {
+        Card(title: String(localized: "连接", bundle: .module)) {
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s4) {
                 CicadaTextField(
-                    title: "Relay 地址",
+                    title: String(localized: "Relay 地址", bundle: .module),
                     text: $model.draft.relayURL,
-                    hint: "Cicada 中继服务地址，例如 wss://relay.example.com"
+                    hint: String(localized: "Cicada 中继服务地址，例如 wss://relay.example.com", bundle: .module)
                 )
                 HStack {
-                    Button("保存") {
+                    Button(String(localized: "保存", bundle: .module)) {
                         Task { await model.saveConnection() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -27,9 +27,9 @@ struct ConnectionCard: View {
 
     private var inlineMessage: (kind: InlineMessage.Kind, text: String)? {
         switch model.saveState {
-        case .ok:     return (.ok, "配置已保存")
+        case .ok:     return (.ok, String(localized: "配置已保存", bundle: .module))
         case .saving: return nil
-        case .err(let e): return (.err, "保存失败：\(e)")
+        case .err(let e): return (.err, String(localized: "保存失败：", bundle: .module) + e)
         case .idle:   return nil
         }
     }

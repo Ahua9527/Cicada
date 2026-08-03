@@ -23,7 +23,7 @@ struct AlarmLeftPanel: View {
             Spacer()
 
             // ② 标题
-            Text("Cicada 警戒已触发")
+            Text("Cicada 警戒已触发", bundle: .module)
                 .font(.system(size: 28, weight: .heavy))
                 .foregroundStyle(.white)
 
@@ -35,13 +35,13 @@ struct AlarmLeftPanel: View {
             }
 
             // ④ 描述
-            Text("此 Mac 已联网并正在监控你的行为。")
+            Text("此 Mac 已联网并正在监控你的行为。", bundle: .module)
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.7))
 
             // ⑤ 停止按钮
             Button(action: onStop) {
-                Label("停止警戒", systemImage: "stop.fill")
+                Label(String(localized: "停止警戒", bundle: .module), systemImage: "stop.fill")
             }
             .buttonStyle(AlarmStopButtonStyle())
             .padding(.top, DesignMetrics.Spacing.s3)

@@ -18,27 +18,27 @@ struct MaintenancePane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s4) {
                 PaneHeader(
-                    title: "维护",
-                    subtitle: "运行时路径、睡眠保持会话与诊断",
+                    title: String(localized: "维护", bundle: .module),
+                    subtitle: String(localized: "运行时路径、睡眠保持会话与诊断", bundle: .module),
                     trailing: { HelpButton { showHelp = true } }
                 )
 
-                Card(title: "运行时") {
-                    SettingRow(title: "登录时启动 Cicada", desc: "登录时自动启动应用和服务") {
+                Card(title: String(localized: "运行时", bundle: .module)) {
+                    SettingRow(title: String(localized: "登录时启动 Cicada", bundle: .module), desc: String(localized: "登录时自动启动应用和服务", bundle: .module)) {
                         launchAtLoginToggle.makeView()
                     }
                 }
 
-                Card(title: "文件夹") {
+                Card(title: String(localized: "文件夹", bundle: .module)) {
                     FolderGrid()
                 }
 
-                Card(title: "SleepHold 状态") {
+                Card(title: String(localized: "SleepHold 状态", bundle: .module)) {
                     SleepHoldCells(model: appModel.sleepHold)
                 }
 
-                Card(title: "诊断") {
-                    Button("运行启动检查") {
+                Card(title: String(localized: "诊断", bundle: .module)) {
+                    Button(String(localized: "运行启动检查", bundle: .module)) {
                         if let runStartupChecks {
                             runStartupChecks()
                         } else {
@@ -50,7 +50,7 @@ struct MaintenancePane: View {
                     if let d = appModel.sleepHold.diagnostic {
                         DiagnosticStrip(diag: d)
                     } else {
-                        Text("暂无诊断信息")
+                        Text(String(localized: "暂无诊断信息", bundle: .module))
                             .font(.caption)
                             .foregroundStyle(.cicadaTextTertiary)
                     }

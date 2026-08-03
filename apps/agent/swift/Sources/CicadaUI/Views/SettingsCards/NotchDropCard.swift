@@ -44,25 +44,25 @@ private struct NotchDropCardRows: View {
     var body: some View {
         Card(title: "NotchDrop") {
             VStack(spacing: 0) {
-                SettingRow(title: "触觉反馈", desc: "拖放文件到刘海时播放触觉反馈") {
+                SettingRow(title: String(localized: "触觉反馈", bundle: .module), desc: String(localized: "拖放文件到刘海时播放触觉反馈", bundle: .module)) {
                     Toggle("", isOn: $hapticFeedback)
                         .labelsHidden()
                         .tint(.cicadaAccent)
                 }
-                SettingRow(title: "文件保留时长", desc: "刘海暂存的文件保留天数") {
+                SettingRow(title: String(localized: "文件保留时长", bundle: .module), desc: String(localized: "刘海暂存的文件保留天数", bundle: .module)) {
                     Picker("", selection: $fileRetentionDays) {
-                        Text("1 天").tag(1)
-                        Text("7 天").tag(7)
-                        Text("30 天").tag(30)
-                        Text("永不清理").tag(0)
+                        Text(String(localized: "1 天", bundle: .module)).tag(1)
+                        Text(String(localized: "7 天", bundle: .module)).tag(7)
+                        Text(String(localized: "30 天", bundle: .module)).tag(30)
+                        Text(String(localized: "永不清理", bundle: .module)).tag(0)
                     }
                     .labelsHidden()
                     .frame(width: 120)
                 }
-                SettingRow(title: "界面语言", desc: "应用显示语言") {
+                SettingRow(title: String(localized: "界面语言", bundle: .module), desc: String(localized: "应用显示语言", bundle: .module)) {
                     Picker("", selection: $interfaceLanguage) {
-                        Text("跟随系统").tag("auto")
-                        Text("简体中文").tag("zh-Hans")
+                        Text(String(localized: "跟随系统", bundle: .module)).tag("auto")
+                        Text(String(localized: "简体中文", bundle: .module)).tag("zh-Hans")
                         Text("English").tag("en")
                     }
                     .labelsHidden()

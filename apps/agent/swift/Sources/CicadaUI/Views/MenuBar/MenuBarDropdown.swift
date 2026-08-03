@@ -25,20 +25,20 @@ public struct MenuBarDropdown: View {
                 state: appModel.sentinels.state,
                 detail: statusDetail
             )
-            MenuBarButton(icon: "rectangle.split.2x1", title: "打开控制中心") {
+            MenuBarButton(icon: "rectangle.split.2x1", title: String(localized: "打开控制中心", bundle: .module)) {
                 router.selection = .overview
                 openWindow(id: "main")
             }
-            MenuBarButton(icon: "slider.horizontal.3", title: "设置…") {
+            MenuBarButton(icon: "slider.horizontal.3", title: String(localized: "设置…", bundle: .module)) {
                 router.selection = .settings
                 openWindow(id: "main")
             }
-            MenuBarButton(icon: "wrench.and.screwdriver", title: "维护…") {
+            MenuBarButton(icon: "wrench.and.screwdriver", title: String(localized: "维护…", bundle: .module)) {
                 router.selection = .maintenance
                 openWindow(id: "main")
             }
             Divider()
-            MenuBarButton(icon: "arrow.right.square", title: "退出 Cicada", tint: .cicadaDanger) {
+            MenuBarButton(icon: "arrow.right.square", title: String(localized: "退出 Cicada", bundle: .module), tint: .cicadaDanger) {
                 onQuit()
             }
         }
@@ -56,11 +56,11 @@ public struct MenuBarDropdown: View {
     private var statusDetail: String {
         switch appModel.sentinels.state {
         case .running:
-            return "监控活跃 · \(appModel.sentinels.activeTriggerCount) 个触发器"
+            return String(localized: "监控活跃", bundle: .module) + " · \(appModel.sentinels.activeTriggerCount) " + String(localized: "个触发器", bundle: .module)
         case .warning:
-            return appModel.sentinels.diagnostic?.message ?? "检测到异常活动"
+            return appModel.sentinels.diagnostic?.message ?? String(localized: "检测到异常活动", bundle: .module)
         case .idle:
-            return "未在监控"
+            return String(localized: "未在监控", bundle: .module)
         }
     }
 }

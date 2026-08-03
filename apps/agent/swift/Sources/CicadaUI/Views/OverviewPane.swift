@@ -9,8 +9,8 @@ struct OverviewPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s5) {
                 PaneHeader(
-                    title: "Cicada 控制中心",
-                    subtitle: "状态、控制与配置的统一入口",
+                    title: String(localized: "Cicada 控制中心", bundle: .module),
+                    subtitle: String(localized: "状态、控制与配置的统一入口", bundle: .module),
                     trailing: { HelpButton { showHelp = true } }
                 )
                 StatusHeroCard(state: appModel.sentinels.state)

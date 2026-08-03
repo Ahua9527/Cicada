@@ -11,8 +11,8 @@ struct SettingsPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s5) {
                 PaneHeader(
-                    title: "设置",
-                    subtitle: "连接、防护、告警、录像与 NotchDrop",
+                    title: String(localized: "设置", bundle: .module),
+                    subtitle: String(localized: "连接、防护、告警、录像与 NotchDrop", bundle: .module),
                     trailing: { HelpButton { showHelp = true } }
                 )
                 SettingsTabBar(selection: $tab)
@@ -52,10 +52,10 @@ public enum SettingsTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .connection: return "连接"
-        case .protection: return "防护"
-        case .alerts:     return "告警"
-        case .recording:  return "录像"
+        case .connection: return String(localized: "连接", bundle: .module)
+        case .protection: return String(localized: "防护", bundle: .module)
+        case .alerts:     return String(localized: "告警", bundle: .module)
+        case .recording:  return String(localized: "录像", bundle: .module)
         case .notch:      return "NotchDrop"
         }
     }
