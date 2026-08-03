@@ -266,6 +266,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compare Cicada app and design screenshots")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--allow-missing", action="store_true", help="write a blocked report and return success when screenshots are missing")
+    parser.add_argument("--allow-diff", action="store_true", help="return success even when screens differ from the design (known or intentional UI changes)")
     return parser.parse_args()
 
 
@@ -290,7 +291,13 @@ def main() -> int:
             )
 
     has_missing = any(result.error for result in results)
-    return 0 if args.allow_missing or not has_missing else 1
+    has_diff = any(result.verdict == "有差异" for result in results)
+    if has_diff and not args.allow_diff:
+        print("visual acceptance failed: screens differ from design; review the report")
+        return 1
+    if has_missing and not args.allow_missing:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
