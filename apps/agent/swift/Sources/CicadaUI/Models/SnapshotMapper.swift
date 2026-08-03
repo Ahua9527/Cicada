@@ -45,7 +45,9 @@ enum SnapshotMapper {
                 key: "camera",
                 label: "录像",
                 status: snap.recordingEnabled ? .ok : .off,
-                valueText: snap.recordingEnabled ? "录制中" : "关闭"
+                // recordingEnabled 是配置开关而非运行态：空闲/完成时也常为 true，
+                // 标「录制中」会谎称正在录制，故显示「已启用」。
+                valueText: snap.recordingEnabled ? "已启用" : "关闭"
             ),
             ReadinessItem(
                 key: "activation",

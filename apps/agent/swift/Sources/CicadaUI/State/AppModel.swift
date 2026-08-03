@@ -49,14 +49,17 @@ public final class AppModel: ObservableObject {
 
     /// 启动轮询。周期稳定（sleep 不计入 IPC 耗时），连续失败时指数退避拉长间隔，
     /// 恢复成功后立即回到 base 周期。在 `applicationDidFinishLaunching` 或 `.onAppear` 调。
+    ///
+    /// 退避只跟 Sentinel 结果：SleepHold 是可选服务，其不可用不应拖慢
+    /// 主状态（Sentinel/告警）刷新——否则无 SleepHold 的机器状态 UI 长期停留在 30s 周期。
     public func startPolling() {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             var consecutiveFailures = 0
             while !Task.isCancelled {
                 let tickStart = ContinuousClock.now
-                let ok = await self?.refreshAll() ?? false
-                if ok {
+                let sentinelOk = await self?.refreshAll() ?? false
+                if sentinelOk {
                     consecutiveFailures = 0
                 } else {
                     consecutiveFailures += 1
@@ -88,12 +91,13 @@ public final class AppModel: ObservableObject {
         pollTask = nil
     }
 
-    /// 手动触发一次全量刷新。返回 false 表示任一上游失败（用于轮询退避）。
+    /// 手动触发一次全量刷新。返回值只代表 Sentinel 是否成功（轮询退避依据）；
+    /// SleepHold 失败不影响返回值（可选服务，见 startPolling 注释）。
     @discardableResult
     func refreshAll() async -> Bool {
         async let s = sentinels.refresh()
         async let h = sleepHold.refresh()
-        let (sentinelOk, sleepOk) = await (s, h)
-        return sentinelOk && sleepOk
+        let (sentinelOk, _) = await (s, h)
+        return sentinelOk
     }
 }

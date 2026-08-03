@@ -41,6 +41,11 @@ final class SentinelsModel: ObservableObject {
             }
             return true
         } catch {
+            // 与 snap 为 nil 的分支一致清空陈旧状态：连接失败后继续展示上一次
+            // 成功的快照/就绪项/触发数会让 Overview 与菜单栏把过期状态当实时。
+            lastSnapshot = nil
+            readiness = []
+            activeTriggerCount = 0
             state = .idle
             diagnostic = Diagnostic(level: .warn, message: "无法连接 sentinel: \(error.localizedDescription)")
             return false

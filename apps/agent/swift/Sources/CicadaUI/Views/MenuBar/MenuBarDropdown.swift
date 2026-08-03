@@ -23,7 +23,7 @@ public struct MenuBarDropdown: View {
         VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s2) {
             MenuBarStatusCard(
                 state: appModel.sentinels.state,
-                detail: "监控活跃 · \(appModel.sentinels.activeTriggerCount) 个触发器"
+                detail: statusDetail
             )
             MenuBarButton(icon: "rectangle.split.2x1", title: "打开控制中心") {
                 router.selection = .overview
@@ -48,6 +48,19 @@ public struct MenuBarDropdown: View {
         // onAppear 自动启动，onDisappear/disappear 自动取消，无需手动持有 Task。
         .task(id: "menubar-refresh") {
             await appModel.sentinels.refresh()
+        }
+    }
+
+    /// 详情文案随 Sentinel 真实状态派生：空闲/告警时若仍显示「监控活跃」，
+    /// 会让用户误以为 Mac 正在被守护。
+    private var statusDetail: String {
+        switch appModel.sentinels.state {
+        case .running:
+            return "监控活跃 · \(appModel.sentinels.activeTriggerCount) 个触发器"
+        case .warning:
+            return appModel.sentinels.diagnostic?.message ?? "检测到异常活动"
+        case .idle:
+            return "未在监控"
         }
     }
 }
