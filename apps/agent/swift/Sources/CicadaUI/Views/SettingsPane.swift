@@ -5,6 +5,7 @@ struct SettingsPane: View {
     @SceneStorage("settings.tab") private var tab: SettingsTab = .connection
     @EnvironmentObject var appModel: AppModel
     @EnvironmentObject var router: ControlCenterRouter
+    @State private var showHelp = false
 
     var body: some View {
         ScrollView {
@@ -12,7 +13,7 @@ struct SettingsPane: View {
                 PaneHeader(
                     title: "设置",
                     subtitle: "连接、防护、告警、录像与 NotchDrop",
-                    trailing: { HelpButton() }
+                    trailing: { HelpButton { showHelp = true } }
                 )
                 SettingsTabBar(selection: $tab)
                 Group {
@@ -30,6 +31,7 @@ struct SettingsPane: View {
         }
         .onAppear { consumePendingTab() }
         .onChange(of: router.pendingSettingsTab) { consumePendingTab() }
+        .sheet(isPresented: $showHelp) { HelpSheet() }
     }
 
     /// 消费一次性子页路由命令（如 NotchDrop 齿轮 → `.notch`）。

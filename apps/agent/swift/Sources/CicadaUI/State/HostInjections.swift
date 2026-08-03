@@ -182,3 +182,19 @@ extension EnvironmentValues {
         set { self[NotchDropSettingsStoreKey.self] = newValue }
     }
 }
+
+// MARK: - NotchDrop Tray Content
+
+private struct TrayContentKey: EnvironmentKey {
+    /// 默认 `nil`：NotchPanel 显示库内空态拖放区（NotchSection .tray），库独立可预览。
+    static let defaultValue: (() -> AnyView)? = nil
+}
+
+extension EnvironmentValues {
+    /// 刘海暂存区内容注入。宿主注入观察 `TrayDrop.shared` 的视图（既有 `TrayView`），
+    /// 覆盖空态与已暂存文件列表（打开/拖拽/删除）；`nil` 时 NotchPanel 用库内空态拖放区。
+    public var trayContent: (() -> AnyView)? {
+        get { self[TrayContentKey.self] }
+        set { self[TrayContentKey.self] = newValue }
+    }
+}

@@ -12,6 +12,7 @@ struct MaintenancePane: View {
     @EnvironmentObject var appModel: AppModel
     @Environment(\.launchAtLoginToggle) private var launchAtLoginToggle
     @Environment(\.runStartupChecks) private var runStartupChecks
+    @State private var showHelp = false
 
     var body: some View {
         ScrollView {
@@ -19,7 +20,7 @@ struct MaintenancePane: View {
                 PaneHeader(
                     title: "维护",
                     subtitle: "运行时路径、睡眠保持会话与诊断",
-                    trailing: { HelpButton() }
+                    trailing: { HelpButton { showHelp = true } }
                 )
 
                 Card(title: "运行时") {
@@ -57,6 +58,7 @@ struct MaintenancePane: View {
             }
             .padding(DesignMetrics.Spacing.s6)
         }
+        .sheet(isPresented: $showHelp) { HelpSheet() }
     }
 }
 

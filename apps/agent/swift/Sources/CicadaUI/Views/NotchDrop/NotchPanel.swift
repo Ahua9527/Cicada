@@ -19,6 +19,10 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
     /// 内部间距，对齐 `NotchViewModel.spacing`。
     private let spacing: CGFloat
 
+    /// 宿主注入的暂存区内容（既有 `TrayView`，覆盖空态 + 已暂存文件列表）。
+    /// `nil` 时用库内空态拖放区（NotchSection .tray），保持库独立可预览。
+    @Environment(\.trayContent) private var trayContent
+
     public init(delegate: Delegate, cornerRadius: CGFloat = 16, spacing: CGFloat = 16) {
         self.delegate = delegate
         self.cornerRadius = cornerRadius
@@ -36,18 +40,29 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
                     kind: .airDrop,
                     cornerRadius: cornerRadius
                 )
-                NotchSection(
-                    delegate: delegate,
-                    icon: "tray.and.arrow.down.fill",
-                    text: "拖放文件到此处暂存一周",
-                    kind: .tray,
-                    cornerRadius: cornerRadius
-                )
+                traySlot
             }
         }
         .padding(spacing)
         .frame(maxWidth: 600, maxHeight: 160)   // 对照 NotchViewModel.notchOpenedSize 600×160
         .preferredColorScheme(.dark)
+    }
+
+    /// 暂存区槽位：宿主注入时用其视图（含已暂存文件的打开/拖拽/删除），
+    /// 否则回退到库内空态拖放区。
+    @ViewBuilder
+    private var traySlot: some View {
+        if let trayContent {
+            trayContent()
+        } else {
+            NotchSection(
+                delegate: delegate,
+                icon: "tray.and.arrow.down.fill",
+                text: "拖放文件到此处暂存一周",
+                kind: .tray,
+                cornerRadius: cornerRadius
+            )
+        }
     }
 
     /// 标题行（对照 NotchHeaderView：标题 + ellipsis）。

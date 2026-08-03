@@ -18,7 +18,11 @@ struct NotchContentView: View {
         ZStack {
             switch vm.contentType {
             case .normal:
+                // 注入既有 TrayView 作为暂存区：它观察 TrayDrop.shared，覆盖空态拖放区
+                // 与已暂存文件的打开/拖拽/删除列表。包内 NotchSection(.tray) 只剩空态，会
+                // 让拖入的文件无法取回/管理。
                 NotchPanel(delegate: vm)
+                    .environment(\.trayContent) { AnyView(TrayView(vm: vm)) }
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             case .menu:
                 NotchMenu(delegate: vm)
