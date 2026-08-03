@@ -48,10 +48,17 @@ public final class ConfigModel: ObservableObject {
     }
 
     /// 保存连接层配置。
+    ///
+    /// 写盘前重载盘上最新配置，仅把用户编辑的 `relayURL` 合并进去，再保存。
+    /// 若直接写整个 `draft`，会在 `config.json` 被并发修改后（如 `cicada config set`
+    /// 改 deviceId/重连设置时控制中心仍开着）回滚那些无关字段。
     public func saveConnection() async {
         saveState = .saving
         do {
-            try store.save(draft)
+            var latest = (try? store.load()) ?? draft
+            latest.relayURL = draft.relayURL
+            try store.save(latest)
+            draft = latest
             saveState = .ok
         } catch {
             saveState = .err(error.localizedDescription)
