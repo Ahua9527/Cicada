@@ -2,8 +2,9 @@ import Foundation
 
 /// Bark HTTP 推送独立封装（async/await + URLSession）。
 ///
-/// 参考现有 `Sentry.makeBarkRequest` 的 URL 构造方式：
-/// GET 请求，路径为 `endpoint/title/body`，queryItems 含 level/group/call/isArchive。
+/// 与 `Sentry.makeBarkRequest` 的路径式构造不同，这里采用 query 式：
+/// GET 请求，title/body/level 等全部作为 queryItem 由系统 percent-encode，
+/// 避免手工编码路径段的双重转义与路径注入问题。
 struct BarkClient {
     let endpoint: URL
     let session: URLSession

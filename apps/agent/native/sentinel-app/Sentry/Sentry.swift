@@ -217,12 +217,15 @@ final class Sentry: NSObject, ObservableObject {
         guard var comps = URLComponents(string: configuration.sentryNotificationConfigBark.endpoint) else {
             return nil
         }
-        // 路径段需 percent-encoding，避免 message 含 `/` `?` `#` 空格 中文时 URL 畸形。
+        // 路径段需 percent-encoding；从允许集去掉 `/`，避免 message 里的斜杠变成额外路径段。
+        var pathSegmentAllowed = CharacterSet.urlPathAllowed
+        pathSegmentAllowed.remove(charactersIn: "/")
         let brand = String(localized: "Cicada - Mac")
-        let brandSegment = brand.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? brand
-        let messageSegment = message.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? message
-        comps.path = comps.path
-            + (comps.path.hasSuffix("/") ? "" : "/")
+        let brandSegment = brand.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? brand
+        let messageSegment = message.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? message
+        // 已编码的段必须写入 percentEncodedPath；赋给 path 会把 % 二次转义（%20 → %2520）。
+        comps.percentEncodedPath = comps.percentEncodedPath
+            + (comps.percentEncodedPath.hasSuffix("/") ? "" : "/")
             + brandSegment + "/" + messageSegment
         comps.queryItems = [
             .init(name: "level", value: "critical"),
