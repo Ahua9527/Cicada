@@ -26,7 +26,7 @@ struct ConnectionCard: View {
     }
 
     private var inlineMessage: (kind: InlineMessage.Kind, text: String)? {
-        switch model.saveState {
+        switch model.connectionSaveState {
         case .ok:     return (.ok, String(localized: "配置已保存", bundle: .module))
         case .saving: return nil
         case .err(let e): return (.err, String(localized: "保存失败：", bundle: .module) + e)

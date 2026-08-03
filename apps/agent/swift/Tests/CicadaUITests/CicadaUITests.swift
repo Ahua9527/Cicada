@@ -221,17 +221,17 @@ final class CicadaUITests: XCTestCase {
 
         model.sentry.sentryRecordingEnabled = true
 
-        // 防抖 + Task.detached 落盘：轮询等待 saveState 到 .ok 且文件反映新值。
+        // 防抖 + Task.detached 落盘：轮询等待 sentrySaveState 到 .ok 且文件反映新值。
         var savedOK = false
         for _ in 0..<100 {
-            if model.saveState == .ok, sentryStore.load().sentryRecordingEnabled {
+            if model.sentrySaveState == .ok, sentryStore.load().sentryRecordingEnabled {
                 savedOK = true
                 break
             }
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         XCTAssertTrue(savedOK, "sentry 配置在防抖窗口后应落盘成功")
-        XCTAssertEqual(model.saveState, .ok)
+        XCTAssertEqual(model.sentrySaveState, .ok)
         XCTAssertTrue(sentryStore.load().sentryRecordingEnabled)
     }
 

@@ -13,8 +13,10 @@ public final class ConfigModel: ObservableObject {
             scheduleSentrySave()
         }
     }
-    /// 保存状态。
-    @Published public private(set) var saveState: SaveState = .idle
+    /// 连接层保存状态。
+    @Published public private(set) var connectionSaveState: SaveState = .idle
+    /// 防护层保存状态。
+    @Published public private(set) var sentrySaveState: SaveState = .idle
 
     public enum SaveState: Equatable {
         case idle
@@ -53,15 +55,15 @@ public final class ConfigModel: ObservableObject {
     /// 若直接写整个 `draft`，会在 `config.json` 被并发修改后（如 `cicada config set`
     /// 改 deviceId/重连设置时控制中心仍开着）回滚那些无关字段。
     public func saveConnection() async {
-        saveState = .saving
+        connectionSaveState = .saving
         do {
             var latest = (try? store.load()) ?? draft
             latest.relayURL = draft.relayURL
             try store.save(latest)
             draft = latest
-            saveState = .ok
+            connectionSaveState = .ok
         } catch {
-            saveState = .err(error.localizedDescription)
+            connectionSaveState = .err(error.localizedDescription)
         }
     }
 
@@ -78,16 +80,16 @@ public final class ConfigModel: ObservableObject {
 
     /// 实际落盘：把同步 I/O 移到 `Task.detached`，主线程不阻塞。
     private func persistSentry() async {
-        saveState = .saving
+        sentrySaveState = .saving
         let snapshot = sentry
         let store = sentryStore
         do {
             try await Task.detached(priority: .utility) {
                 try store.save(snapshot)
             }.value
-            saveState = .ok
+            sentrySaveState = .ok
         } catch {
-            saveState = .err(error.localizedDescription)
+            sentrySaveState = .err(error.localizedDescription)
         }
     }
 
