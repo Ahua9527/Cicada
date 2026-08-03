@@ -13,6 +13,8 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var config: ConfigModel
     @Published var sleepHold: SleepHoldModel
     @Published public private(set) var alarm: AlarmModel
+    /// 启动检查诊断：宿主 `runStartupChecks` 后将失败项映射写入，供维护页诊断卡展示。
+    @Published private(set) var startupDiagnostic: Diagnostic?
 
     private var pollTask: Task<Void, Never>?
 
@@ -99,5 +101,15 @@ public final class AppModel: ObservableObject {
         async let h = sleepHold.refresh()
         let (sentinelOk, _) = await (s, h)
         return sentinelOk
+    }
+
+    /// 宿主写入启动检查诊断：非空 message 生成 danger 级诊断，空则清空。
+    /// 由 `MaintenanceHostInjections` 在 `runStartupChecks` 后调用。
+    public func setStartupDiagnostic(message: String?) {
+        if let message, !message.isEmpty {
+            startupDiagnostic = Diagnostic(level: .danger, message: message)
+        } else {
+            startupDiagnostic = nil
+        }
     }
 }

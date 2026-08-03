@@ -35,6 +35,9 @@ struct MaintenancePane: View {
 
                 Card(title: String(localized: "SleepHold 状态", bundle: .module)) {
                     SleepHoldCells(model: appModel.sleepHold)
+                    if let d = appModel.sleepHold.diagnostic {
+                        DiagnosticStrip(diag: d)
+                    }
                 }
 
                 Card(title: String(localized: "诊断", bundle: .module)) {
@@ -47,7 +50,7 @@ struct MaintenancePane: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                 } content: {
-                    if let d = appModel.sleepHold.diagnostic {
+                    if let d = appModel.startupDiagnostic {
                         DiagnosticStrip(diag: d)
                     } else {
                         Text(String(localized: "暂无诊断信息", bundle: .module))

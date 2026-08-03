@@ -28,12 +28,4 @@ public enum NavSection: String, Hashable, CaseIterable, Identifiable {
         case .maintenance: return "wrench.and.screwdriver"
         }
     }
-
-    public var statusText: String {
-        switch self {
-        case .overview: return String(localized: "运行中", bundle: .module)
-        case .settings: return String(localized: "就绪", bundle: .module)
-        case .maintenance: return String(localized: "睡眠保持空闲", bundle: .module)
-        }
-    }
 }

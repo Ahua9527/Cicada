@@ -10,7 +10,7 @@ struct ConnectionCard: View {
                 CicadaTextField(
                     title: String(localized: "Relay 地址", bundle: .module),
                     text: $model.draft.relayURL,
-                    hint: String(localized: "Cicada 中继服务地址，例如 wss://relay.example.com", bundle: .module)
+                    hint: String(localized: "Cicada 中继服务地址，例如 https://relay.example.com", bundle: .module)
                 )
                 HStack {
                     Button(String(localized: "保存", bundle: .module)) {

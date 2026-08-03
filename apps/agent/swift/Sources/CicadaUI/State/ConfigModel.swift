@@ -90,4 +90,12 @@ public final class ConfigModel: ObservableObject {
             saveState = .err(error.localizedDescription)
         }
     }
+
+    /// 退出前同步刷盘：取消防抖任务并立即同步落盘，避免在 150ms 防抖窗口内退出丢失改动。
+    /// `applicationWillTerminate` 调用——此时进程即将退出，不再走 `Task.detached` 异步写盘。
+    public func flushPendingSentrySave() {
+        saveSentryTask?.cancel()
+        saveSentryTask = nil
+        try? sentryStore.save(sentry)
+    }
 }

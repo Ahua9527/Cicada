@@ -10,8 +10,10 @@ struct RecordingCard: View {
     @ObservedObject var model: ConfigModel
     @Environment(\.cameraAuthorizationStatus) private var cameraAuthorizationStatus
     @Environment(\.requestCameraPermission) private var requestCameraPermission
+    @Environment(\.cameraOptions) private var cameraOptions
 
     @State private var authStatus: CameraAuthorizationStatus = .authorized
+    @State private var cameras: [CameraOption] = []
 
     var body: some View {
         Card(title: String(localized: "录像", bundle: .module)) {
@@ -25,7 +27,10 @@ struct RecordingCard: View {
                     .frame(height: 200)
             }
         }
-        .onAppear { authStatus = cameraAuthorizationStatus() }
+        .onAppear {
+            authStatus = cameraAuthorizationStatus()
+            cameras = cameraOptions()
+        }
     }
 
     private var recordingEnabledBinding: Binding<Bool> {
@@ -57,11 +62,26 @@ struct RecordingCard: View {
         case .restricted, .denied:
             CameraPreviewPlaceholder()
         case .authorized:
-            // 实时预览是既定观察点（见 overview-P4.2 已知限制），授权后先给中性占位。
+            // 实时预览是既定观察点（见 overview-P4.2 已知限制），授权后先给中性占位 +
+            // 设备选择器：多摄像头 Mac 可切换 sentryRecordingDevice，否则静默回退内置/默认。
             CameraPreviewPlaceholder(
                 title: String(localized: "相机已授权", bundle: .module),
                 subtitle: String(localized: "警戒触发时将自动录制画面", bundle: .module)
-            )
+            ) {
+                if cameras.count > 1 {
+                    Picker(selection: $model.sentry.sentryRecordingDevice) {
+                        Text(String(localized: "默认", bundle: .module)).tag(String?.none)
+                        ForEach(cameras) { camera in
+                            Text(camera.name).tag(Optional(camera.id))
+                        }
+                    } label: {
+                        Text(String(localized: "录像设备", bundle: .module))
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    EmptyView()
+                }
+            }
         }
     }
 

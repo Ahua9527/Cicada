@@ -55,6 +55,8 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // ⭐ P4 新增：退出前同步刷盘未落盘的 Sentry 配置（防抖窗口内退出不丢失改动）。
+        AppModel.shared.config.flushPendingSentrySave()
         // ⭐ P4 新增：停止 AppModel 轮询
         AppModel.shared.stopPolling()
         SentinelNotifierServer.shared.stop()

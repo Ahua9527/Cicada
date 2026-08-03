@@ -93,6 +93,17 @@ enum MaintenanceHostInjections {
         AVCaptureDevice.requestAccess(for: .video) { _ in }
     }
 
+    /// 可用相机列表（映射 AVCaptureDevice.DiscoverySession → 包内 CameraOption）。
+    /// 与 `CameraManager.discoverCameras` 同源，供 RecordingCard 设备选择器。
+    static func availableCameraOptions() -> [CameraOption] {
+        let session = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
+            mediaType: .video,
+            position: .unspecified
+        )
+        return session.devices.map { CameraOption(id: $0.uniqueID, name: $0.localizedName) }
+    }
+
     // MARK: - Path Helpers
 
     /// ~/.cicada 主目录。由 `CicadaSentinelPaths.notchDropDirectory()` 的父目录推导
@@ -136,12 +147,19 @@ struct HostMaintenanceInjectionsModifier: ViewModifier {
             .environment(\.requestCameraPermission) {
                 MaintenanceHostInjections.requestCameraPermission()
             }
+            .environment(\.cameraOptions) {
+                MaintenanceHostInjections.availableCameraOptions()
+            }
             .environment(\.runStartupChecks) {
                 // `AppDelegate` 是 `@MainActor` 类，`runStartupChecks()` main-actor 隔离。
                 // `runStartupChecks` 环境值类型是 `(() -> Void)?` nonisolated 闭包，
                 // 用 `Task { @MainActor in ... }` 异步派发到主线程执行（fire-and-forget）。
                 Task { @MainActor in
                     appDelegate.runStartupChecks()
+                    // 把启动检查失败项映射为诊断写回 AppModel，供维护页诊断卡展示
+                    // （否则失败项只留在 AppDelegate.startupDiagnostics，UI 无任何读取者）。
+                    let messages = appDelegate.startupDiagnostics.map(\.message).joined(separator: "\n")
+                    AppModel.shared.setStartupDiagnostic(message: messages.isEmpty ? nil : messages)
                 }
             }
     }

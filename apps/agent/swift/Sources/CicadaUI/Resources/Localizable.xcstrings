@@ -101,16 +101,6 @@
         }
       }
     },
-    "监控未启动，点击下方按钮开启守护": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Monitoring not started, tap below to begin"
-          }
-        }
-      }
-    },
     "Cicada 控制中心": {
       "localizations": {
         "en": {
@@ -307,16 +297,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Save failed: "
-          }
-        }
-      }
-    },
-    "Cicada 中继服务地址，例如 wss://relay.example.com": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cicada relay service URL, e.g. wss://relay.example.com"
           }
         }
       }
@@ -1197,6 +1177,76 @@
           "stringUnit": {
             "state": "translated",
             "value": "Connection, protection, alerts, recording, and NotchDrop."
+          }
+        }
+      }
+    },
+    "Cicada 已激活": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada Activated"
+          }
+        }
+      }
+    },
+    "监控未启动，锁定 Mac 后自动开启守护": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitoring inactive. It arms automatically once you lock your Mac."
+          }
+        }
+      }
+    },
+    "Cicada 中继服务地址，例如 https://relay.example.com": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada relay service address, e.g. https://relay.example.com"
+          }
+        }
+      }
+    },
+    "待配置": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs setup"
+          }
+        }
+      }
+    },
+    "保持中": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Holding"
+          }
+        }
+      }
+    },
+    "录像设备": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recording device"
+          }
+        }
+      }
+    },
+    "默认": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
           }
         }
       }

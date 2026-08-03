@@ -4,6 +4,8 @@ import SwiftUI
 struct NavRow: View {
     let section: NavSection
     let active: Bool
+    /// 侧栏状态文案：由调用方从实时模型派生（见 ControlCenterRoot.statusText(for:)）。
+    let statusText: String
 
     var body: some View {
         HStack(spacing: DesignMetrics.Spacing.s3) {
@@ -16,7 +18,7 @@ struct NavRow: View {
                 Text(section.title)
                     .font(.subheadline.weight(active ? .semibold : .regular))
                     .foregroundStyle(.cicadaTextPrimary)
-                Text(section.statusText)
+                Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.cicadaTextTertiary)
             }
@@ -35,9 +37,9 @@ struct NavRow: View {
 
 #Preview {
     VStack(spacing: 4) {
-        NavRow(section: .overview, active: true)
-        NavRow(section: .settings, active: false)
-        NavRow(section: .maintenance, active: false)
+        NavRow(section: .overview, active: true, statusText: "运行中")
+        NavRow(section: .settings, active: false, statusText: "就绪")
+        NavRow(section: .maintenance, active: false, statusText: "睡眠保持空闲")
     }
     .padding()
     .background(.cicadaBgSurface)

@@ -127,6 +127,29 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Camera Options
+
+/// 可选相机设备（包内值类型，避免 CicadaUI 依赖 AVFoundation）。
+public struct CameraOption: Identifiable, Hashable {
+    public let id: String
+    public let name: String
+    public init(id: String, name: String) { self.id = id; self.name = name }
+}
+
+private struct CameraOptionsKey: EnvironmentKey {
+    /// 默认空列表：库独立预览/单测时不显示设备选择器。
+    static let defaultValue: () -> [CameraOption] = { [] }
+}
+
+extension EnvironmentValues {
+    /// 可用相机列表。宿主注入 `AVCaptureDevice.DiscoverySession` 映射；
+    /// 多摄像头 Mac 在授权态下用此列表渲染设备选择器（绑定 `sentryRecordingDevice`）。
+    public var cameraOptions: () -> [CameraOption] {
+        get { self[CameraOptionsKey.self] }
+        set { self[CameraOptionsKey.self] = newValue }
+    }
+}
+
 // MARK: - NotchDrop Settings
 
 /// NotchDrop 设置的宿主桥接模型：把引擎真实设置（NotchViewModel 的 hapticFeedback /
