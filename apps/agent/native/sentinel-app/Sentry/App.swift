@@ -61,6 +61,7 @@ struct CicadaApp: SwiftUI.App {
                     .frame(width: 0, height: 0)
             }
         }
+        .menuBarExtraStyle(.window)
     }
 }
 
