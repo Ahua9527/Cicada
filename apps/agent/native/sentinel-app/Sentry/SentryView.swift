@@ -25,10 +25,13 @@ struct SentryView: View {
                     .transition(.opacity)
                     .ignoresSafeArea()
                 Rectangle().fill(.ultraThinMaterial).opacity(0.5)
-            }
-            AlarmOverlayContent(reason: appModel.alarm.reason) {
-                // 停止链路：AlarmModel.stop() → controller.stop() → finishCurrentSession()。
-                Task { await appModel.alarm.stop() }
+                AlarmOverlayContent(reason: appModel.alarm.reason) {
+                    // 停止链路：AlarmModel.stop() → controller.stop() → finishCurrentSession()。
+                    Task { await appModel.alarm.stop() }
+                }
+            } else {
+                // 非告警态：仅展示已激活监控占位，不暴露「停止警戒」（避免误中断监控）。
+                MonitoringOverlayContent()
             }
         }
         .frame(width: 700, height: 400, alignment: .center)
