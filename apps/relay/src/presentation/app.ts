@@ -10,7 +10,6 @@ import {
   requestIdMiddleware,
   loggingMiddleware,
   securityHeadersMiddleware,
-  deviceContextMiddleware,
   corsMiddleware,
   rateLimitMiddleware,
   requestSizeLimitMiddleware,
@@ -93,10 +92,7 @@ export class CicadaRelayApp {
       );
     }
 
-    // H7: 在限流前注入已校验的 deviceId（仅 /relay/ 路径），让限流可优先按设备计量。
-    pipeline.use(deviceContextMiddleware());
-
-    // Rate limiting
+    // Rate limiting（限流键只使用可信来源，见 rate-limit.middleware）
     if (enableRateLimit) {
       pipeline.use(
         rateLimitMiddleware({

@@ -151,17 +151,13 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
 /**
  * 获取客户端标识符
  *
- * H7: 优先使用已校验的 deviceId；其次使用 Cloudflare 可信的
- * cf-connecting-ip（由 Cloudflare 边缘注入，不可被客户端伪造）；
- * x-forwarded-for 仅在 cf-connecting-ip 缺失时作为兜底（不可信但仍优于
- * 'unknown'，可避免同源 IP 共用 unknown 桶）。若都缺失才退化到 'unknown'。
+ * 限流键只使用可信来源：Cloudflare 边缘注入的 cf-connecting-ip（客户端
+ * 无法伪造）；x-forwarded-for 仅在 cf-connecting-ip 缺失时作为兜底（不可信
+ * 但仍优于 'unknown'，可避免同源 IP 共用 unknown 桶）。若都缺失才退化到
+ * 'unknown'。不使用 x-device-id 等客户端自报身份——其在 DO 内完成签名校验
+ * 前不可信，否则攻击者可轮换标识获取新限流桶或消耗受害设备配额。
  */
 function getClientIdentifier(context: MiddlewareContext): string {
-  // 优先使用已校验的设备ID
-  if (context.deviceId) {
-    return `device:${context.deviceId}`;
-  }
-
   // 优先使用 Cloudflare 边缘注入的 cf-connecting-ip
   const cfIp =
     context.headers['cf-connecting-ip'] ??

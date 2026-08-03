@@ -12,7 +12,7 @@ export * from './rate-limit.middleware';
 import { MiddlewarePipeline } from './pipeline';
 import { requestIdMiddleware, loggingMiddleware } from './logging.middleware';
 import { corsMiddleware, type CorsOptions } from './cors.middleware';
-import { securityHeadersMiddleware, requestSizeLimitMiddleware, deviceContextMiddleware } from './security.middleware';
+import { securityHeadersMiddleware, requestSizeLimitMiddleware } from './security.middleware';
 import { rateLimitMiddleware, type RateLimitOptions } from './rate-limit.middleware';
 
 /**
@@ -54,10 +54,7 @@ export function createDefaultPipeline(options: DefaultPipelineOptions = {}): Mid
     pipeline.use(corsMiddleware(corsOptions));
   }
 
-  // H7: 注入已校验的 deviceId，让限流优先按设备计量。
-  pipeline.use(deviceContextMiddleware());
-
-  // 限流中间件
+  // 限流中间件（限流键只使用可信来源，见 rate-limit.middleware）
   if (enableRateLimit) {
     pipeline.use(rateLimitMiddleware(rateLimitOptions));
   }

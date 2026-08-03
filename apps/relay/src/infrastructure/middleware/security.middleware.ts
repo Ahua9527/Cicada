@@ -5,27 +5,6 @@
 import type { Middleware, MiddlewareResult } from './types';
 import { extractResponse } from './types';
 import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
-import { isValidDeviceId } from '@cicada/shared';
-
-/**
- * 设备上下文中间件
- *
- * H7: 在路由前从 x-device-id 头提取并校验 deviceId 格式，写入
- * context.deviceId，让速率限制中间件可优先按 deviceId 计量。仅在
- * /relay/ 路径（WebSocket 升级）上启用，避免公开端点被任意
- * x-device-id 绕过 IP 维度的限流。完整签名校验仍在 DO 内完成。
- */
-export function deviceContextMiddleware(): Middleware {
-  return async (context, next) => {
-    if (context.url.pathname.startsWith('/relay/')) {
-      const rawDeviceId = context.request.headers.get('x-device-id');
-      if (rawDeviceId && isValidDeviceId(rawDeviceId)) {
-        context.deviceId = rawDeviceId;
-      }
-    }
-    return next();
-  };
-}
 
 /**
  * 安全头中间件
