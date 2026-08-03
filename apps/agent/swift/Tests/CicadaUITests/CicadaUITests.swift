@@ -291,6 +291,74 @@ final class CicadaUITests: XCTestCase {
         XCTAssertEqual(delegate.stopCount, 0)
     }
 
+    @MainActor
+    func testSentinelsModelCatchClearsStaleState() async {
+        let snap = SentinelStatusSnapshot(
+            state: "running",
+            activityHint: "",
+            recordingEnabled: true,
+            sleepHoldActive: true,
+            sleepHoldSessionId: "abc"
+        )
+        var shouldThrow = false
+        let model = SentinelsModel(statusProvider: {
+            if shouldThrow { throw NSError(domain: "SentinelsModelTests", code: 1) }
+            return SentinelControlResponse(ok: true, message: "", status: snap)
+        })
+
+        let ok = await model.refresh()
+        XCTAssertTrue(ok)
+        XCTAssertEqual(model.state, .running)
+        XCTAssertEqual(model.readiness.count, 4)
+        XCTAssertNotNil(model.lastSnapshot)
+
+        // 连接失败：catch 分支应清空陈旧快照/就绪项/触发数，与 nil 分支一致，
+        // 避免 Overview/菜单栏把上一次成功的过期状态当实时。
+        shouldThrow = true
+        let ok2 = await model.refresh()
+        XCTAssertFalse(ok2)
+        XCTAssertEqual(model.state, .idle)
+        XCTAssertNil(model.lastSnapshot)
+        XCTAssertTrue(model.readiness.isEmpty)
+        XCTAssertEqual(model.activeTriggerCount, 0)
+        XCTAssertNotNil(model.diagnostic)
+    }
+
+    @MainActor
+    func testConfigModelSaveConnectionMergesConcurrentChanges() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configPath = directory.appendingPathComponent("config.json").path
+        let store = ConfigStore(path: configPath)
+
+        var initial = CicadaConfig.defaultConfig()
+        initial.relayURL = "https://a.example.com"
+        initial.deviceId = "MAC_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        try store.save(initial)
+
+        let model = ConfigModel(
+            store: store,
+            sentryStore: SentryConfigStore(path: directory.appendingPathComponent("sentry-config.json").path)
+        )
+
+        // 模拟控制中心打开后，CLI 并发改了 deviceId（盘上最新值）。
+        var concurrent = try store.load()
+        concurrent.deviceId = "MAC_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        try store.save(concurrent)
+
+        // 用户在控制中心只改 relayURL 并保存。
+        model.draft.relayURL = "https://b.example.com"
+        await model.saveConnection()
+
+        // 盘上：relayURL=B（用户编辑），deviceId=DEV2（并发修改保留，未被陈旧 draft 回滚）。
+        let reloaded = try store.load()
+        XCTAssertEqual(reloaded.relayURL, "https://b.example.com")
+        XCTAssertEqual(reloaded.deviceId, "MAC_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+        // draft 同步为合并结果。
+        XCTAssertEqual(model.draft.relayURL, "https://b.example.com")
+        XCTAssertEqual(model.draft.deviceId, "MAC_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cicada-ui-tests-\(UUID().uuidString)", isDirectory: true)

@@ -11,10 +11,12 @@ final class SentinelsModel: ObservableObject {
     @Published private(set) var lastSnapshot: SentinelStatusSnapshot?
 
     private let client: UdsSentinelControlClient
+    private let statusProvider: () async throws -> SentinelControlResponse
     fileprivate weak var configProvider: ConfigModel?
 
-    init(client: UdsSentinelControlClient = .init()) {
+    init(client: UdsSentinelControlClient = .init(), statusProvider: (() async throws -> SentinelControlResponse)? = nil) {
         self.client = client
+        self.statusProvider = statusProvider ?? { try await client.statusAsync() }
     }
 
     /// 轮询刷新状态。连接失败时设为 idle 并生成诊断警告。
@@ -22,7 +24,7 @@ final class SentinelsModel: ObservableObject {
     @discardableResult
     func refresh() async -> Bool {
         do {
-            let resp = try await client.statusAsync()
+            let resp = try await statusProvider()
             if let snap = resp.status {
                 lastSnapshot = snap
                 state = SnapshotMapper.toState(snap)
