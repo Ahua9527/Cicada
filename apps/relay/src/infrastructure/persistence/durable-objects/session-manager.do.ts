@@ -102,6 +102,8 @@ export class SessionManagerDO {
    */
   private lastSessionSaveAt = 0;
   private pendingSaveCount = 0;
+  private saveInFlight = false;
+  private saveDirty = false;
   private static readonly SAVE_THROTTLE_MS = 30_000;
   private static readonly SAVE_THROTTLE_COUNT = 20;
 
@@ -173,10 +175,20 @@ export class SessionManagerDO {
   /**
    * Save sessions to persistent storage
    *
-   * H9: 写入成功后重置节流计数与时间戳，避免后续 handleIncomingMessage
-   * 因为陈旧的 lastSessionSaveAt 立刻再次触发落盘。
+   * H9: 节流 + 单写合并。一次 storage.put 进行期间，新到达的消息只标记 saveDirty，
+   * 不再各自触发一次完整 put——否则突发流量在 put 未返回期间会因陈旧的
+   * lastSessionSaveAt 退化为每条一写，耗尽 DO 写预算。计数在落盘前同步重置，
+   * 避免陈旧时间戳在 put 期间再次触发；落盘完成后若 dirty 则尾随一次补写。
    */
   private async saveSessions(): Promise<void> {
+    if (this.saveInFlight) {
+      this.saveDirty = true;
+      return;
+    }
+    this.saveInFlight = true;
+    // 同步重置节流计数：避免 put 期间用陈旧 lastSessionSaveAt 再触发落盘。
+    this.lastSessionSaveAt = Date.now();
+    this.pendingSaveCount = 0;
     try {
       const sessions = Array.from(this.sessionInfo.values()).map(info =>
         this.normalizeSessionInfo(info.deviceId ?? this.state.id.toString(), info)
@@ -185,10 +197,15 @@ export class SessionManagerDO {
         [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: sessions,
         [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: Array.from(this.nonces),
       });
-      this.lastSessionSaveAt = Date.now();
-      this.pendingSaveCount = 0;
     } catch (error) {
       this.logStructured('error', 'Failed to save session data', { error });
+    } finally {
+      this.saveInFlight = false;
+    }
+    // 落盘期间到达的变更：尾随一次补写（仍受 in-flight 闸门保护）。
+    if (this.saveDirty) {
+      this.saveDirty = false;
+      this.state.waitUntil(this.saveSessions());
     }
   }
 
@@ -1486,7 +1503,9 @@ export class SessionManagerDO {
 
   private pruneUsedRegistrationNonces(now: number): void {
     for (const [nonce, expiresAt] of this.usedRegistrationNonces.entries()) {
-      if (now >= expiresAt) {
+      // > 而非 >=：边界处（now == registrationTimestamp + SKEW）时间戳仍合法，
+      // 须保留到边界之后，否则捕获的签名注册能在该精确边界重放。
+      if (now > expiresAt) {
         this.usedRegistrationNonces.delete(nonce);
       }
     }

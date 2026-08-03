@@ -8,6 +8,8 @@
  * 过期时刻锚定到所声明时间戳的最晚可接受时间（timestamp + maxAge），
  * 而非首次使用时刻：时间戳采用 ±maxAge 对称窗口，未来时间戳在该窗口
  * 内一直合法，若按 now + maxAge 过期会留下最长一个 maxAge 的重放窗口。
+ * 条目保留到该边界之后才淘汰（> 而非 >=）：边界处时间戳仍合法，nonce
+ * 须仍标记已用，否则捕获的请求能在 timestamp + maxAge 精确重放。
  */
 export class NonceValidator {
   private readonly usedNonces = new Map<string, number>();
@@ -33,7 +35,7 @@ export class NonceValidator {
     if (expiry === undefined) {
       return false;
     }
-    if (Date.now() >= expiry) {
+    if (Date.now() > expiry) {
       this.usedNonces.delete(nonce);
       return false;
     }
@@ -46,9 +48,9 @@ export class NonceValidator {
 
   cleanup(maxEntries: number = 1000): void {
     const now = Date.now();
-    // 1. 淘汰超过窗口的旧 nonce
+    // 1. 淘汰窗口之外的旧 nonce（> 而非 >=：边界处时间戳仍合法，须保留到边界之后）
     for (const [nonce, expiry] of this.usedNonces) {
-      if (now >= expiry) {
+      if (now > expiry) {
         this.usedNonces.delete(nonce);
       }
     }
