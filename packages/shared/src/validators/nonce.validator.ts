@@ -4,6 +4,10 @@
  * H10: 改为按时间淘汰——usedNonces 存储为 Map<nonce, expiry>，
  * cleanup 时删除超过窗口的旧 nonce，并按插入顺序裁剪到 maxEntries，
  * 而非全量 clear()。
+ *
+ * 过期时刻锚定到所声明时间戳的最晚可接受时间（timestamp + maxAge），
+ * 而非首次使用时刻：时间戳采用 ±maxAge 对称窗口，未来时间戳在该窗口
+ * 内一直合法，若按 now + maxAge 过期会留下最长一个 maxAge 的重放窗口。
  */
 export class NonceValidator {
   private readonly usedNonces = new Map<string, number>();
@@ -20,7 +24,7 @@ export class NonceValidator {
       return false;
     }
 
-    this.usedNonces.set(nonce, now + this.maxAge);
+    this.usedNonces.set(nonce, timestamp + this.maxAge);
     return true;
   }
 

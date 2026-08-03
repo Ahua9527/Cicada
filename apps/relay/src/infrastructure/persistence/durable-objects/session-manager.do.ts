@@ -1202,7 +1202,11 @@ export class SessionManagerDO {
           { status: 403 }
         );
       }
-      this.usedRegistrationNonces.set(nonceKey, now + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW);
+      // 过期锚定到所声明时间戳的最晚可接受时间，防止未来时间戳在条目过期后重放。
+      this.usedRegistrationNonces.set(
+        nonceKey,
+        Number(payload.registrationTimestamp) + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+      );
     }
 
     const record: DeviceRegistryRecord = {
