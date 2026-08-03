@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "CicadaSwift",
     defaultLocalization: "zh-Hans",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v13)],
     products: [
         .library(name: "CicadaCore", targets: ["CicadaCore"]),
         .library(name: "CicadaIPC", targets: ["CicadaIPC"]),

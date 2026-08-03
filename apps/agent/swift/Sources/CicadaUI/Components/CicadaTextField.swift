@@ -40,8 +40,7 @@ struct CicadaTextField: View {
 }
 
 #Preview {
-    @Previewable @State var text = "https://api.day.app/xxx"
-    return CicadaTextField(title: "Bark Endpoint", text: $text, hint: "输入 Bark 服务端地址")
+    CicadaTextField(title: "Bark Endpoint", text: .constant("https://api.day.app/xxx"), hint: "输入 Bark 服务端地址")
         .padding()
         .background(.cicadaBgSurface)
         .frame(width: 400)

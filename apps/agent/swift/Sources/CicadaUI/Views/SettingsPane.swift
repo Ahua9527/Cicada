@@ -30,7 +30,7 @@ struct SettingsPane: View {
             .padding(DesignMetrics.Spacing.s6)
         }
         .onAppear { consumePendingTab() }
-        .onChange(of: router.pendingSettingsTab) { consumePendingTab() }
+        .onChange(of: router.pendingSettingsTab) { _ in consumePendingTab() }
         .sheet(isPresented: $showHelp) { HelpSheet() }
     }
 
@@ -104,8 +104,8 @@ struct SettingsTabChip: View {
 }
 
 #Preview {
-    @Previewable @State var tab: SettingsTab = .connection
-    return SettingsPane()
+    SettingsPane()
         .environmentObject(AppModel())
+        .environmentObject(ControlCenterRouter())
         .frame(width: 640, height: 600)
 }
