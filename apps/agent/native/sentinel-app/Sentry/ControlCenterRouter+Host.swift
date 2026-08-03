@@ -20,9 +20,13 @@ extension ControlCenterRouter {
     /// 先设 `selection`（驱动 `ControlCenterRoot` 侧栏 + detail 切换），
     /// 再调 `SentinelController.shared.openMainWindow()`（通过已注册的
     /// `mainWindowOpener` 调 `openWindow(id:"main")`）。
+    /// `tab` 非空时同时下发一次性设置子页命令（`SettingsPane` 消费）。
     @discardableResult
-    func open(_ section: NavSection = .overview) -> SentinelCommandResult {
+    func open(_ section: NavSection = .overview, tab: SettingsTab? = nil) -> SentinelCommandResult {
         selection = section
+        if let tab {
+            pendingSettingsTab = tab
+        }
         return SentinelController.shared.openMainWindow()
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsPane: View {
     @SceneStorage("settings.tab") private var tab: SettingsTab = .connection
     @EnvironmentObject var appModel: AppModel
+    @EnvironmentObject var router: ControlCenterRouter
 
     var body: some View {
         ScrollView {
@@ -27,11 +28,20 @@ struct SettingsPane: View {
             }
             .padding(DesignMetrics.Spacing.s6)
         }
+        .onAppear { consumePendingTab() }
+        .onChange(of: router.pendingSettingsTab) { consumePendingTab() }
+    }
+
+    /// 消费一次性子页路由命令（如 NotchDrop 齿轮 → `.notch`）。
+    private func consumePendingTab() {
+        guard let pending = router.pendingSettingsTab else { return }
+        tab = pending
+        router.pendingSettingsTab = nil
     }
 }
 
-/// 设置页子导航 Tab 枚举。
-enum SettingsTab: String, CaseIterable, Hashable {
+/// 设置页子导航 Tab 枚举。public：供 `ControlCenterRouter.pendingSettingsTab` 与宿主路由使用。
+public enum SettingsTab: String, CaseIterable, Hashable {
     case connection
     case protection
     case alerts

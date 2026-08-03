@@ -1,10 +1,45 @@
 import SwiftUI
 
-/// NotchDrop 设置卡：触觉反馈 + 文件保留时长 + 界面语言（本地 @AppStorage）。
+/// NotchDrop 设置卡：触觉反馈 + 文件保留时长 + 界面语言。
+///
+/// 宿主注入 `notchDropSettingsStore` 时绑定引擎真实设置（NotchViewModel / TrayDrop）；
+/// 未注入（预览/单测）回退到本地 @AppStorage 占位。
 struct NotchDropCard: View {
-    @AppStorage("notch.hapticFeedback") private var hapticFeedback: Bool = true
-    @AppStorage("notch.fileRetentionDays") private var fileRetentionDays: Int = 7
-    @AppStorage("notch.interfaceLanguage") private var interfaceLanguage: String = "auto"
+    @Environment(\.notchDropSettingsStore) private var store
+
+    @AppStorage("notch.hapticFeedback") private var fallbackHapticFeedback: Bool = true
+    @AppStorage("notch.fileRetentionDays") private var fallbackFileRetentionDays: Int = 7
+    @AppStorage("notch.interfaceLanguage") private var fallbackInterfaceLanguage: String = "auto"
+
+    var body: some View {
+        if let store {
+            StoreDrivenContent(store: store)
+        } else {
+            NotchDropCardRows(
+                hapticFeedback: $fallbackHapticFeedback,
+                fileRetentionDays: $fallbackFileRetentionDays,
+                interfaceLanguage: $fallbackInterfaceLanguage
+            )
+        }
+    }
+}
+
+private struct StoreDrivenContent: View {
+    @ObservedObject var store: NotchDropSettingsStore
+
+    var body: some View {
+        NotchDropCardRows(
+            hapticFeedback: $store.hapticFeedback,
+            fileRetentionDays: $store.fileRetentionDays,
+            interfaceLanguage: $store.interfaceLanguage
+        )
+    }
+}
+
+private struct NotchDropCardRows: View {
+    @Binding var hapticFeedback: Bool
+    @Binding var fileRetentionDays: Int
+    @Binding var interfaceLanguage: String
 
     var body: some View {
         Card(title: "NotchDrop") {

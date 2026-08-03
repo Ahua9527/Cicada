@@ -10,5 +10,9 @@ public final class ControlCenterRouter: ObservableObject {
     /// 当前选中的侧栏分区。默认 `.overview`，`nil` 时 detail 回退到概览。
     @Published public var selection: NavSection? = .overview
 
+    /// 一次性设置子页路由命令：外部（如 NotchDrop 齿轮）要求设置页切到指定 tab；
+    /// `SettingsPane` onAppear/onChange 消费后置回 `nil`。
+    @Published public var pendingSettingsTab: SettingsTab?
+
     public init() {}
 }

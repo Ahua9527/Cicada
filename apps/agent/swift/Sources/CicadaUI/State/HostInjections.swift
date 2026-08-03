@@ -92,3 +92,93 @@ extension EnvironmentValues {
         set { self[RunStartupChecksKey.self] = newValue }
     }
 }
+
+// MARK: - Camera Permission
+
+/// 相机授权状态的包内镜像（避免 CicadaUI 依赖 AVFoundation）。
+public enum CameraAuthorizationStatus {
+    case notDetermined
+    case restricted
+    case denied
+    case authorized
+}
+
+private struct CameraAuthorizationStatusKey: EnvironmentKey {
+    /// 默认 `.authorized`：库独立预览/单测时不显示权限引导。
+    static let defaultValue: () -> CameraAuthorizationStatus = { .authorized }
+}
+
+private struct RequestCameraPermissionKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    /// 查询当前相机授权状态。宿主注入 `AVCaptureDevice.authorizationStatus(for: .video)` 映射。
+    public var cameraAuthorizationStatus: () -> CameraAuthorizationStatus {
+        get { self[CameraAuthorizationStatusKey.self] }
+        set { self[CameraAuthorizationStatusKey.self] = newValue }
+    }
+
+    /// 请求相机授权。`nil` 时 RecordingCard 不显示请求按钮；宿主注入
+    /// `AVCaptureDevice.requestAccess(for: .video)` 或 `CameraManager.requestPermission()`。
+    public var requestCameraPermission: (() -> Void)? {
+        get { self[RequestCameraPermissionKey.self] }
+        set { self[RequestCameraPermissionKey.self] = newValue }
+    }
+}
+
+// MARK: - NotchDrop Settings
+
+/// NotchDrop 设置的宿主桥接模型：把引擎真实设置（NotchViewModel 的 hapticFeedback /
+/// selectedLanguage、TrayDrop 的 selectedFileStorageTime）投影为可观察值。
+///
+/// 宿主创建共享实例：初值从持久层/引擎读取；用户编辑经 `didSet → onChange` 写回引擎。
+/// 默认 `nil`：NotchDropCard 回退到本地 @AppStorage 占位（库独立可预览）。
+@MainActor
+public final class NotchDropSettingsStore: ObservableObject {
+    @Published public var hapticFeedback: Bool {
+        didSet { onChange(.haptic(hapticFeedback)) }
+    }
+
+    /// 保留天数：1 / 7 / 30 / 0（0 = 永不清理）。
+    @Published public var fileRetentionDays: Int {
+        didSet { onChange(.retention(fileRetentionDays)) }
+    }
+
+    /// 界面语言："auto" / "zh-Hans" / "en"。
+    @Published public var interfaceLanguage: String {
+        didSet { onChange(.language(interfaceLanguage)) }
+    }
+
+    public enum Change {
+        case haptic(Bool)
+        case retention(Int)
+        case language(String)
+    }
+
+    private let onChange: (Change) -> Void
+
+    public init(
+        hapticFeedback: Bool,
+        fileRetentionDays: Int,
+        interfaceLanguage: String,
+        onChange: @escaping (Change) -> Void
+    ) {
+        self.hapticFeedback = hapticFeedback
+        self.fileRetentionDays = fileRetentionDays
+        self.interfaceLanguage = interfaceLanguage
+        self.onChange = onChange
+    }
+}
+
+private struct NotchDropSettingsStoreKey: EnvironmentKey {
+    static let defaultValue: NotchDropSettingsStore? = nil
+}
+
+extension EnvironmentValues {
+    /// NotchDrop 设置桥。宿主注入 `NotchDropSettingsStore.shared`（见宿主 +Host 扩展）。
+    public var notchDropSettingsStore: NotchDropSettingsStore? {
+        get { self[NotchDropSettingsStoreKey.self] }
+        set { self[NotchDropSettingsStoreKey.self] = newValue }
+    }
+}

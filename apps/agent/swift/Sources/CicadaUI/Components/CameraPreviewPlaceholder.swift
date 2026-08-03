@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// 相机未授权占位视图。
+/// 相机预览占位视图。
 ///
 /// 实际相机预览（授权后）由 Xcode 宿主的 `CameraSessionController` +
 /// `CameraPreviewView`（NSView）提供，CicadaUI 只做占位。
-struct CameraPreviewPlaceholder: View {
+/// `overlayContent` 可叠加操作按钮（如「请求相机权限」）。
+struct CameraPreviewPlaceholder<OverlayContent: View>: View {
+    var title: String = "相机预览未授权"
+    var subtitle: String = "请在系统设置中授予摄像头访问权限"
+    @ViewBuilder var overlayContent: OverlayContent
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: DesignMetrics.Radius.lg)
@@ -22,18 +27,25 @@ struct CameraPreviewPlaceholder: View {
                 Image(systemName: "camera.fill")
                     .font(.system(size: 32))
                     .foregroundStyle(Color.white.opacity(0.4))
-                Text("相机预览未授权")
+                Text(title)
                     .font(.subheadline)
                     .foregroundStyle(Color.white.opacity(0.5))
-                Text("请在系统设置中授予摄像头访问权限")
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(Color.white.opacity(0.3))
+                overlayContent
             }
         }
         .overlay(
             RoundedRectangle(cornerRadius: DesignMetrics.Radius.lg)
                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
+    }
+}
+
+extension CameraPreviewPlaceholder where OverlayContent == EmptyView {
+    init(title: String = "相机预览未授权", subtitle: String = "请在系统设置中授予摄像头访问权限") {
+        self.init(title: title, subtitle: subtitle, overlayContent: { EmptyView() })
     }
 }
 
