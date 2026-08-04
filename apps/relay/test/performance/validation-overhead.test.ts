@@ -33,6 +33,11 @@ describe('验证性能测试', () => {
     it('单次验证应该在 1ms 内完成', () => {
       const request = createValidRequest('lock');
 
+      // 预热：避免首次调用的 JIT/冷启动尖峰主导单次测量（CI 共享 runner 上尤甚）
+      for (let i = 0; i < 100; i++) {
+        validateCommandRequest(request);
+      }
+
       const start = performance.now();
       validateCommandRequest(request);
       const end = performance.now();
@@ -50,6 +55,10 @@ describe('验证性能测试', () => {
 
       for (const cmd of commands) {
         const request = createValidRequest(cmd);
+        // 预热该命令的验证路径，避免首次调用尖峰
+        for (let i = 0; i < 100; i++) {
+          validateCommandRequest(request);
+        }
         const start = performance.now();
         validateCommandRequest(request);
         const end = performance.now();
