@@ -302,12 +302,15 @@ describe('API Integration Tests', () => {
       });
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (contentLength !== undefined) headers['Content-Length'] = contentLength;
-      return new Request('http://localhost/v1/shortcuts/command', {
+      // duplex 为 undici/Node 运行时对流式 body 的要求；workers-types 的 RequestInit 未声明它，
+      // 先赋值给变量再传入以绕过对象字面量的多余属性检查。
+      const init = {
         method: 'POST',
         headers,
         body: stream,
-        duplex: 'half',
-      });
+        duplex: 'half' as const,
+      };
+      return new Request('http://localhost/v1/shortcuts/command', init);
     };
 
     it('rejects an oversized body with no content-length', async () => {
