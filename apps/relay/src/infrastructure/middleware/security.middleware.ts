@@ -38,9 +38,9 @@ export function securityHeadersMiddleware(): Middleware {
 /**
  * 请求体大小限制中间件
  *
- * M11: 不再仅依赖 content-length 头（可被绕过）。对携带请求体但缺失
- * content-length 的请求（含 transfer-encoding: chunked），改为流式
- * 累计字节数，超限即中断并返回 413；未超限则用缓冲重建 request 供下游
+ * M11: 不再仅依赖 content-length 头（可被绕过）。合法且超限的 content-length
+ * 早退 413；其余所有请求体（含 content-length 缺失/畸形/少报）一律流式
+ * 累计实际字节数，超限即中断并返回 413；未超限则用缓冲重建 request 供下游
  * 消费。
  */
 export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): Middleware {
@@ -81,8 +81,10 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
             ),
           };
         }
-      } else if (context.request.body) {
-        // 缺失 content-length（含 chunked）：流式累计，超限中断
+      }
+
+      // 其余所有请求体（content-length 缺失/畸形/少报）：流式累计实际字节，超限中断
+      if (context.request.body) {
         const reader = context.request.body.getReader();
         const chunks: BlobPart[] = [];
         let total = 0;
@@ -129,11 +131,14 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
           reader.releaseLock();
         }
 
-        // 用缓冲重建 request，下游可再次读取 body
+        // 用缓冲重建 request，下游可再次读取 body；去掉原始 content-length
+        // （可能少报/畸形），让新 Request 按实际 body 长度重算。
+        const rebuiltHeaders = new Headers(context.request.headers);
+        rebuiltHeaders.delete('content-length');
         const rebuiltBody = new Blob(chunks);
         context.request = new Request(context.request.url, {
           method: context.request.method,
-          headers: context.request.headers,
+          headers: rebuiltHeaders,
           body: rebuiltBody,
         });
       }

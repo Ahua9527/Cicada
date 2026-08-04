@@ -290,6 +290,47 @@ describe('API Integration Tests', () => {
       expect(data.ok).toBe(false);
     });
 
+    // 流式 body（无 content-length 或可控 content-length）用于验证绕过防护：
+    // content-length 缺失/少报/畸形时仍按实际字节计数并拒绝超限请求。
+    const oversizedStream = (contentLength?: string) => {
+      const body = 'x'.repeat(20 * 1024);
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(body));
+          controller.close();
+        },
+      });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (contentLength !== undefined) headers['Content-Length'] = contentLength;
+      return new Request('http://localhost/v1/shortcuts/command', {
+        method: 'POST',
+        headers,
+        body: stream,
+        duplex: 'half',
+      });
+    };
+
+    it('rejects an oversized body with no content-length', async () => {
+      const response = await app.handle(oversizedStream(), mockEnv, mockCtx);
+      const data = (await response.json()) as any;
+      expect(response.status).toBe(413);
+      expect(data.ok).toBe(false);
+    });
+
+    it('rejects an oversized body with an understated content-length', async () => {
+      const response = await app.handle(oversizedStream('100'), mockEnv, mockCtx);
+      const data = (await response.json()) as any;
+      expect(response.status).toBe(413);
+      expect(data.ok).toBe(false);
+    });
+
+    it('rejects an oversized body with a malformed content-length', async () => {
+      const response = await app.handle(oversizedStream('abc'), mockEnv, mockCtx);
+      const data = (await response.json()) as any;
+      expect(response.status).toBe(413);
+      expect(data.ok).toBe(false);
+    });
+
     it('should reject invalid JSON', async () => {
       const request = new Request('http://localhost/unknown-post', {
         method: 'POST',
