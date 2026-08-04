@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant RT as SentryMonitorRuntime (actor)
+    participant S as Sentry (@MainActor)
+    participant SC as SentinelController
+    participant AM as AppModel.shared
+    participant Al as AlarmModel
+    participant SW as SkyLightOperator
+    participant SV as SentryView (SkyLightWindow)
+    participant AOC as AlarmOverlayContent (CicadaUI)
+
+    Note over SC: 用户锁屏 → SentinelController.start() → sentry.run()
+    S->>SW: makeDefaultWindowController: delegateView(AnyView(SentryView(sentry, appModel)), .main)
+    SW->>SV: 创建警戒窗口（监控态：AlarmOverlayContent reason="" ）
+    Note over RT: 触发条件命中（合盖/断网/断电）
+    RT->>S: onAlarm(reason) await
+    S->>S: triggerAlarm(reason): status=.alarming, isAlrarming=true
+    S->>SC: onAlarmingActivaty(reason) 闭包
+    SC->>SC: viewModel.status=.activityDetected, activityHint=...
+    SC->>Al: AppModel.shared.alarm.activate(reason:)
+    Al-->>Al: isActive=true, reason=reason
+    Al-->>SV: @Published isActive 变化 → 视图刷新
+    SV->>AOC: AlarmOverlayContent(reason: alarm.reason, onStop: {Task{await alarm.stop()}})
+    Note over SV: sentry.isAlraming=true → 显示 ColorfulView(.sunset)+ultraThinMaterial
+    Note over AOC: 显示「Cicada 警戒已触发」+ AlarmEye 动画 + 停止按钮
+    Note over AOC: 用户点击「停止警戒」
+    AOC->>Al: await alarm.stop()
+    Al->>Al: isActive=false, reason=""
+    Al->>S: await delegate?.alarmDidStop()
+    S->>S: stop(): status=.stopping → finishStop()
+    S->>S: stopAlarm() 停音效, stopRecording() 停录像
+    S->>SW: closeWindowIfNeeded: animateWindowClose(alpha→0, 0.3s) { controller.close() }
+    SW-->>SV: 窗口关闭
+    S->>S: restoreIdleState(): status=.idle

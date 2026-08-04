@@ -1,0 +1,55 @@
+sequenceDiagram
+  autonumber
+  participant App as App (SwiftUI.App)
+  participant Del as AppDelegate
+  participant VM as ViewModel.shared
+  participant SC as SentinelController.shared
+  participant AM as AppModel.shared
+  participant RR as ControlCenterRouter.shared
+  participant Win as WindowGroup(main)
+  participant Root as ControlCenterRoot
+  participant MB as MenuBarExtra
+  participant Drop as MenuBarDropdown
+
+  Note over App,Del: 应用启动
+  App->>Del: NSApplicationDelegateAdaptor 创建
+  Del->>AM: startPolling()  [P4]
+  Del->>VM: setTimerCallback { SC.handleTimerTick() }  [本轮新增]
+  Del->>SC: (间接触发) NotchDropCoordinator/IPC/Notifier start
+
+  Note over App: Scene 求值
+  App->>Win: WindowGroup(id:"main")
+  App->>Win: 内容 = ControlCenterRoot()
+  App->>Win: environmentObject(AM) + environmentObject(RR)
+  Win->>Root: 渲染
+  Root->>RR: 读 selection (默认 .overview)
+  Root->>Root: NavigationSplitView + List(selection:$RR.selection)
+  Root->>AM: 各 Pane 取 sentinels/config/sleepHold
+
+  App->>MB: MenuBarExtra
+  App->>MB: content = MenuBarDropdown(onQuit:{ NSApp.terminate(nil) })
+  App->>MB: environmentObject(AM) + environmentObject(RR)
+  Note over MB: label 内 MainWindowOpenBridge 注册 mainWindowOpener { openWindow(id:"main") }
+  MB->>Drop: 渲染
+  Drop->>AM: onAppear → sentinels.refresh()
+
+  Note over Drop,RR: 用户点「设置…」
+  Drop->>RR: selection = .settings
+  Drop->>Win: openWindow(id:"main")
+  Win->>Root: 已渲染，selection 变更驱动切到 SettingsPane
+
+  Note over App,RR: 用户点系统菜单「Cicada → Settings」
+  App->>RR: ControlCenterRouter.shared.open(.settings)
+  RR->>RR: selection = .settings
+  RR->>SC: openMainWindow()
+  SC->>Win: mainWindowOpener() → openWindow(id:"main")
+
+  Note over VM,SC: 1s 定时器 tick (持续)
+  VM->>SC: callback() → handleTimerTick()
+  SC->>VM: 按 status 驱动 welcome→running→completed
+
+  Note over Drop: 用户点「退出 Cicada」
+  Drop->>Del: onQuit() → NSApp.terminate(nil)
+  Del->>AM: stopPolling()
+  Del->>SC: servers.stop() / disconnectFromSleepHold()
+  Note over App: 进程退出

@@ -1,4 +1,5 @@
 import Cocoa
+import CicadaUI
 import Combine
 import Foundation
 import SwiftUI
@@ -97,7 +98,8 @@ class NotchViewModel: NSObject, ObservableObject {
     func showSettings() {
         notchClose()
         Task { @MainActor in
-            _ = SentryControlCenterRouter.shared.open(.settings)
+            // NotchDrop 齿轮应直达 NotchDrop 设置子页，而非设置首页/上次停留的 tab。
+            _ = ControlCenterRouter.shared.open(.settings, tab: .notch)
         }
     }
 

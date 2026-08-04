@@ -10,6 +10,7 @@
 	<true/>
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
 	<array>
+		<string>/.cicada/</string>
 		<string>/.cicada/run/</string>
 		<string>/.cicada/notchdrop/</string>
 	</array>

@@ -13,6 +13,7 @@
 		50D002062DE1000000BB8467 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 50D002052DE1000000BB8467 /* Collections */; };
 		50D002082DE1000000BB8467 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = 50D002072DE1000000BB8467 /* LaunchAtLogin */; };
 		50D0FD7E2DE0EEAE00BB8467 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 50D0FD7D2DE0EEAE00BB8467 /* SkyLightWindow */; };
+		50D0AA042DE2000000BB8467 /* CicadaUI in Frameworks */ = {isa = PBXBuildFile; productRef = 50D0AA032DE2000000BB8467 /* CicadaUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +76,7 @@
 				50D002042DE1000000BB8467 /* Pow in Frameworks */,
 				50D002062DE1000000BB8467 /* Collections in Frameworks */,
 				50D002082DE1000000BB8467 /* LaunchAtLogin in Frameworks */,
+				50D0AA042DE2000000BB8467 /* CicadaUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,6 +149,7 @@
 				50D002032DE1000000BB8467 /* Pow */,
 				50D002052DE1000000BB8467 /* Collections */,
 				50D002072DE1000000BB8467 /* LaunchAtLogin */,
+				50D0AA032DE2000000BB8467 /* CicadaUI */,
 			);
 			productName = Sentry;
 			productReference = 50D0FD622DE0ED6000BB8467 /* Cicada.app */;
@@ -186,6 +189,7 @@
 				50D002002DE1000000BB8467 /* XCRemoteSwiftPackageReference "Pow" */,
 				50D002012DE1000000BB8467 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				50D002022DE1000000BB8467 /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+				50D0AA012DE2000000BB8467 /* XCLocalSwiftPackageReference "CicadaSwift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -510,6 +514,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		50D0AA012DE2000000BB8467 /* XCLocalSwiftPackageReference "CicadaSwift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../swift";
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		50D001222DE0F18200BB8467 /* XCRemoteSwiftPackageReference "ColorfulX" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -578,6 +589,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 50D0FD7C2DE0EEAE00BB8467 /* XCRemoteSwiftPackageReference "SkyLightWindow" */;
 			productName = SkyLightWindow;
+		};
+		50D0AA032DE2000000BB8467 /* CicadaUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 50D0AA012DE2000000BB8467 /* XCLocalSwiftPackageReference "CicadaSwift" */;
+			productName = CicadaUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

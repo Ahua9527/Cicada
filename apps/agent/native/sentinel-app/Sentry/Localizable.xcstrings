@@ -3063,6 +3063,36 @@
           }
         }
       }
+    },
+    "Open ~/.cicada": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 ~/.cicada"
+          }
+        }
+      }
+    },
+    "Open Config": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开配置"
+          }
+        }
+      }
+    },
+    "Open Data Directory": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开数据目录"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

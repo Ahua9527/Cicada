@@ -19,9 +19,12 @@ coverage/
 .wrangler/
 apps/relay/.wrangler/
 apps/agent/swift/.build/
+apps/agent/swift/build/
 apps/agent/swift/.swiftpm/
 apps/agent/native/notification-agent/.build/
 apps/agent/native/sentinel-app/.build/
+apps/agent/native/sentinel-app/build/
+*.pbxproj.bak
 
 # macOS and editors
 .DS_Store
@@ -36,3 +39,6 @@ xcuserdata/
 npm-debug.log*
 pnpm-debug.log*
 .workbuddy/
+
+# Local design previews
+design-previews/

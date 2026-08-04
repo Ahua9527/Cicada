@@ -5,6 +5,8 @@
 //  Created by 秋星桥 on 5/24/25.
 //
 
+import CicadaUI
+import Combine
 import Foundation
 import SwiftUI
 
@@ -14,6 +16,7 @@ final class SentryConfigurationManager: ObservableObject {
 
     private let sleepHoldClient: SleepHoldServiceClient
     private let now: () -> Date
+    private let configModel: ConfigModel
     private let connectRetryInterval: TimeInterval = 3
     private let extendInterval: TimeInterval = 10
 
@@ -22,9 +25,12 @@ final class SentryConfigurationManager: ObservableObject {
     private var nextConnectAttemptAt: Date = .distantPast
     private var nextExtendAt: Date = .distantPast
     private var sleepHoldStateToken: UInt64 = 0
+    private var configCancellable: AnyCancellable?
 
-    @PublishedPersist(key: "sentry.config", defaultValue: .init(), engine: UserDefaultStorage())
-    var cfg: SentryConfiguration
+    var cfg: SentryConfiguration {
+        get { configModel.sentry }
+        set { configModel.sentry = newValue }
+    }
 
     @Published var sleepHoldServiceIdentifier: String = ""
     @Published var sleepHoldServiceLastUpdate: Date = .init()
@@ -40,11 +46,15 @@ final class SentryConfigurationManager: ObservableObject {
     init(
         sleepHoldClient: SleepHoldServiceClient = CicadaDaemonSleepHoldServiceClient(),
         now: @escaping () -> Date = Date.init,
-        persistEngine: PersistProvider = UserDefaultStorage()
+        configModel: ConfigModel? = nil
     ) {
+        let configModel = configModel ?? AppModel.shared.config
         self.sleepHoldClient = sleepHoldClient
         self.now = now
-        _cfg = .init(key: "sentry.config", defaultValue: .init(), engine: persistEngine)
+        self.configModel = configModel
+        configCancellable = configModel.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
     }
 
     var hasTriggerEnabled: Bool {
@@ -221,26 +231,4 @@ final class SentryConfigurationManager: ObservableObject {
             print(ok ? successMessage : failureMessage)
         }
     }
-}
-
-struct SentryConfiguration: Codable, Equatable, Hashable {
-    var sentryTriggersLidEnabled: Bool = false
-    var sentryTriggersInternetEnabled: Bool = false
-    var sentryTriggersPowerEnabled: Bool = false
-
-    var sentryAlarmsSoundsEnabled: Bool = false
-
-    var sentryAlarmsNotificationType: NotificationType = .none
-    enum NotificationType: String, Codable, Equatable, Hashable {
-        case none
-        case bark
-    }
-
-    var sentryNotificationConfigBark: NotificationConfiguration_Bark = .init()
-    struct NotificationConfiguration_Bark: Codable, Equatable, Hashable {
-        var endpoint: String = "https://"
-    }
-
-    var sentryRecordingEnabled: Bool = false
-    var sentryRecordingDevice: String? = nil
 }

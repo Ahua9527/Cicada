@@ -3,8 +3,10 @@
 //  NotchDrop
 //
 //  Created by 秋星桥 on 2024/7/7.
+//  P4 重构：内容路由换用 CicadaUI 的 NotchPanel / NotchMenu（.notification 保留宿主视图）。
 //
 
+import CicadaUI
 import ColorfulX
 import SwiftUI
 import UniformTypeIdentifiers
@@ -16,13 +18,14 @@ struct NotchContentView: View {
         ZStack {
             switch vm.contentType {
             case .normal:
-                HStack(spacing: vm.spacing) {
-                    AirDropView(vm: vm)
-                    TrayView(vm: vm)
-                }
-                .transition(.scale(scale: 0.8).combined(with: .opacity))
+                // 注入既有 TrayView 作为暂存区：它观察 TrayDrop.shared，覆盖空态拖放区
+                // 与已暂存文件的打开/拖拽/删除列表。包内 NotchSection(.tray) 只剩空态，会
+                // 让拖入的文件无法取回/管理。
+                NotchPanel(delegate: vm)
+                    .environment(\.trayContent) { AnyView(TrayView(vm: vm)) }
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
             case .menu:
-                NotchMenuView(vm: vm)
+                NotchMenu(delegate: vm)
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             case .notification:
                 if let payload = vm.notificationPayload {

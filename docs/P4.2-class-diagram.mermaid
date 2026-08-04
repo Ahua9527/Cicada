@@ -1,0 +1,101 @@
+classDiagram
+  direction LR
+
+  class NavSection {
+    <<public enum>>
+    +overview
+    +settings
+    +maintenance
+    +id: String
+    +title: String
+    +systemImage: String
+    +statusText: String
+  }
+
+  class ControlCenterRouter {
+    <<public @MainActor ObservableObject>>
+    +selection: NavSection?
+    +init()
+  }
+
+  class AppModel {
+    <<public @MainActor ObservableObject>>
+    +sentinels: SentinelsModel
+    +config: ConfigModel
+    +sleepHold: SleepHoldModel
+    +alarm: AlarmModel
+    +startPolling()
+    +stopPolling()
+    +convenience init()
+  }
+
+  class ControlCenterRoot {
+    <<public struct View>>
+    -appModel: AppModel ~EnvironmentObject~
+    -router: ControlCenterRouter ~EnvironmentObject~
+    +init()
+  }
+
+  class MenuBarDropdown {
+    <<public struct View>>
+    -appModel: AppModel ~EnvironmentObject~
+    -router: ControlCenterRouter ~EnvironmentObject~
+    -openWindow: OpenWindowAction ~Environment~
+    +onQuit: () -> Void
+    +init(onQuit:)
+  }
+
+  class ControlCenterRouter_Host {
+    <<host extension>>
+    +$shared: ControlCenterRouter
+    +open(section: NavSection) SentinelCommandResult
+  }
+
+  class AppModel_Host {
+    <<host extension>>
+    +$shared: AppModel
+  }
+
+  class SentinelController {
+    <<host @MainActor ObservableObject>>
+    +$shared: SentinelController
+    +openMainWindow() SentinelCommandResult
+    +registerMainWindowOpener(opener)
+    +handleTimerTick()
+  }
+
+  class ViewModel {
+    <<host ObservableObject>>
+    +$shared: ViewModel
+    +status: PanelStatus
+    +setTimerCallback(cb)
+  }
+
+  class AppDelegate {
+    <<host NSApplicationDelegate>>
+    -applicationDidFinishLaunching()
+    -applicationWillTerminate()
+  }
+
+  class App {
+    <<host SwiftUI.App>>
+    -appDelegate: AppDelegate
+    +WindowGroup(id:"main") → ControlCenterRoot
+    +MenuBarExtra → MenuBarDropdown
+    +commands → ControlCenterRouter.shared.open(.x)
+  }
+
+  ControlCenterRoot --> ControlCenterRouter : observes selection
+  ControlCenterRoot ..> NavSection : lists
+  MenuBarDropdown --> ControlCenterRouter : sets selection
+  MenuBarDropdown ..> NavSection : cases
+  ControlCenterRouter_Host ..|> ControlCenterRouter : extension
+  ControlCenterRouter_Host --> SentinelController : openMainWindow()
+  AppModel_Host ..|> AppModel : extension
+  App --> ControlCenterRoot : injects env
+  App --> MenuBarDropdown : injects env + onQuit
+  App --> ControlCenterRouter_Host : commands
+  AppDelegate --> AppModel_Host : startPolling/stopPolling
+  AppDelegate --> ViewModel : setTimerCallback
+  SentinelController --> ViewModel : reads status
+  SentinelController --> AppModel_Host : alarm

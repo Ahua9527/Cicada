@@ -21,6 +21,10 @@ final class NotchDropCoordinator: ObservableObject, SentinelNotificationRenderin
 
     fileprivate var windowController: NotchWindowController?
 
+    /// 当前活动的 NotchViewModel：供控制中心设置卡读写引擎真实设置
+    /// （hapticFeedback / selectedLanguage）。无刘海窗口时为 nil。
+    var activeViewModel: NotchViewModel? { windowController?.vm }
+
     init(storageDirectory: URL = NotchDropPaths.defaultStorageDirectory, presenter: NotchDropPresenting? = nil) {
         self.storageDirectory = storageDirectory
         let defaultPresenter = NotchDropWindowPresenter()

@@ -67,7 +67,10 @@ public enum SleepHoldControlError: Error, CustomStringConvertible {
     }
 }
 
-public final class SleepHoldControlClient {
+/// `@unchecked Sendable`：实例字段 `socketPath`/`timeoutMs` 均为 `let` 不可变；
+/// `request(_:)` 每次调用新建独立 fd，POSIX socket 调用本身线程安全，
+/// 无实例可变状态，故可安全跨 `Task.detached` 逃逸。
+public final class SleepHoldControlClient: @unchecked Sendable {
     private let socketPath: String
     private let timeoutMs: Int
 

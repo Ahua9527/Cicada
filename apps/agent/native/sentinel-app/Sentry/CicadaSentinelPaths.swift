@@ -31,6 +31,15 @@ enum CicadaSentinelPaths {
             .path
     }
 
+    static func sentryConfigPath(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
+    ) -> String {
+        URL(fileURLWithPath: cicadaHome(environment: environment, homeDirectory: homeDirectory), isDirectory: true)
+            .appendingPathComponent("sentry-config.json")
+            .path
+    }
+
     static func notchDropDirectory(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
