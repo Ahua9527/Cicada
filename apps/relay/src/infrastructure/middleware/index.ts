@@ -54,7 +54,7 @@ export function createDefaultPipeline(options: DefaultPipelineOptions = {}): Mid
     pipeline.use(corsMiddleware(corsOptions));
   }
 
-  // 限流中间件
+  // 限流中间件（限流键只使用可信来源，见 rate-limit.middleware）
   if (enableRateLimit) {
     pipeline.use(rateLimitMiddleware(rateLimitOptions));
   }

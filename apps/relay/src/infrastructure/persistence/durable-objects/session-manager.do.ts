@@ -12,6 +12,7 @@ import {
   ShortcutGrantRecord,
   Env,
 } from '../../../types';
+import { ErrorCode, constantTimeStringEqual } from '@cicada/shared';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 import {
   createPublicServerErrorResponse,
@@ -93,6 +94,19 @@ export class SessionManagerDO {
   private cleanupTimer: Timer | null = null;
   private readonly startTime = Date.now();
 
+  /**
+   * H9: 节流 saveSessions 的状态。
+   * handleIncomingMessage 每条 ping/pong 都会更新 sessionInfo，但无需每次
+   * 都落盘——累积变更 ≥ SAVE_THROTTLE_MS 或 ≥ SAVE_THROTTLE_COUNT 才真正
+   * 调一次 saveSessions()，减少 DO storage 写入。
+   */
+  private lastSessionSaveAt = 0;
+  private pendingSaveCount = 0;
+  private saveInFlight = false;
+  private saveDirty = false;
+  private static readonly SAVE_THROTTLE_MS = 30_000;
+  private static readonly SAVE_THROTTLE_COUNT = 20;
+
   constructor(
     private state: DurableObjectState,
     private env: Env,
@@ -154,14 +168,27 @@ export class SessionManagerDO {
       }
 
     } catch (error) {
-      console.error('Failed to load session data:', error);
+      this.logStructured('error', 'Failed to load session data', { error });
     }
   }
 
   /**
    * Save sessions to persistent storage
+   *
+   * H9: 节流 + 单写合并。一次 storage.put 进行期间，新到达的消息只标记 saveDirty，
+   * 不再各自触发一次完整 put——否则突发流量在 put 未返回期间会因陈旧的
+   * lastSessionSaveAt 退化为每条一写，耗尽 DO 写预算。计数在落盘前同步重置，
+   * 避免陈旧时间戳在 put 期间再次触发；落盘完成后若 dirty 则尾随一次补写。
    */
   private async saveSessions(): Promise<void> {
+    if (this.saveInFlight) {
+      this.saveDirty = true;
+      return;
+    }
+    this.saveInFlight = true;
+    // 同步重置节流计数：避免 put 期间用陈旧 lastSessionSaveAt 再触发落盘。
+    this.lastSessionSaveAt = Date.now();
+    this.pendingSaveCount = 0;
     try {
       const sessions = Array.from(this.sessionInfo.values()).map(info =>
         this.normalizeSessionInfo(info.deviceId ?? this.state.id.toString(), info)
@@ -171,7 +198,14 @@ export class SessionManagerDO {
         [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: Array.from(this.nonces),
       });
     } catch (error) {
-      console.error('Failed to save session data:', error);
+      this.logStructured('error', 'Failed to save session data', { error });
+    } finally {
+      this.saveInFlight = false;
+    }
+    // 落盘期间到达的变更：尾随一次补写（仍受 in-flight 闸门保护）。
+    if (this.saveDirty) {
+      this.saveDirty = false;
+      this.state.waitUntil(this.saveSessions());
     }
   }
 
@@ -193,7 +227,7 @@ export class SessionManagerDO {
     this.cleanupTimer = setInterval(() => {
       this.cleanupInactiveSessions();
     }, this.options.cleanupInterval);
-
+    // Cloudflare Workers 无 unref，Node 测试运行时需要它让事件循环退出；可选调用兼容两者。
     (this.cleanupTimer as { unref?: () => void }).unref?.();
   }
 
@@ -228,6 +262,7 @@ export class SessionManagerDO {
       this.agentAbsentSince = null;
       this.state.waitUntil(this.syncRelayRegistryAgentOffline(deviceId, sessionId));
     }, this.options.agentAbsenceGraceMs);
+    // 同上：可选调用 unref，避免 Node 测试进程被挂起。
     (this.agentAbsenceTimer as { unref?: () => void }).unref?.();
   }
 
@@ -303,7 +338,7 @@ export class SessionManagerDO {
     });
 
     ws.addEventListener('error', error => {
-      console.error(`Device ${deviceId} WebSocket error:`, error);
+      this.logStructured('error', `Device ${deviceId} WebSocket error`, { error });
     });
 
     return { success: true };
@@ -366,13 +401,13 @@ export class SessionManagerDO {
       }
       this.relaySockets.delete('agent');
       if (this.relayRoomInfo?.deviceId) {
-        this.rejectPendingShortcutCommands('agent_unavailable', 'Agent disconnected.');
+        this.rejectPendingShortcutCommands(ErrorCode.AGENT_UNAVAILABLE, 'Agent disconnected.');
         this.scheduleAgentAbsenceTimeout(this.relayRoomInfo.deviceId, sessionId);
       }
     });
 
     ws.addEventListener('error', error => {
-      console.error('Relay agent WebSocket error:', error);
+      this.logStructured('error', 'Relay agent WebSocket error', { error });
     });
 
     return { success: true };
@@ -394,7 +429,7 @@ export class SessionManagerDO {
       ws.send(JSON.stringify(message));
       return { success: true };
     } catch (error) {
-      console.error(`Failed to send message to device ${deviceId}:`, error);
+      this.logStructured('error', `Failed to send message to device ${deviceId}`, { error });
       return { success: false, error: 'Failed to send message' };
     }
   }
@@ -419,6 +454,12 @@ export class SessionManagerDO {
       }
     }
 
+    if (results.failed > 0) {
+      this.logStructured('warn', 'Broadcast had partial failures', {
+        success: results.success,
+        failed: results.failed,
+      });
+    }
     return results;
   }
 
@@ -923,7 +964,15 @@ export class SessionManagerDO {
 
     this.sessionInfo.set(deviceId, updatedInfo);
 
-    this.state.waitUntil(this.saveSessions());
+    // H9: 节流落盘——累积变更 ≥ SAVE_THROTTLE_COUNT 或距上次落盘 ≥
+    // SAVE_THROTTLE_MS 才真正调 saveSessions()，避免每条 ping/pong 都写 DO storage。
+    this.pendingSaveCount++;
+    if (
+      this.pendingSaveCount >= SessionManagerDO.SAVE_THROTTLE_COUNT ||
+      now - this.lastSessionSaveAt >= SessionManagerDO.SAVE_THROTTLE_MS
+    ) {
+      this.state.waitUntil(this.saveSessions());
+    }
 
     if (shouldReplyPong) {
       const ws = this.sessions.get(deviceId);
@@ -967,7 +1016,7 @@ export class SessionManagerDO {
     const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
-        'invalid_shortcut_command',
+        ErrorCode.INVALID_SHORTCUT_COMMAND,
         'Shortcut command dispatch body must be a valid JSON object.',
         400
       );
@@ -978,7 +1027,7 @@ export class SessionManagerDO {
     const grantId = typeof payload.grantId === 'string' ? payload.grantId : '';
     if (!clientRequestId || !command || !grantId) {
       return this.shortcutError(
-        'invalid_shortcut_command',
+        ErrorCode.INVALID_SHORTCUT_COMMAND,
         'Shortcut command dispatch is missing required fields.',
         400,
         clientRequestId,
@@ -992,7 +1041,7 @@ export class SessionManagerDO {
       targetDeviceId !== this.relayRoomInfo.deviceId
     ) {
       return this.shortcutError(
-        'agent_unavailable',
+        ErrorCode.AGENT_UNAVAILABLE,
         'Shortcut command target does not match this agent room.',
         503,
         clientRequestId,
@@ -1003,7 +1052,7 @@ export class SessionManagerDO {
     const agent = this.relaySockets.get('agent');
     if (!agent) {
       return this.shortcutError(
-        'agent_unavailable',
+        ErrorCode.AGENT_UNAVAILABLE,
         'Agent is not online.',
         503,
         clientRequestId,
@@ -1017,7 +1066,7 @@ export class SessionManagerDO {
         this.pendingShortcutCommands.delete(dispatchId);
         resolve(
           this.shortcutError(
-            'command_timeout',
+            ErrorCode.COMMAND_TIMEOUT,
             'Agent did not return a shortcut result before timeout.',
             504,
             clientRequestId,
@@ -1025,6 +1074,7 @@ export class SessionManagerDO {
           )
         );
       }, this.options.shortcutCommandTimeoutMs);
+      // 同上：可选调用 unref，避免 Node 测试进程被挂起。
       (timer as { unref?: () => void }).unref?.();
       this.pendingShortcutCommands.set(dispatchId, {
         resolve,
@@ -1051,7 +1101,7 @@ export class SessionManagerDO {
         this.pendingShortcutCommands.delete(dispatchId);
         resolve(
           this.shortcutError(
-            'agent_unavailable',
+            ErrorCode.AGENT_UNAVAILABLE,
             'Failed to send shortcut command to agent.',
             503,
             clientRequestId,
@@ -1132,16 +1182,12 @@ export class SessionManagerDO {
       this.pruneUsedRegistrationNonces(now);
       const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
       if (this.usedRegistrationNonces.has(nonceKey)) {
-        console.warn(
-          JSON.stringify({
-            level: 'warn',
-            message: 'Agent registration replay rejected',
-            request_id: requestId,
-            security_event: 'agent_registration_replayed',
-            status: 409,
-            do_operation: 'registry_agent_online',
-          })
-        );
+        this.logStructured('warn', 'Agent registration replay rejected', {
+          request_id: requestId,
+          security_event: 'agent_registration_replayed',
+          status: 409,
+          do_operation: 'registry_agent_online',
+        });
         return this.jsonResponse(
           {
             ok: false,
@@ -1173,7 +1219,11 @@ export class SessionManagerDO {
           { status: 403 }
         );
       }
-      this.usedRegistrationNonces.set(nonceKey, now + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW);
+      // 过期锚定到所声明时间戳的最晚可接受时间，防止未来时间戳在条目过期后重放。
+      this.usedRegistrationNonces.set(
+        nonceKey,
+        Number(payload.registrationTimestamp) + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+      );
     }
 
     const record: DeviceRegistryRecord = {
@@ -1322,13 +1372,17 @@ export class SessionManagerDO {
 
     const token = extractShortcutToken(request);
     if (!token) {
-      return this.shortcutError('invalid_token', 'Shortcut token is missing or malformed.', 401);
+      return this.shortcutError(
+        ErrorCode.INVALID_TOKEN,
+        'Shortcut token is missing or malformed.',
+        401
+      );
     }
 
     const payload = await readJsonObject(request);
     if (!payload) {
       return this.shortcutError(
-        'invalid_shortcut_command',
+        ErrorCode.INVALID_SHORTCUT_COMMAND,
         'Shortcut command body must be a valid JSON object.',
         400
       );
@@ -1340,7 +1394,7 @@ export class SessionManagerDO {
 
     if (!deviceId || !command) {
       return this.shortcutError(
-        'invalid_shortcut_command',
+        ErrorCode.INVALID_SHORTCUT_COMMAND,
         'Shortcut command requires device_id and command.',
         400,
         requestId,
@@ -1350,19 +1404,42 @@ export class SessionManagerDO {
 
     const tokenHash = await this.hashShortcutToken(token);
     const record = this.registryDevices.get(deviceId);
-    const grant = record?.shortcutGrants?.find(candidate => candidate.tokenHash === tokenHash);
+    // M9: 使用恒定时间字符串比较替代 ===，避免 tokenHash 比较的时序侧信道。
+    const grant = record?.shortcutGrants?.find(
+      candidate =>
+        candidate.tokenHash.length === tokenHash.length &&
+        constantTimeStringEqual(candidate.tokenHash, tokenHash)
+    );
     if (!record || !grant) {
-      return this.shortcutError('invalid_token', 'Shortcut token is invalid.', 401, requestId, command);
+      return this.shortcutError(
+        ErrorCode.INVALID_TOKEN,
+        'Shortcut token is invalid.',
+        401,
+        requestId,
+        command
+      );
     }
     if (grant.revokedAt) {
-      return this.shortcutError('grant_revoked', 'Shortcut grant has been revoked.', 403, requestId, command);
+      return this.shortcutError(
+        ErrorCode.GRANT_REVOKED,
+        'Shortcut grant has been revoked.',
+        403,
+        requestId,
+        command
+      );
     }
     if (Date.now() >= grant.expiresAt) {
-      return this.shortcutError('grant_expired', 'Shortcut grant has expired.', 403, requestId, command);
+      return this.shortcutError(
+        ErrorCode.GRANT_EXPIRED,
+        'Shortcut grant has expired.',
+        403,
+        requestId,
+        command
+      );
     }
     if (!grant.allowedCommands.includes(command)) {
       return this.shortcutError(
-        'command_not_allowed',
+        ErrorCode.COMMAND_NOT_ALLOWED,
         'Shortcut grant does not allow this command.',
         403,
         requestId,
@@ -1370,13 +1447,25 @@ export class SessionManagerDO {
       );
     }
     if (!record.connected || !record.liveSessionId) {
-      return this.shortcutError('agent_unavailable', 'Agent is not online.', 503, requestId, command);
+      return this.shortcutError(
+        ErrorCode.AGENT_UNAVAILABLE,
+        'Agent is not online.',
+        503,
+        requestId,
+        command
+      );
     }
     if (
       typeof this.env?.CICADA_SESSIONS?.idFromName !== 'function' ||
       typeof this.env?.CICADA_SESSIONS?.get !== 'function'
     ) {
-      return this.shortcutError('agent_unavailable', 'Agent routing is unavailable.', 503, requestId, command);
+      return this.shortcutError(
+        ErrorCode.AGENT_UNAVAILABLE,
+        'Agent routing is unavailable.',
+        503,
+        requestId,
+        command
+      );
     }
 
     const sessionRoom = this.env.CICADA_SESSIONS.get(
@@ -1414,7 +1503,9 @@ export class SessionManagerDO {
 
   private pruneUsedRegistrationNonces(now: number): void {
     for (const [nonce, expiresAt] of this.usedRegistrationNonces.entries()) {
-      if (now >= expiresAt) {
+      // > 而非 >=：边界处（now == registrationTimestamp + SKEW）时间戳仍合法，
+      // 须保留到边界之后，否则捕获的签名注册能在该精确边界重放。
+      if (now > expiresAt) {
         this.usedRegistrationNonces.delete(nonce);
       }
     }
@@ -1524,6 +1615,8 @@ export class SessionManagerDO {
     }
 
     const now = Date.now();
+    // H8: 默认从对外响应中移除 ipAddress/userAgent 等敏感字段，仅暴露
+    // deviceId/在线状态/最后心跳时间等非敏感字段。完整鉴权机制后续补齐。
     const devices = Array.from(this.registryDevices.values())
       .sort((left, right) => right.lastSeen - left.lastSeen)
       .map(device => ({
@@ -1532,8 +1625,6 @@ export class SessionManagerDO {
         connectedAt: device.connectedAt,
         lastPing: device.lastPing ?? device.lastSeen,
         uptime: device.connected && device.connectedAt ? now - device.connectedAt : undefined,
-        ipAddress: device.ipAddress,
-        userAgent: device.userAgent,
       }));
     return this.jsonResponse({
       success: true,
@@ -1680,23 +1771,54 @@ export class SessionManagerDO {
   ): void {
     const normalizedError = error instanceof Error ? error : new Error(String(error));
     const sanitizedError = sanitizeError(normalizedError);
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        message,
-        request_id: requestId,
-        error_type: sanitizedError.name,
-        do_operation: operation,
-        ...(operation === 'websocket_upgrade'
-          ? { websocket_outcome: 'upgrade_failed' }
-          : {}),
-        error: {
-          name: sanitizedError.name,
-          message: sanitizedError.message,
-          stack: sanitizedError.stack,
-        },
-      })
-    );
+    // L2: 保留 snake_case 字段名以兼容现有日志聚合与测试契约。
+    this.logStructured('error', message, {
+      request_id: requestId,
+      error_type: sanitizedError.name,
+      do_operation: operation,
+      ...(operation === 'websocket_upgrade' ? { websocket_outcome: 'upgrade_failed' } : {}),
+      error: {
+        name: sanitizedError.name,
+        message: sanitizedError.message,
+        stack: sanitizedError.stack,
+      },
+    });
+  }
+
+  /**
+   * L2: DO 内统一的结构化日志输出。
+   *
+   * DO 运行在独立 isolate，无法复用 Worker 侧的 Logger 实例，这里以
+   * console 输出 JSON 结构化日志，便于外部聚合。仅透传调用方提供的
+   * 字段（保持现有 snake_case 契约），error 字段会被 sanitizeError
+   * 处理后再序列化。
+   */
+  private logStructured(
+    level: 'error' | 'warn' | 'info',
+    message: string,
+    context: Record<string, unknown> = {}
+  ): void {
+    const payload: Record<string, unknown> = { level, message };
+    for (const [key, value] of Object.entries(context)) {
+      if (key === 'error' && value instanceof Error) {
+        const sanitized = sanitizeError(value);
+        payload.error = {
+          name: sanitized.name,
+          message: sanitized.message,
+          stack: sanitized.stack,
+        };
+      } else {
+        payload[key] = value;
+      }
+    }
+    const text = JSON.stringify(payload);
+    if (level === 'error') {
+      console.error(text);
+    } else if (level === 'warn') {
+      console.warn(text);
+    } else {
+      console.info(text);
+    }
   }
 
   /**

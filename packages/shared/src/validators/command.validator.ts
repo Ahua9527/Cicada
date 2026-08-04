@@ -14,7 +14,14 @@ export const SUPPORTED_COMMANDS: ReadonlySet<string> = new Set(COMMANDS);
  * Device ID 格式验证正则表达式
  * 统一为 MAC_[32位十六进制]
  */
-const DEVICE_ID_PATTERN = /^MAC_[A-F0-9]{32}$/i;
+export const DEVICE_ID_PATTERN = /^MAC_[A-F0-9]{32}$/i;
+
+/**
+ * 校验 deviceId 是否符合 MAC_[32位十六进制] 格式（M10 复用）
+ */
+export function isValidDeviceId(value: string): boolean {
+  return DEVICE_ID_PATTERN.test(value);
+}
 
 /**
  * 命令请求验证器

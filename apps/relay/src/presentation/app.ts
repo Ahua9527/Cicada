@@ -92,7 +92,7 @@ export class CicadaRelayApp {
       );
     }
 
-    // Rate limiting
+    // Rate limiting（限流键只使用可信来源，见 rate-limit.middleware）
     if (enableRateLimit) {
       pipeline.use(
         rateLimitMiddleware({

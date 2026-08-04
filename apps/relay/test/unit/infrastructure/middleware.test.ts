@@ -308,7 +308,6 @@ describe('Middleware', () => {
     });
 
     it.each([
-      [[], 'https://caller.example'],
       [['*'], '*'],
       [['https://caller.example'], 'https://caller.example'],
     ])('adds allowed origin headers for %j', async (allowedOrigins, expectedOrigin) => {
@@ -324,6 +323,19 @@ describe('Middleware', () => {
 
       expect(result).not.toBe(response);
       expect(result.headers.get('Access-Control-Allow-Origin')).toBe(expectedOrigin);
+    });
+
+    it('does not add CORS headers when allowedOrigins is empty (secure default)', async () => {
+      const request = new Request('http://localhost/test', {
+        headers: { Origin: 'https://caller.example' },
+      });
+
+      const result = (await corsMiddleware({ allowedOrigins: [] })(
+        createContext({ request }),
+        async () => new Response('ok')
+      )) as Response;
+
+      expect(result.headers.has('Access-Control-Allow-Origin')).toBe(false);
     });
 
     it('does not add headers for a rejected origin', async () => {
@@ -359,7 +371,10 @@ describe('Middleware', () => {
       const response = new Response('ok');
       const middleware = rateLimitMiddleware({ windowMs: 1_000, maxRequests: 2 });
 
-      const result = await middleware(createContext({ deviceId: 'device-1' }), async () => response);
+      const result = await middleware(
+        createContext({ headers: { 'cf-connecting-ip': '192.0.2.10' } }),
+        async () => response
+      );
 
       expect(result).toBe(response);
       expect(response.headers.get('X-RateLimit-Limit')).toBe('2');
@@ -394,9 +409,40 @@ describe('Middleware', () => {
       ).resolves.toBeInstanceOf(Response);
     });
 
+    it('ignores unauthenticated x-device-id and keys by trusted IP', async () => {
+      const middleware = rateLimitMiddleware({ windowMs: 10_000, maxRequests: 2 });
+
+      // 同一可信 IP 轮换 deviceId：共享同一限流桶，第 3 次被限
+      for (const deviceId of ['MAC_AAA', 'MAC_BBB']) {
+        await middleware(
+          createContext({
+            headers: { 'cf-connecting-ip': '198.51.100.1', 'x-device-id': deviceId },
+          }),
+          async () => new Response('ok')
+        );
+      }
+      const limited = (await middleware(
+        createContext({
+          headers: { 'cf-connecting-ip': '198.51.100.1', 'x-device-id': 'MAC_CCC' },
+        }),
+        async () => new Response('unexpected')
+      )) as { response: Response };
+      expect(limited.response.status).toBe(429);
+
+      // 同一 deviceId 换一个可信 IP：独立桶，不受上面计数影响
+      const separate = await middleware(
+        createContext({
+          headers: { 'cf-connecting-ip': '198.51.100.2', 'x-device-id': 'MAC_AAA' },
+        }),
+        async () => new Response('ok')
+      );
+      expect(separate).toBeInstanceOf(Response);
+      expect((separate as Response).status).toBe(200);
+    });
+
     it('returns the existing 429 contract at the limit', async () => {
       const middleware = rateLimitMiddleware({ windowMs: 10_000, maxRequests: 1 });
-      const context = createContext({ deviceId: 'limited' });
+      const context = createContext({ headers: { 'cf-connecting-ip': '192.0.2.11' } });
       await middleware(context, async () => new Response('ok'));
 
       const result = (await middleware(context, async () => new Response('unexpected'))) as {
@@ -419,7 +465,7 @@ describe('Middleware', () => {
       jest.useFakeTimers();
       jest.setSystemTime(1_000);
       const middleware = rateLimitMiddleware({ windowMs: 100, maxRequests: 1 });
-      const context = createContext({ deviceId: 'expiring' });
+      const context = createContext({ headers: { 'cf-connecting-ip': '192.0.2.12' } });
       await middleware(context, async () => new Response('ok'));
       jest.setSystemTime(1_101);
 
@@ -441,17 +487,17 @@ describe('Middleware', () => {
       const middleware = rateLimitMiddleware({
         windowMs: 120_000,
         maxRequests: 2,
-        keyGenerator: context => context.deviceId ?? 'unknown',
+        keyGenerator: context => context.headers['x-device-id'] ?? 'unknown',
       });
 
-      await middleware(createContext({ deviceId: 'one' }), async () => new Response('ok'));
+      await middleware(createContext({ headers: { 'x-device-id': 'one' } }), async () => new Response('ok'));
       jest.setSystemTime(60_999);
-      await middleware(createContext({ deviceId: 'two' }), async () => new Response('ok'));
+      await middleware(createContext({ headers: { 'x-device-id': 'two' } }), async () => new Response('ok'));
 
       expect(entriesSpy).not.toHaveBeenCalled();
 
       jest.setSystemTime(61_000);
-      await middleware(createContext({ deviceId: 'three' }), async () => new Response('ok'));
+      await middleware(createContext({ headers: { 'x-device-id': 'three' } }), async () => new Response('ok'));
       expect(entriesSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -462,11 +508,11 @@ describe('Middleware', () => {
       const middleware = rateLimitMiddleware({
         windowMs: 120_000,
         maxRequests: 2,
-        keyGenerator: context => context.deviceId ?? 'unknown',
+        keyGenerator: context => context.headers['x-device-id'] ?? 'unknown',
       });
 
       for (let index = 0; index <= 1_000; index++) {
-        await middleware(createContext({ deviceId: `device-${index}` }), async () =>
+        await middleware(createContext({ headers: { 'x-device-id': `device-${index}` } }), async () =>
           new Response('ok')
         );
       }
@@ -486,7 +532,7 @@ describe('Middleware', () => {
         } as MapIterator<[K, V]>;
       });
 
-      await middleware(createContext({ deviceId: 'overflow' }), async () => new Response('ok'));
+      await middleware(createContext({ headers: { 'x-device-id': 'overflow' } }), async () => new Response('ok'));
 
       expect(scanned).toBe(100);
     });
@@ -498,11 +544,11 @@ describe('Middleware', () => {
       const middleware = rateLimitMiddleware({
         windowMs: 100,
         maxRequests: 1,
-        keyGenerator: context => context.deviceId ?? 'unknown',
+        keyGenerator: context => context.headers['x-device-id'] ?? 'unknown',
       });
 
       for (let index = 0; index <= 1_000; index++) {
-        await middleware(createContext({ deviceId: `expired-${index}` }), async () =>
+        await middleware(createContext({ headers: { 'x-device-id': `expired-${index}` } }), async () =>
           new Response('ok')
         );
       }
@@ -524,7 +570,7 @@ describe('Middleware', () => {
       });
 
       for (let index = 0; index < 12; index++) {
-        await middleware(createContext({ deviceId: `fresh-${index}` }), async () =>
+        await middleware(createContext({ headers: { 'x-device-id': `fresh-${index}` } }), async () =>
           new Response('ok')
         );
       }
@@ -533,7 +579,7 @@ describe('Middleware', () => {
       expect(scanned).toBeGreaterThanOrEqual(1_001);
 
       const scannedAfterCleanup = scanned;
-      await middleware(createContext({ deviceId: 'post-cleanup' }), async () => new Response('ok'));
+      await middleware(createContext({ headers: { 'x-device-id': 'post-cleanup' } }), async () => new Response('ok'));
       expect(scanned).toBe(scannedAfterCleanup);
     });
   });
