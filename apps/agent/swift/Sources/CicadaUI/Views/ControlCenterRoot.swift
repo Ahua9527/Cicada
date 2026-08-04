@@ -28,6 +28,7 @@ public struct ControlCenterRoot: View {
             case .none:        OverviewPane()
             }
         }
+        .frame(minWidth: 880, minHeight: 600)
     }
 
     /// 侧栏状态从实时模型派生，而非固定文案：
