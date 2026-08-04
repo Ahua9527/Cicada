@@ -301,7 +301,9 @@ describe('API Integration Tests', () => {
         },
       });
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (contentLength !== undefined) headers['Content-Length'] = contentLength;
+      if (contentLength !== undefined) {
+        headers['Content-Length'] = contentLength;
+      }
       // duplex 为 undici/Node 运行时对流式 body 的要求；workers-types 的 RequestInit 未声明它，
       // 先赋值给变量再传入以绕过对象字面量的多余属性检查。
       const init = {
