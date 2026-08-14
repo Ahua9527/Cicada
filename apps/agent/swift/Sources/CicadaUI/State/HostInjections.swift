@@ -93,6 +93,35 @@ extension EnvironmentValues {
     }
 }
 
+// MARK: - Install SleepHold Service
+
+/// SleepHold 安装流程的失败分类（CicadaUI 包内契约，镜像 `CameraAuthorizationStatus`
+/// 的做法：视图层按分类翻译成本地化文案，宿主只回传分类不拼文案）。
+public enum SleepHoldInstallError: Error {
+    /// 用户在系统授权弹窗中点了取消（AppleScript error -128）。
+    case authorizationCancelled
+    /// 授权弹窗等待超时（用户未在限时内输入密码）。
+    case authorizationTimedOut
+    /// 授权通过但安装命令失败，附带 shell 输出便于诊断。
+    case commandFailed(String)
+    /// 安装命令全部成功，但装载后服务未响应 socket 探活。
+    case serviceNotResponding
+}
+
+private struct InstallSleepHoldServiceKey: EnvironmentKey {
+    /// 默认 `nil`：维护页「安装 SleepHold 服务」按钮置灰（库独立预览无安装能力）。
+    static let defaultValue: (() async -> Result<Void, SleepHoldInstallError>)? = nil
+}
+
+extension EnvironmentValues {
+    /// 维护页「安装 SleepHold 服务」按钮行为。宿主注入系统授权弹窗安装链路；
+    /// 失败返回 `SleepHoldInstallError` 分类，由视图层翻译为本地化文案。
+    public var installSleepHoldService: (() async -> Result<Void, SleepHoldInstallError>)? {
+        get { self[InstallSleepHoldServiceKey.self] }
+        set { self[InstallSleepHoldServiceKey.self] = newValue }
+    }
+}
+
 // MARK: - Camera Permission
 
 /// 相机授权状态的包内镜像（避免 CicadaUI 依赖 AVFoundation）。

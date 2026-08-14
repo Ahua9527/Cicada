@@ -3123,6 +3123,16 @@
           }
         }
       }
+    },
+    "Cicada needs to install the SleepHold background service (keeps your Mac awake when needed). Administrator permission is required.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cicada 需要安装 SleepHold 后台服务（在需要时防止 Mac 睡眠），需要管理员权限。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

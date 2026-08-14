@@ -4,6 +4,7 @@ import XCTest
 import CicadaCore
 import CicadaIPC
 import CicadaSleepHoldCore
+import CicadaSystem
 
 final class CicadaUITests: XCTestCase {
     func testSnapshotMapperToStateRunning() {
@@ -277,7 +278,7 @@ final class CicadaUITests: XCTestCase {
     func testSleepHoldReachableWithZeroSessionsIsInactive() async {
         let model = SleepHoldModel(statusProvider: {
             SleepHoldControlResponse(ok: true, status: .canSleep, activeSessions: 0)
-        })
+        }, isInstalled: { true })
 
         await model.refresh()
 
@@ -292,27 +293,47 @@ final class CicadaUITests: XCTestCase {
             SleepHoldControlResponse(ok: true, status: .hold, activeSessions: 0),
             SleepHoldControlResponse(ok: true, status: .canSleep, activeSessions: 2),
         ] {
-            let model = SleepHoldModel(statusProvider: { response })
+            let model = SleepHoldModel(statusProvider: { response }, isInstalled: { true })
             await model.refresh()
             XCTAssertTrue(model.isActive, "\(response)")
         }
     }
 
     @MainActor
-    func testSleepHoldReportsServiceAndConnectionFailures() async {
+    func testSleepHoldReportsServiceAndConnectionFailures() async throws {
         let rejected = SleepHoldModel(statusProvider: {
             SleepHoldControlResponse(ok: false, error: "service unavailable")
-        })
+        }, isInstalled: { true })
         await rejected.refresh()
         XCTAssertFalse(rejected.isActive)
         XCTAssertEqual(rejected.diagnostic?.message, "service unavailable")
 
+        // 已安装但连不上：诊断必须给出可读描述，且不泄露内部错误类型名
+        // （旧实现用 localizedDescription，会产出 “CicadaSystem.SleepHoldControlError 错误0”）。
         let disconnected = SleepHoldModel(statusProvider: {
-            throw NSError(domain: "SleepHoldTests", code: 1)
-        })
+            throw SleepHoldControlError.unavailable("No such file or directory")
+        }, isInstalled: { true })
         await disconnected.refresh()
         XCTAssertFalse(disconnected.isActive)
-        XCTAssertNotNil(disconnected.diagnostic)
+        let message = try XCTUnwrap(disconnected.diagnostic?.message)
+        XCTAssertTrue(message.hasSuffix("No such file or directory"), message)
+        XCTAssertFalse(message.contains("SleepHoldControlError"), message)
+    }
+
+    @MainActor
+    func testSleepHoldNotInstalledSkipsSocketAndExposesInstallState() async {
+        // 服务未安装时不应再尝试连接 socket（必然 ENOENT），直接给出可行动诊断。
+        // provider 返回可达快照：若 refresh 仍调用了 provider，cells 会被填成 3 个。
+        let model = SleepHoldModel(statusProvider: {
+            SleepHoldControlResponse(ok: true, status: .hold, activeSessions: 1)
+        }, isInstalled: { false })
+
+        let ok = await model.refresh()
+
+        XCTAssertFalse(ok)
+        XCTAssertFalse(model.serviceInstalled)
+        XCTAssertTrue(model.cells.isEmpty)
+        XCTAssertNotNil(model.diagnostic)
     }
 
     @MainActor

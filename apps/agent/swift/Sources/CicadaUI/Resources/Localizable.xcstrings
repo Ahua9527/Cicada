@@ -1390,6 +1390,96 @@
           }
         }
       }
+    },
+    "安装 SleepHold 服务": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install SleepHold Service"
+          }
+        }
+      }
+    },
+    "安装后台服务，登录后自动运行；需要输入一次管理员密码": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installs the background service that runs at login; requires your administrator password once."
+          }
+        }
+      }
+    },
+    "安装…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install…"
+          }
+        }
+      }
+    },
+    "安装中…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installing…"
+          }
+        }
+      }
+    },
+    "SleepHold 服务未安装": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SleepHold service is not installed"
+          }
+        }
+      }
+    },
+    "无法连接 sleephold 服务（可能未运行）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot connect to the sleephold service (it may not be running)"
+          }
+        }
+      }
+    },
+    "授权已取消或超时": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorization was cancelled or timed out"
+          }
+        }
+      }
+    },
+    "安装失败：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation failed: %@"
+          }
+        }
+      }
+    },
+    "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed but the service is not responding; see ~/.cicada/sleephold.stderr.log"
+          }
+        }
+      }
     }
   },
   "version": "2300"

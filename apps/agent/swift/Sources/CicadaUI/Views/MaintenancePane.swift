@@ -12,8 +12,10 @@ struct MaintenancePane: View {
     @EnvironmentObject var appModel: AppModel
     @Environment(\.launchAtLoginToggle) private var launchAtLoginToggle
     @Environment(\.runStartupChecks) private var runStartupChecks
+    @Environment(\.installSleepHoldService) private var installSleepHoldService
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showHelp = false
+    @State private var installingSleepHold = false
 
     var body: some View {
         ScrollView {
@@ -47,6 +49,21 @@ struct MaintenancePane: View {
                         }
                     }
                     .animation(.easeOut(duration: 0.2), value: appModel.sleepHold.diagnostic?.motionKey)
+
+                    if !appModel.sleepHold.serviceInstalled {
+                        SettingRow(
+                            title: String(localized: "安装 SleepHold 服务", bundle: .module),
+                            desc: String(localized: "安装后台服务，登录后自动运行；需要输入一次管理员密码", bundle: .module)
+                        ) {
+                            Button(installingSleepHold
+                                   ? String(localized: "安装中…", bundle: .module)
+                                   : String(localized: "安装…", bundle: .module)) {
+                                installSleepHold()
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .disabled(installingSleepHold || installSleepHoldService == nil)
+                        }
+                    }
                 }
 
                 Card(title: String(localized: "诊断", bundle: .module)) {
@@ -79,6 +96,33 @@ struct MaintenancePane: View {
 
     private var diagnosticTransition: AnyTransition {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
+    }
+
+    /// 点「安装…」：走宿主注入的授权弹窗安装链路，完成后刷新全量状态。
+    /// 失败按 `SleepHoldInstallError` 分类翻成本地化诊断写回 SleepHold 诊断条；
+    /// 成功则靠 refreshAll 自然消条、状态卡转正常。
+    private func installSleepHold() {
+        guard let installSleepHoldService, !installingSleepHold else { return }
+        installingSleepHold = true
+        Task {
+            let result = await installSleepHoldService()
+            if case .failure(let error) = result {
+                appModel.sleepHold.setDiagnostic(sleepHoldInstallMessage(error))
+            }
+            await appModel.refreshAll()
+            installingSleepHold = false
+        }
+    }
+
+    private func sleepHoldInstallMessage(_ error: SleepHoldInstallError) -> String {
+        switch error {
+        case .authorizationCancelled, .authorizationTimedOut:
+            return String(localized: "授权已取消或超时", bundle: .module)
+        case .commandFailed(let detail):
+            return String(localized: "安装失败：\(detail)", bundle: .module)
+        case .serviceNotResponding:
+            return String(localized: "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log", bundle: .module)
+        }
     }
 }
 

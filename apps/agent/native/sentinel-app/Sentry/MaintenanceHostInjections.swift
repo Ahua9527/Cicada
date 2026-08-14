@@ -7,6 +7,7 @@
 //  - `folderActions`：FolderGrid 6 个按钮的真实 NSWorkspace / NotchDropCoordinator 行为。
 //  - `launchAtLoginToggle`：真实 `LaunchAtLogin.Toggle`（写 SMLoginItemSetEnabled）。
 //  - `runStartupChecks`：`AppDelegate.runStartupChecks()` 走启动诊断链路。
+//  - `installSleepHoldService`：SleepHold 后台服务的系统授权弹窗安装链路。
 //
 //  通过 ViewModifier `hostMaintenanceInjections(appDelegate:)` 一次性注入，
 //  在 App.swift 的 WindowGroup 上应用。CicadaUI 库默认占位保持库独立可预览/单测。
@@ -14,6 +15,8 @@
 
 import AppKit
 import AVFoundation
+import CicadaCore
+import CicadaSystem
 import CicadaUI
 import LaunchAtLogin
 import SwiftUI
@@ -110,6 +113,74 @@ enum MaintenanceHostInjections {
         return session.devices.map { CameraOption(id: $0.uniqueID, name: $0.localizedName) }
     }
 
+    /// 安装 SleepHold 后台服务：系统授权弹窗输入一次密码，以 root 装载 launchd 服务。
+    ///
+    /// 为什么不用 CLI 的 `SleepHoldServiceManager.install()`（sudo 路径）：GUI 进程没有
+    /// tty，sudo 无法提示密码（会挂到超时）；且 sudo 凭证按 tty 记账，用户在终端跑过
+    /// `sudo -v` 也不会惠及本进程。故这里用 AppleScript `with administrator privileges`
+    /// 弹系统授权窗，一次性以 root 执行全部安装命令。
+    ///
+    /// 提权命令只能在宿主层发起：CicadaSystem 不允许直接调用 osascript 等外部二进制
+    /// （CommandExecutionDependencyTests 架构约束），所以库侧只暴露 `prepareInstall()`
+    /// （建目录 + 写 plist），cp/chown/launchctl 的提权拼装在这里完成。
+    ///
+    /// 授权弹窗阻塞等用户输入（最长 120s），整体放 `Task.detached` 避免卡主线程。
+    /// 失败按 `SleepHoldInstallError` 分类透传给 CicadaUI 视图层做本地化。
+    static func installSleepHoldService() async -> Result<Void, SleepHoldInstallError> {
+        await Task.detached(priority: .userInitiated) { () -> Result<Void, SleepHoldInstallError> in
+            let manager = SleepHoldServiceManager()
+            let plistPath: String
+            do {
+                plistPath = try manager.prepareInstall()
+            } catch {
+                return .failure(.commandFailed(error.localizedDescription))
+            }
+
+            let target = shellQuoted(RuntimePaths.sleepHoldPlistPath)
+            let script = [
+                "/bin/cp -f \(shellQuoted(plistPath)) \(target)",
+                "/usr/sbin/chown root:wheel \(target)",
+                "/bin/chmod 644 \(target)",
+                "/bin/launchctl unload \(target) 2>/dev/null || true",
+                "/bin/launchctl load \(target)",
+            ].joined(separator: " && ")
+            let prompt = String(localized: "Cicada needs to install the SleepHold background service (keeps your Mac awake when needed). Administrator permission is required.")
+            let source = "do shell script \"\(appleScriptEscaped(script))\""
+                + " with prompt \"\(appleScriptEscaped(prompt))\""
+                + " with administrator privileges"
+
+            let result = ProcessRunner().run("/usr/bin/osascript", args: ["-e", source], timeoutMs: 120_000)
+            guard result.code == 0 else {
+                if result.code == 124 {
+                    return .failure(.authorizationTimedOut)
+                }
+                if result.stderr.contains("-128") || result.stderr.contains("User canceled") {
+                    return .failure(.authorizationCancelled)
+                }
+                return .failure(.commandFailed(result.stderr.isEmpty ? result.stdout : result.stderr))
+            }
+
+            // 探活：launchctl load 后服务应立即可连；给 launchd 一点拉起时间再判失败。
+            for attempt in 0..<5 {
+                if attempt > 0 { Thread.sleep(forTimeInterval: 0.4) }
+                if let response = try? manager.ping(), response.ok {
+                    return .success(())
+                }
+            }
+            return .failure(.serviceNotResponding)
+        }.value
+    }
+
+    /// shell 单引号包裹（脚本经 `do shell script` 过一层 shell，路径必须引用）。
+    private static func shellQuoted(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// AppleScript 字符串字面量转义（`do shell script "..."` 内嵌双引号串）。
+    private static func appleScriptEscaped(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
     // MARK: - Path Helpers
 
     /// ~/.cicada 主目录。由 `CicadaSentinelPaths.notchDropDirectory()` 的父目录推导
@@ -152,6 +223,9 @@ struct HostMaintenanceInjectionsModifier: ViewModifier {
             .environment(\.notchDropSettingsStore, .shared)
             .environment(\.requestCameraPermission) {
                 await MaintenanceHostInjections.requestCameraPermission()
+            }
+            .environment(\.installSleepHoldService) {
+                await MaintenanceHostInjections.installSleepHoldService()
             }
             .environment(\.cameraOptions) {
                 MaintenanceHostInjections.availableCameraOptions()

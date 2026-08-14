@@ -159,16 +159,7 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
     }
 
     public func install() throws {
-        try fm.createDirectory(atPath: RuntimePaths.cicadaHome, withIntermediateDirectories: true)
-        try fm.createDirectory(atPath: RuntimePaths.runDir, withIntermediateDirectories: true)
-
-        let binaryPath = RuntimePaths.sleepHoldBinaryPath
-        guard fm.fileExists(atPath: binaryPath) else {
-            throw CicadaError.io("SleepHold helper 不存在: \(binaryPath)。请先将 Cicada.app 安装到 /Applications")
-        }
-
-        let plistPath = RuntimePaths.runDir + "/com.cicada.sleephold.plist"
-        try sleepHoldPlist().write(toFile: plistPath, atomically: true, encoding: .utf8)
+        let plistPath = try prepareInstall()
         try runSudo(["/bin/cp", "-f", plistPath, RuntimePaths.sleepHoldPlistPath])
         try runSudo(["/usr/sbin/chown", "root:wheel", RuntimePaths.sleepHoldPlistPath])
         try runSudo(["/bin/chmod", "644", RuntimePaths.sleepHoldPlistPath])
@@ -249,6 +240,26 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
         </dict>
         </plist>
         """
+    }
+
+    /// 安装前准备（无需提权）：建好目录、确认 helper 已随 App 安装、把 launchd plist
+    /// 写入 runDir，返回待拷贝的 plist 源路径。
+    ///
+    /// `install()`（CLI sudo 路径）与 GUI 的提权安装共用此准备步骤；GUI 调用方随后
+    /// 自行以 root 身份把该 plist 拷到 `RuntimePaths.sleepHoldPlistPath` 并装载
+    /// （本层不允许直接调用外部提权二进制，见 CommandExecutionDependencyTests）。
+    public func prepareInstall() throws -> String {
+        try fm.createDirectory(atPath: RuntimePaths.cicadaHome, withIntermediateDirectories: true)
+        try fm.createDirectory(atPath: RuntimePaths.runDir, withIntermediateDirectories: true)
+
+        let binaryPath = RuntimePaths.sleepHoldBinaryPath
+        guard fm.fileExists(atPath: binaryPath) else {
+            throw CicadaError.io("SleepHold helper 不存在: \(binaryPath)。请先将 Cicada.app 安装到 /Applications")
+        }
+
+        let plistPath = RuntimePaths.runDir + "/com.cicada.sleephold.plist"
+        try sleepHoldPlist().write(toFile: plistPath, atomically: true, encoding: .utf8)
+        return plistPath
     }
 
     private func runSudo(_ args: [String]) throws {
