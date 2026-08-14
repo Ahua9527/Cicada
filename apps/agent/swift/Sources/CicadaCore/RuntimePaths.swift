@@ -1,7 +1,15 @@
 import Foundation
 
 public enum RuntimePaths {
-    public static let home = FileManager.default.homeDirectoryForCurrentUser.path
+    /// 真实用户 home。沙箱内 `homeDirectoryForCurrentUser` 会返回容器路径，
+    /// 而 `~/.cicada` 运行时目录由 entitlements 的 home-relative 例外授权在真实 home 下，
+    /// 因此统一用 getpwuid 解析。
+    public static let home: String = {
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+            return String(cString: dir)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.path
+    }()
     public static let cicadaHome = home + "/.cicada"
     public static let runDir = cicadaHome + "/run"
     public static let binDir = cicadaHome + "/bin"

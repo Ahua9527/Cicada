@@ -1,4 +1,5 @@
 import Dispatch
+import CicadaCore
 import Foundation
 
 enum NotchDropPaths {
@@ -6,7 +7,7 @@ enum NotchDropPaths {
 
     static func storageDirectory(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
+        homeDirectory: String = RuntimePaths.home
     ) -> URL {
         CicadaSentinelPaths.notchDropDirectory(
             environment: environment,

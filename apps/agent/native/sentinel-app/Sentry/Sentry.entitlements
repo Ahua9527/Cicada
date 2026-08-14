@@ -14,5 +14,15 @@
 		<string>/.cicada/run/</string>
 		<string>/.cicada/notchdrop/</string>
 	</array>
+	<key>com.apple.security.temporary-exception.sbpl</key>
+	<array>
+		<string>(allow network-outbound (regex #"^/Users/[^/]+/\.cicada/"))</string>
+		<string>(allow network-bind (regex #"^/Users/[^/]+/\.cicada/"))</string>
+		<string>(allow hid-control)</string>
+	</array>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>

@@ -19,14 +19,28 @@ public final class SleepHoldIOPowerController: SleepHoldPowerControlling {
 
         var sleepDisabled = false
         let ret = "SleepDisabled".withCString { bytes in
-            var valueSize = UInt32(MemoryLayout<CFBoolean>.size)
+            var valueSize = UInt32(MemoryLayout<Bool>.size)
             return IORegistryEntryGetProperty(entry, bytes, &sleepDisabled, &valueSize)
         }
 
         guard ret == KERN_SUCCESS else {
-            return .unknown
+            return fallbackRead(entry: entry)
         }
         return sleepDisabled ? .hold : .canSleep
+    }
+
+    /// IORegistryEntryGetProperty 对 CFBoolean 属性的字节布局依赖内核版本，
+    /// 不可靠时回退到 CreateCFProperty 拿真值。
+    private func fallbackRead(entry: io_registry_entry_t) -> SleepHoldPowerStatus {
+        guard let prop = IORegistryEntryCreateCFProperty(
+            entry,
+            "SleepDisabled" as CFString,
+            kCFAllocatorDefault,
+            0
+        )?.takeRetainedValue(), let value = prop as? Bool else {
+            return .unknown
+        }
+        return value ? .hold : .canSleep
     }
 
     public func set(_ status: SleepHoldPowerStatus) -> Result<Void, Error> {
