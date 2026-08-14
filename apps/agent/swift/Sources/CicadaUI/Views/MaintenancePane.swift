@@ -50,14 +50,20 @@ struct MaintenancePane: View {
                     }
                     .animation(.easeOut(duration: 0.2), value: appModel.sleepHold.diagnostic?.motionKey)
 
-                    if !appModel.sleepHold.serviceInstalled {
+                    if let recoveryAction = appModel.sleepHold.recoveryAction {
                         SettingRow(
-                            title: String(localized: "安装 SleepHold 服务", bundle: .module),
-                            desc: String(localized: "安装后台服务，登录后自动运行；需要输入一次管理员密码", bundle: .module)
+                            title: recoveryAction == .install
+                                ? String(localized: "安装 SleepHold 服务", bundle: .module)
+                                : String(localized: "重新安装 SleepHold 服务", bundle: .module),
+                            desc: recoveryAction == .install
+                                ? String(localized: "安装后台服务，登录后自动运行；需要输入一次管理员密码", bundle: .module)
+                                : String(localized: "服务已安装但无响应，重新安装可修复；需要输入一次管理员密码", bundle: .module)
                         ) {
                             Button(installingSleepHold
                                    ? String(localized: "安装中…", bundle: .module)
-                                   : String(localized: "安装…", bundle: .module)) {
+                                   : (recoveryAction == .install
+                                      ? String(localized: "安装…", bundle: .module)
+                                      : String(localized: "重新安装…", bundle: .module))) {
                                 installSleepHold()
                             }
                             .buttonStyle(PrimaryButtonStyle())
@@ -98,18 +104,23 @@ struct MaintenancePane: View {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 
-    /// 点「安装…」：走宿主注入的授权弹窗安装链路，完成后刷新全量状态。
-    /// 失败按 `SleepHoldInstallError` 分类翻成本地化诊断写回 SleepHold 诊断条；
-    /// 成功则靠 refreshAll 自然消条、状态卡转正常。
+    /// 点「安装…/重新安装…」：走宿主注入的授权弹窗安装链路（重装复用同一链路，
+    /// 脚本内 launchctl unload+load 幂等覆盖，不增加卸载或迁移流程）。
+    /// 安装结束后先刷新实际状态——服务可能迟到恢复；只有服务仍不可用
+    /// （`recoveryAction != nil`）时才记录「授权取消/命令失败/服务未响应」具体错误，
+    /// 避免服务已恢复却继续显示失败。
     private func installSleepHold() {
         guard let installSleepHoldService, !installingSleepHold else { return }
         installingSleepHold = true
+        // 开始重试：清除旧安装错误。
+        appModel.sleepHold.clearInstallDiagnostic()
         Task {
             let result = await installSleepHoldService()
-            if case .failure(let error) = result {
-                appModel.sleepHold.setDiagnostic(sleepHoldInstallMessage(error))
-            }
+            // 先刷新实际状态；成功恢复的 refresh 会顺带清除安装诊断。
             await appModel.refreshAll()
+            if case .failure(let error) = result, appModel.sleepHold.recoveryAction != nil {
+                appModel.sleepHold.setInstallDiagnostic(sleepHoldInstallMessage(error))
+            }
             installingSleepHold = false
         }
     }

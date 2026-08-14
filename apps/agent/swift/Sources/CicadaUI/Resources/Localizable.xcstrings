@@ -1480,6 +1480,36 @@
           }
         }
       }
+    },
+    "重新安装 SleepHold 服务": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall SleepHold Service"
+          }
+        }
+      }
+    },
+    "服务已安装但无响应，重新安装可修复；需要输入一次管理员密码": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The service is installed but not responding; reinstall to repair. Requires your administrator password once."
+          }
+        }
+      }
+    },
+    "重新安装…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall…"
+          }
+        }
+      }
     }
   },
   "version": "2300"
