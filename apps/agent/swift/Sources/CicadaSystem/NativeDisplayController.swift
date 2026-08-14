@@ -1,7 +1,52 @@
+import CoreGraphics
 import Foundation
 import IOKit
 
 final class NativeDisplayController: NativeDisplayControlling {
+    /// DisplayServices 私有框架绑定。真实签名以显示器 ID 为首参：
+    /// `int DisplayServicesGetBrightness(CGDirectDisplayID, float *)`
+    /// `int DisplayServicesSetBrightness(CGDirectDisplayID, float)`
+    /// 封装为内部可注入结构，单测可验证显示器 ID 与数值确实传递。
+    struct BrightnessServices {
+        var get: (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+        var set: (CGDirectDisplayID, Float) -> Int32
+
+        /// 线上绑定：dlopen DisplayServices。Apple Silicon 上 IOKit 的
+        /// IODisplayGetFloatParameter 已失效，与 SleepHoldPowerController 一致走
+        /// dlopen 模式；框架或符号缺失时回退为恒失败（-1），由调用方报可读错误。
+        static let live: BrightnessServices = {
+            let fallback = BrightnessServices(get: { _, _ in -1 }, set: { _, _ in -1 })
+            guard let handle = dlopen(
+                "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices",
+                RTLD_NOW
+            ) else {
+                return fallback
+            }
+            typealias GetBrightnessFn = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+            typealias SetBrightnessFn = @convention(c) (CGDirectDisplayID, Float) -> Int32
+            guard let getSym = dlsym(handle, "DisplayServicesGetBrightness"),
+                  let setSym = dlsym(handle, "DisplayServicesSetBrightness") else {
+                return fallback
+            }
+            return BrightnessServices(
+                get: unsafeBitCast(getSym, to: GetBrightnessFn.self),
+                set: unsafeBitCast(setSym, to: SetBrightnessFn.self)
+            )
+        }()
+    }
+
+    private let brightness: BrightnessServices
+    private let mainDisplayID: () -> CGDirectDisplayID
+
+    /// 亮度只控制主显示器（CGMainDisplayID）；多显示器选择不在此扩展。
+    init(
+        brightness: BrightnessServices = .live,
+        mainDisplayID: @escaping () -> CGDirectDisplayID = { CGMainDisplayID() }
+    ) {
+        self.brightness = brightness
+        self.mainDisplayID = mainDisplayID
+    }
+
     func sleepDisplays() -> Result<Void, NativeCommandError> {
         let service = IORegistryEntryFromPath(kIOMainPortDefault, "IOService:/IOResources/IODisplayWrangler")
         guard service != 0 else {
@@ -34,8 +79,7 @@ final class NativeDisplayController: NativeDisplayControlling {
 
     func setBrightness(_ level: Float) -> Result<Float, NativeCommandError> {
         let clamped = max(0, min(1, level))
-        let services = Self.displayServices
-        let status = services.set(clamped)
+        let status = brightness.set(mainDisplayID(), clamped)
         guard status == 0 else {
             return .failure(.message("设置亮度失败: DisplayServices(\(status))"))
         }
@@ -44,8 +88,7 @@ final class NativeDisplayController: NativeDisplayControlling {
 
     func adjustBrightness(by delta: Float) -> Result<Float, NativeCommandError> {
         var current: Float = 0
-        let services = Self.displayServices
-        let status = services.get(&current)
+        let status = brightness.get(mainDisplayID(), &current)
         guard status == 0 else {
             return .failure(.message("读取亮度失败: DisplayServices(\(status))"))
         }
@@ -59,9 +102,7 @@ final class NativeDisplayController: NativeDisplayControlling {
             return .failure(.message("无法创建截屏目录: \(error.localizedDescription)"))
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let path = "\(directory)/screenshot-\(formatter.string(from: Date())).png"
+        let path = Self.makeScreenshotPath(directory: directory)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
@@ -79,29 +120,16 @@ final class NativeDisplayController: NativeDisplayControlling {
         return .success(path)
     }
 
-    /// DisplayServices 私有框架：Apple Silicon 上 IOKit 的 IODisplayGetFloatParameter 已失效，
-    /// 与 SleepHoldPowerController 一致的 dlopen 模式。
-    private typealias GetBrightnessFn = @convention(c) (UnsafeMutablePointer<Float>) -> Int32
-    private typealias SetBrightnessFn = @convention(c) (Float) -> Int32
-
-    private static let displayServices: (get: GetBrightnessFn, set: SetBrightnessFn) = {
-        let fallbackGet: GetBrightnessFn = { _ in -1 }
-        let fallbackSet: SetBrightnessFn = { _ in -1 }
-        guard let handle = dlopen(
-            "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices",
-            RTLD_NOW
-        ) else {
-            return (fallbackGet, fallbackSet)
-        }
-        guard let getSym = dlsym(handle, "DisplayServicesGetBrightness"),
-              let setSym = dlsym(handle, "DisplayServicesSetBrightness") else {
-            return (fallbackGet, fallbackSet)
-        }
-        return (
-            unsafeBitCast(getSym, to: GetBrightnessFn.self),
-            unsafeBitCast(setSym, to: SetBrightnessFn.self)
-        )
-    }()
+    /// 截屏路径：毫秒时间戳 + UUID。同一秒（甚至同一毫秒）连续截图不会互相覆盖；
+    /// 目录与返回字段（data.path）保持不变。
+    static func makeScreenshotPath(
+        directory: String,
+        date: Date = Date(),
+        uuid: UUID = UUID()
+    ) -> String {
+        let millis = Int((date.timeIntervalSince1970 * 1_000).rounded())
+        return "\(directory)/screenshot-\(millis)-\(uuid.uuidString).png"
+    }
 
     private func describeIOStatus(_ status: IOReturn) -> String {
         if let message = mach_error_string(status) {

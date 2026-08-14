@@ -30,8 +30,8 @@ final class NativePowerController: NativePowerControlling {
         return .success(())
     }
 
-    /// restart/shutdown 走 loginwindow 的 AppleEvent，与系统菜单行为一致；
-    /// 守护进程运行在用户 Aqua session，无需 root。
+    /// restart/shutdown 走 loginwindow 的 Finder 电源事件（kAEFinderEvents 套件），
+    /// 与系统菜单行为一致；守护进程运行在用户 Aqua session，无需 root。
     func restartSystem() -> Result<Void, NativeCommandError> {
         sendLoginWindowEvent(kAERestart, label: "重启")
     }
@@ -40,15 +40,23 @@ final class NativePowerController: NativePowerControlling {
         sendLoginWindowEvent(kAEShutDown, label: "关机")
     }
 
-    private func sendLoginWindowEvent(_ eventID: AEEventID, label: String) -> Result<Void, NativeCommandError> {
-        let descriptor = NSAppleEventDescriptor(
-            eventClass: AEEventClass(kAECoreSuite),
+    /// 仅构造 loginwindow 电源事件描述符，不发送。
+    /// 抽出独立方法：单测可校验事件类别（FNDR）、事件 ID（rest/shut）与目标，
+    /// 而不真正触发重启/关机。
+    static func makeLoginWindowEvent(_ eventID: AEEventID) -> NSAppleEventDescriptor {
+        NSAppleEventDescriptor(
+            eventClass: AEEventClass(kAEFinderEvents),
             eventID: eventID,
             targetDescriptor: NSAppleEventDescriptor(bundleIdentifier: "com.apple.loginwindow"),
             returnID: AEReturnID(kAutoGenerateReturnID),
             transactionID: AETransactionID(kAnyTransactionID)
         )
+    }
+
+    private func sendLoginWindowEvent(_ eventID: AEEventID, label: String) -> Result<Void, NativeCommandError> {
+        let descriptor = Self.makeLoginWindowEvent(eventID)
         do {
+            // .noReply：事件送达 loginwindow 即返回，电源动作由系统立即执行。
             _ = try descriptor.sendEvent(
                 options: [.noReply],
                 timeout: TimeInterval(kAEDefaultTimeout)
