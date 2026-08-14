@@ -46,15 +46,36 @@ export const COMMAND_DESCRIPTIONS: Readonly<Record<CommandType, string>> = {
   sentry_status: '获取哨兵状态',
   sentry_unlock: '解除哨兵告警',
   sentry_open: '打开哨兵窗口',
+  wake: '唤醒显示器',
+  restart: '重启系统',
+  shutdown: '关机',
+  bt_on: '开启蓝牙',
+  bt_off: '关闭蓝牙',
+  bt_status: '获取蓝牙状态',
+  brightness_up: '调高亮度',
+  brightness_down: '调低亮度',
+  brightness_set: '设置亮度',
+  screenshot: '截屏',
+  mute: '静音',
+  unmute: '取消静音',
+  volume_up: '调高音量',
+  volume_down: '调低音量',
+  volume_set: '设置音量',
+  app_open: '打开应用',
+  app_close: '关闭应用',
+  app_switch: '切换到应用',
+  app_list: '列出运行中应用',
 } as const;
 
 /**
  * 命令分类
  */
 export const COMMAND_CATEGORIES = {
-  SYSTEM: ['lock', 'sleep', 'sleep_displays'] as const,
+  SYSTEM: ['lock', 'sleep', 'sleep_displays', 'wake', 'restart', 'shutdown'] as const,
   POWER: ['caffeinate', 'decaffeinate'] as const,
-  HARDWARE: ['bt_toggle', 'volume_mute'] as const,
+  HARDWARE: ['bt_toggle', 'bt_on', 'bt_off', 'bt_status', 'volume_mute', 'mute', 'unmute', 'volume_up', 'volume_down', 'volume_set', 'brightness_up', 'brightness_down', 'brightness_set'] as const,
+  DISPLAY: ['screenshot'] as const,
+  APP: ['app_open', 'app_close', 'app_switch', 'app_list'] as const,
   UTILITY: ['ping', 'status'] as const,
   SENTRY: ['sentry_start', 'sentry_stop', 'sentry_status', 'sentry_unlock', 'sentry_open'] as const,
 } as const;
@@ -63,8 +84,6 @@ export const COMMAND_CATEGORIES = {
  * 已弃用的命令（用于向后兼容性检查）
  */
 export const DEPRECATED_COMMANDS = {
-  bt_on: 'bt_toggle',
-  bt_off: 'bt_toggle',
   sleep_hold: 'caffeinate',
   sleep_release: 'decaffeinate',
 } as const;

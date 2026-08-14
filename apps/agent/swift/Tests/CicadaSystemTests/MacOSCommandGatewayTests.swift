@@ -36,11 +36,35 @@ private final class FakeBluetoothController: NativeBluetoothControlling {
 
 private final class FakeAudioController: NativeAudioControlling {
     var result: Result<Bool, NativeCommandError> = .success(true)
+    var setMutedResult: Result<Void, NativeCommandError> = .success(())
+    var setVolumeResult: Result<Float, NativeCommandError> = .success(0.5)
+    var adjustVolumeResult: Result<Float, NativeCommandError> = .success(0.6)
+    var currentVolumeResult: Result<Float, NativeCommandError> = .success(0.5)
     private(set) var callCount = 0
+    private(set) var mutedValues: [Bool] = []
+    private(set) var volumeValues: [Float] = []
 
     func toggleSystemMute() -> Result<Bool, NativeCommandError> {
         callCount += 1
         return result
+    }
+
+    func setMuted(_ muted: Bool) -> Result<Void, NativeCommandError> {
+        mutedValues.append(muted)
+        return setMutedResult
+    }
+
+    func setVolume(_ level: Float) -> Result<Float, NativeCommandError> {
+        volumeValues.append(level)
+        return setVolumeResult
+    }
+
+    func adjustVolume(by delta: Float) -> Result<Float, NativeCommandError> {
+        adjustVolumeResult
+    }
+
+    func currentVolume() -> Result<Float, NativeCommandError> {
+        currentVolumeResult
     }
 }
 
@@ -55,6 +79,14 @@ private final class FakePowerController: NativePowerControlling {
     func sleepNow() -> Result<Void, NativeCommandError> {
         sleepCount += 1
         return sleepResult
+    }
+
+    func restartSystem() -> Result<Void, NativeCommandError> {
+        .success(())
+    }
+
+    func shutdownSystem() -> Result<Void, NativeCommandError> {
+        .success(())
     }
 
     func startNoSleepAssertion() -> Result<String, NativeCommandError> {
@@ -79,6 +111,22 @@ private final class FakeDisplayController: NativeDisplayControlling {
     func sleepDisplays() -> Result<Void, NativeCommandError> {
         callCount += 1
         return result
+    }
+
+    func wakeDisplays() -> Result<Void, NativeCommandError> {
+        .success(())
+    }
+
+    func setBrightness(_ level: Float) -> Result<Float, NativeCommandError> {
+        .success(level)
+    }
+
+    func adjustBrightness(by delta: Float) -> Result<Float, NativeCommandError> {
+        .success(0.5 + delta)
+    }
+
+    func captureScreen(to directory: String) -> Result<String, NativeCommandError> {
+        .success("\(directory)/screenshot-test.png")
     }
 }
 
@@ -263,6 +311,46 @@ final class MacOSCommandGatewayTests: XCTestCase {
         XCTAssertFalse(result.success)
         XCTAssertEqual(result.message, "Sentinel 打开失败: launch denied")
         XCTAssertTrue(fixture.sentinel.actions.isEmpty)
+    }
+
+    func testNewHardwareCommandsUseNativeControllers() {
+        let fixture = GatewayFixture()
+
+        XCTAssertTrue(fixture.gateway.execute(command: "bt_on").success)
+        XCTAssertEqual(fixture.bluetooth.setValues, [true])
+        XCTAssertTrue(fixture.gateway.execute(command: "bt_off").success)
+        XCTAssertEqual(fixture.bluetooth.setValues, [true, false])
+
+        let btStatus = fixture.gateway.execute(command: "bt_status")
+        XCTAssertTrue(btStatus.success)
+        XCTAssertEqual(btStatus.data?["bluetooth"], "on")
+
+        XCTAssertTrue(fixture.gateway.execute(command: "brightness_up").success)
+        let brightness = fixture.gateway.execute(command: "brightness_set", params: ["level": 0.8])
+        XCTAssertTrue(brightness.success)
+        XCTAssertTrue(brightness.message.contains("80%"))
+        XCTAssertFalse(
+            fixture.gateway.execute(command: "brightness_set", params: [:]).success
+        )
+
+        XCTAssertTrue(fixture.gateway.execute(command: "mute").success)
+        XCTAssertEqual(fixture.audio.mutedValues, [true])
+        XCTAssertTrue(fixture.gateway.execute(command: "unmute").success)
+        XCTAssertEqual(fixture.audio.mutedValues, [true, false])
+        XCTAssertTrue(fixture.gateway.execute(command: "volume_up").success)
+        let volume = fixture.gateway.execute(command: "volume_set", params: ["level": "0.3"])
+        XCTAssertTrue(volume.success)
+        XCTAssertEqual(fixture.audio.volumeValues, [0.3])
+
+        XCTAssertTrue(fixture.gateway.execute(command: "wake").success)
+        XCTAssertTrue(fixture.gateway.execute(command: "restart").success)
+        XCTAssertTrue(fixture.gateway.execute(command: "shutdown").success)
+
+        let shot = fixture.gateway.execute(command: "screenshot")
+        XCTAssertTrue(shot.success)
+        XCTAssertNotNil(shot.data?["path"])
+
+        XCTAssertFalse(fixture.gateway.execute(command: "app_open", params: [:]).success)
     }
 
     func testSentryOpenRetriesIPCWhileSentinelAppStarts() {

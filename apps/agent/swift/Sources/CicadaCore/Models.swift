@@ -72,6 +72,25 @@ public enum RemoteCommand: String, CaseIterable {
     case sentryStatus = "sentry_status"
     case sentryUnlock = "sentry_unlock"
     case sentryOpen = "sentry_open"
+    case wake
+    case restart
+    case shutdown
+    case btOn = "bt_on"
+    case btOff = "bt_off"
+    case btStatus = "bt_status"
+    case brightnessUp = "brightness_up"
+    case brightnessDown = "brightness_down"
+    case brightnessSet = "brightness_set"
+    case screenshot
+    case mute
+    case unmute
+    case volumeUp = "volume_up"
+    case volumeDown = "volume_down"
+    case volumeSet = "volume_set"
+    case appOpen = "app_open"
+    case appClose = "app_close"
+    case appSwitch = "app_switch"
+    case appList = "app_list"
 }
 
 public extension RemoteCommand {

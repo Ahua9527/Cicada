@@ -1025,6 +1025,10 @@ export class SessionManagerDO {
     const targetDeviceId = typeof payload.deviceId === 'string' ? payload.deviceId : '';
     const command = typeof payload.command === 'string' ? payload.command : '';
     const grantId = typeof payload.grantId === 'string' ? payload.grantId : '';
+    const params =
+      payload.params && typeof payload.params === 'object' && !Array.isArray(payload.params)
+        ? (payload.params as Record<string, unknown>)
+        : undefined;
     if (!clientRequestId || !command || !grantId) {
       return this.shortcutError(
         ErrorCode.INVALID_SHORTCUT_COMMAND,
@@ -1093,6 +1097,7 @@ export class SessionManagerDO {
               requestId: dispatchId,
               grantId,
               command,
+              ...(params ? { params } : {}),
             },
           })
         );
@@ -1387,7 +1392,7 @@ export class SessionManagerDO {
         400
       );
     }
-    const { deviceId, command, requestId } = parseShortcutCommandPayload(
+    const { deviceId, command, requestId, params } = parseShortcutCommandPayload(
       payload,
       `shortcut-${this.createRandomToken(12)}`
     );
@@ -1480,6 +1485,7 @@ export class SessionManagerDO {
           deviceId,
           grantId: grant.grantId,
           command,
+          ...(params ? { params } : {}),
         }),
       }))
     );

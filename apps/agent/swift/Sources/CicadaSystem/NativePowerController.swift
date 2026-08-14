@@ -1,3 +1,4 @@
+import Carbon
 import Darwin
 import Foundation
 import IOKit.pwr_mgt
@@ -27,6 +28,35 @@ final class NativePowerController: NativePowerControlling {
         }
 
         return .success(())
+    }
+
+    /// restart/shutdown 走 loginwindow 的 AppleEvent，与系统菜单行为一致；
+    /// 守护进程运行在用户 Aqua session，无需 root。
+    func restartSystem() -> Result<Void, NativeCommandError> {
+        sendLoginWindowEvent(kAERestart, label: "重启")
+    }
+
+    func shutdownSystem() -> Result<Void, NativeCommandError> {
+        sendLoginWindowEvent(kAEShutDown, label: "关机")
+    }
+
+    private func sendLoginWindowEvent(_ eventID: AEEventID, label: String) -> Result<Void, NativeCommandError> {
+        let descriptor = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kAECoreSuite),
+            eventID: eventID,
+            targetDescriptor: NSAppleEventDescriptor(bundleIdentifier: "com.apple.loginwindow"),
+            returnID: AEReturnID(kAutoGenerateReturnID),
+            transactionID: AETransactionID(kAnyTransactionID)
+        )
+        do {
+            _ = try descriptor.sendEvent(
+                options: [.noReply],
+                timeout: TimeInterval(kAEDefaultTimeout)
+            )
+            return .success(())
+        } catch {
+            return .failure(.message("\(label)失败: \(error.localizedDescription)"))
+        }
     }
 
     func startNoSleepAssertion() -> Result<String, NativeCommandError> {

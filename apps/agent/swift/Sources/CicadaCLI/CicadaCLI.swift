@@ -39,6 +39,13 @@ public protocol DaemonControlClienting {
 
 public protocol LocalCommandExecuting {
     func execute(command rawCommand: String) -> CommandExecutionResult
+    func execute(command rawCommand: String, params: [String: String]) -> CommandExecutionResult
+}
+
+public extension LocalCommandExecuting {
+    func execute(command rawCommand: String, params: [String: String]) -> CommandExecutionResult {
+        execute(command: rawCommand)
+    }
 }
 
 extension DaemonManager: DaemonManaging {
@@ -367,8 +374,9 @@ public final class CicadaCLI {
 
     private func handleRun(_ args: [String]) -> CLIResult {
         guard let command = args.first else {
-            return .failure("用法: cicada run <command>")
+            return .failure("用法: cicada run <command> [key=value ...]")
         }
+        let params = Self.parseRunParams(Array(args.dropFirst()))
 
         if command == RemoteCommand.caffeinate.rawValue || command == RemoteCommand.decaffeinate.rawValue {
             do {
@@ -398,7 +406,7 @@ public final class CicadaCLI {
             }
         }
 
-        let result = commandExecutor.execute(command: command)
+        let result = commandExecutor.execute(command: command, params: params)
         if let config = try? configStore.load(), config.showNotifications {
             let level: NotificationLevel = result.success ? .success : .error
             _ = notifier.notifyQuick(
@@ -410,6 +418,19 @@ public final class CicadaCLI {
             )
         }
         return cliResult(from: result)
+    }
+
+    static func parseRunParams(_ args: [String]) -> [String: String] {
+        var params: [String: String] = [:]
+        for arg in args {
+            guard let separator = arg.firstIndex(of: "=") else { continue }
+            let key = String(arg[..<separator]).trimmingCharacters(in: .whitespaces)
+            let value = String(arg[arg.index(after: separator)...])
+            if !key.isEmpty {
+                params[key] = value
+            }
+        }
+        return params
     }
 
     private func daemonControlResponse(for command: RemoteCommand) throws -> DaemonControlResponse {

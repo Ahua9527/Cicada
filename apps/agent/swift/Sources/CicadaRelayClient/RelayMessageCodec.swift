@@ -5,6 +5,7 @@ struct ShortcutRelayCommand: Equatable {
     let requestId: String
     let grantId: String
     let command: String
+    let params: [String: String]
 }
 
 struct ShortcutGrantUpdateAcknowledgement: Equatable {
@@ -46,7 +47,19 @@ enum RelayMessageCodec {
         return ShortcutRelayCommand(
             requestId: data["requestId"] as? String ?? object["id"] as? String ?? "",
             grantId: data["grantId"] as? String ?? "",
-            command: data["command"] as? String ?? ""
+            command: data["command"] as? String ?? "",
+            params: (data["params"] as? [String: Any])?.compactMapValues { value in
+                switch value {
+                case let string as String:
+                    return string
+                case let number as NSNumber:
+                    return number.stringValue
+                case let bool as Bool:
+                    return bool ? "true" : "false"
+                default:
+                    return nil
+                }
+            } ?? [:]
         )
     }
 

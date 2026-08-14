@@ -91,7 +91,11 @@ export function parseShortcutCommandPayload(
     typeof payload.request_id === 'string' && payload.request_id.trim()
       ? payload.request_id.trim()
       : fallbackRequestId;
-  return { deviceId, command, requestId };
+  const params =
+    payload.params && typeof payload.params === 'object' && !Array.isArray(payload.params)
+      ? (payload.params as Record<string, unknown>)
+      : undefined;
+  return { deviceId, command, requestId, params };
 }
 
 export function shortcutErrorResponse(
@@ -134,4 +138,5 @@ export type ShortcutCommandPayload = {
   deviceId: string;
   command: string;
   requestId: string;
+  params?: Record<string, unknown>;
 };

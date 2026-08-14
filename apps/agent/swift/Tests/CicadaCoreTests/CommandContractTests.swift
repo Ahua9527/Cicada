@@ -16,7 +16,7 @@ final class CommandContractTests: XCTestCase {
     func testSwiftCommandsMatchSharedContract() throws {
         let contract = try loadContract()
 
-        XCTAssertEqual(contract.protocolVersion, 1)
+        XCTAssertEqual(contract.protocolVersion, 2)
         XCTAssertEqual(contract.commands, RemoteCommand.allCases.map(\.rawValue))
     }
 

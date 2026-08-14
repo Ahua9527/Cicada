@@ -5,6 +5,7 @@ import CicadaSystem
 
 public protocol CommandExecuting {
     func execute(command rawCommand: String) -> CommandExecutionResult
+    func execute(command rawCommand: String, params: [String: String]) -> CommandExecutionResult
 }
 
 public protocol NotifierSending {
@@ -17,7 +18,11 @@ public protocol NotifierSending {
     ) -> NotifyResponse
 }
 
-extension MacOSCommandGateway: CommandExecuting {}
+extension MacOSCommandGateway: CommandExecuting {
+    public func execute(command rawCommand: String, params: [String: String]) -> CommandExecutionResult {
+        execute(command: rawCommand, params: params as [String: Any])
+    }
+}
 extension UdsNotifier: NotifierSending {}
 
 public enum RelayConnectionState: String, Codable {
@@ -257,7 +262,8 @@ public final class RelayDaemonService: NSObject {
 
         let result = handleCommand(
             incoming.command,
-            commandId: incoming.requestId.isEmpty ? "shortcut" : incoming.requestId
+            commandId: incoming.requestId.isEmpty ? "shortcut" : incoming.requestId,
+            params: incoming.params
         )
         sendShortcutResult(
             requestId: incoming.requestId,
@@ -271,8 +277,14 @@ public final class RelayDaemonService: NSObject {
     }
 
     @discardableResult
-    private func handleCommand(_ command: String, commandId: String) -> CommandExecutionResult {
-        let result = commandGateway.execute(command: command)
+    private func handleCommand(
+        _ command: String,
+        commandId: String,
+        params: [String: String] = [:]
+    ) -> CommandExecutionResult {
+        let result = params.isEmpty
+            ? commandGateway.execute(command: command)
+            : commandGateway.execute(command: command, params: params)
         if config.showNotifications {
             let level: NotificationLevel = result.success ? .success : .error
             let title = NotificationTitles.command(command)

@@ -125,6 +125,30 @@ describe('SessionManager pure logic', () => {
     });
   });
 
+  it('passes through shortcut command params and rejects non-object params', () => {
+    expect(
+      parseShortcutCommandPayload(
+        {
+          device_id: 'device-1',
+          command: 'brightness_set',
+          params: { level: 0.8 },
+        },
+        'fallback'
+      )
+    ).toEqual({
+      deviceId: 'device-1',
+      command: 'brightness_set',
+      requestId: 'fallback',
+      params: { level: 0.8 },
+    });
+    expect(
+      parseShortcutCommandPayload(
+        { device_id: 'device-1', command: 'ping', params: [1, 2] },
+        'fallback'
+      )
+    ).toEqual({ deviceId: 'device-1', command: 'ping', requestId: 'fallback' });
+  });
+
   it('maps shortcut errors without DO state', async () => {
     const response = shortcutErrorResponse(
       'grant_revoked',

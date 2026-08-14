@@ -23,12 +23,18 @@ protocol NativeBluetoothControlling {
 
 protocol NativeAudioControlling {
     func toggleSystemMute() -> Result<Bool, NativeCommandError>
+    func setMuted(_ muted: Bool) -> Result<Void, NativeCommandError>
+    func setVolume(_ level: Float) -> Result<Float, NativeCommandError>
+    func adjustVolume(by delta: Float) -> Result<Float, NativeCommandError>
+    func currentVolume() -> Result<Float, NativeCommandError>
 }
 
 protocol NativePowerControlling: AnyObject {
     var noSleepAssertionActive: Bool { get }
 
     func sleepNow() -> Result<Void, NativeCommandError>
+    func restartSystem() -> Result<Void, NativeCommandError>
+    func shutdownSystem() -> Result<Void, NativeCommandError>
     func startNoSleepAssertion() -> Result<String, NativeCommandError>
     func stopNoSleepAssertion() -> Result<String, NativeCommandError>
     func batteryDescription() -> String?
@@ -36,4 +42,15 @@ protocol NativePowerControlling: AnyObject {
 
 protocol NativeDisplayControlling {
     func sleepDisplays() -> Result<Void, NativeCommandError>
+    func wakeDisplays() -> Result<Void, NativeCommandError>
+    func setBrightness(_ level: Float) -> Result<Float, NativeCommandError>
+    func adjustBrightness(by delta: Float) -> Result<Float, NativeCommandError>
+    func captureScreen(to directory: String) -> Result<String, NativeCommandError>
+}
+
+protocol NativeAppControlling {
+    func openApplication(named name: String) -> Result<Void, NativeCommandError>
+    func closeApplication(named name: String) -> Result<Void, NativeCommandError>
+    func switchToApplication(named name: String) -> Result<Void, NativeCommandError>
+    func listRunningApplications() -> [String]
 }

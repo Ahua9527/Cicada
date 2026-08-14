@@ -1,4 +1,4 @@
-export const COMMAND_PROTOCOL_VERSION = 1;
+export const COMMAND_PROTOCOL_VERSION = 2;
 
 export const COMMANDS = [
   'lock',
@@ -15,4 +15,23 @@ export const COMMANDS = [
   'sentry_status',
   'sentry_unlock',
   'sentry_open',
+  'wake',
+  'restart',
+  'shutdown',
+  'bt_on',
+  'bt_off',
+  'bt_status',
+  'brightness_up',
+  'brightness_down',
+  'brightness_set',
+  'screenshot',
+  'mute',
+  'unmute',
+  'volume_up',
+  'volume_down',
+  'volume_set',
+  'app_open',
+  'app_close',
+  'app_switch',
+  'app_list',
 ] as const;

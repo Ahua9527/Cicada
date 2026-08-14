@@ -11,6 +11,7 @@ public final class MacOSCommandGateway {
     private let displayController: any NativeDisplayControlling
     private let sleepHoldLeaseController: any SleepHoldLeasing
     private let sentinelControlClient: any SentinelControlClienting
+    private let appController: any NativeAppControlling
     private let sentinelAppOpener: () -> Result<Void, NativeCommandError>
     private let sentinelOpenRetryAttempts: Int
     private let sentinelOpenRetryDelayMicros: useconds_t
@@ -25,6 +26,7 @@ public final class MacOSCommandGateway {
             displayController: NativeDisplayController(),
             sleepHoldLeaseController: SleepHoldLeaseController(),
             sentinelControlClient: UdsSentinelControlClient(),
+            appController: NativeAppController(),
             sentinelAppOpener: MacOSCommandGateway.openInstalledSentinelApp
         )
     }
@@ -37,6 +39,7 @@ public final class MacOSCommandGateway {
         displayController: any NativeDisplayControlling,
         sleepHoldLeaseController: any SleepHoldLeasing,
         sentinelControlClient: any SentinelControlClienting = UdsSentinelControlClient(),
+        appController: any NativeAppControlling = NativeAppController(),
         sentinelAppOpener: @escaping () -> Result<Void, NativeCommandError> = MacOSCommandGateway.openInstalledSentinelApp,
         sentinelOpenRetryAttempts: Int = 20,
         sentinelOpenRetryDelayMicros: useconds_t = 100_000
@@ -48,12 +51,17 @@ public final class MacOSCommandGateway {
         self.displayController = displayController
         self.sleepHoldLeaseController = sleepHoldLeaseController
         self.sentinelControlClient = sentinelControlClient
+        self.appController = appController
         self.sentinelAppOpener = sentinelAppOpener
         self.sentinelOpenRetryAttempts = max(1, sentinelOpenRetryAttempts)
         self.sentinelOpenRetryDelayMicros = sentinelOpenRetryDelayMicros
     }
 
     public func execute(command rawCommand: String) -> CommandExecutionResult {
+        execute(command: rawCommand, params: [:])
+    }
+
+    public func execute(command rawCommand: String, params: [String: Any]) -> CommandExecutionResult {
         guard let command = RemoteCommand(rawValue: rawCommand) else {
             return CommandExecutionResult(success: false, message: "未知命令: \(rawCommand)")
         }
@@ -87,7 +95,212 @@ public final class MacOSCommandGateway {
             return executeSentinelAction(.unlock)
         case .sentryOpen:
             return openSentinel()
+        case .wake:
+            return wakeDisplays()
+        case .restart:
+            return restartSystem()
+        case .shutdown:
+            return shutdownSystem()
+        case .btOn:
+            return setBluetooth(true)
+        case .btOff:
+            return setBluetooth(false)
+        case .btStatus:
+            return bluetoothStatus()
+        case .brightnessUp:
+            return adjustBrightness(by: 0.1)
+        case .brightnessDown:
+            return adjustBrightness(by: -0.1)
+        case .brightnessSet:
+            return setBrightness(params: params)
+        case .screenshot:
+            return captureScreen()
+        case .mute:
+            return setMuted(true)
+        case .unmute:
+            return setMuted(false)
+        case .volumeUp:
+            return adjustVolume(by: 0.1)
+        case .volumeDown:
+            return adjustVolume(by: -0.1)
+        case .volumeSet:
+            return setVolume(params: params)
+        case .appOpen:
+            return appAction(params: params, action: appController.openApplication, verb: "打开")
+        case .appClose:
+            return appAction(params: params, action: appController.closeApplication, verb: "关闭")
+        case .appSwitch:
+            return appAction(params: params, action: appController.switchToApplication, verb: "切换到")
+        case .appList:
+            return listApplications()
         }
+    }
+
+    private func wakeDisplays() -> CommandExecutionResult {
+        switch displayController.wakeDisplays() {
+        case .success:
+            return CommandExecutionResult(success: true, message: "显示器已唤醒")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func restartSystem() -> CommandExecutionResult {
+        switch powerController.restartSystem() {
+        case .success:
+            return CommandExecutionResult(success: true, message: "系统重启命令已执行")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func shutdownSystem() -> CommandExecutionResult {
+        switch powerController.shutdownSystem() {
+        case .success:
+            return CommandExecutionResult(success: true, message: "系统关机命令已执行")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func setBluetooth(_ enabled: Bool) -> CommandExecutionResult {
+        switch bluetoothController.setPowerState(enabled) {
+        case .success:
+            return CommandExecutionResult(success: true, message: "蓝牙已\(enabled ? "开启" : "关闭")")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func bluetoothStatus() -> CommandExecutionResult {
+        switch bluetoothController.powerState() {
+        case let .success(isEnabled):
+            return CommandExecutionResult(
+                success: true,
+                message: "蓝牙\(isEnabled ? "开启" : "关闭")",
+                data: ["bluetooth": isEnabled ? "on" : "off"]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func adjustBrightness(by delta: Float) -> CommandExecutionResult {
+        switch displayController.adjustBrightness(by: delta) {
+        case let .success(level):
+            return CommandExecutionResult(
+                success: true,
+                message: "亮度 \(Int((level * 100).rounded()))%",
+                data: ["brightness": String(level)]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func setBrightness(params: [String: Any]) -> CommandExecutionResult {
+        guard let level = Self.levelParam(params) else {
+            return CommandExecutionResult(success: false, message: "brightness_set 需要 params.level（0-1）")
+        }
+        switch displayController.setBrightness(level) {
+        case let .success(applied):
+            return CommandExecutionResult(
+                success: true,
+                message: "亮度已设为 \(Int((applied * 100).rounded()))%",
+                data: ["brightness": String(applied)]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func captureScreen() -> CommandExecutionResult {
+        switch displayController.captureScreen(to: RuntimePaths.cicadaHome + "/screenshots") {
+        case let .success(path):
+            return CommandExecutionResult(
+                success: true,
+                message: "截屏已保存: \(path)",
+                data: ["path": path]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func setMuted(_ muted: Bool) -> CommandExecutionResult {
+        switch audioController.setMuted(muted) {
+        case .success:
+            return CommandExecutionResult(success: true, message: muted ? "静音已开启" : "静音已关闭")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func adjustVolume(by delta: Float) -> CommandExecutionResult {
+        switch audioController.adjustVolume(by: delta) {
+        case let .success(level):
+            return CommandExecutionResult(
+                success: true,
+                message: "音量 \(Int((level * 100).rounded()))%",
+                data: ["volume": String(level)]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func setVolume(params: [String: Any]) -> CommandExecutionResult {
+        guard let level = Self.levelParam(params) else {
+            return CommandExecutionResult(success: false, message: "volume_set 需要 params.level（0-1）")
+        }
+        switch audioController.setVolume(level) {
+        case let .success(applied):
+            return CommandExecutionResult(
+                success: true,
+                message: "音量已设为 \(Int((applied * 100).rounded()))%",
+                data: ["volume": String(applied)]
+            )
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func appAction(
+        params: [String: Any],
+        action: (String) -> Result<Void, NativeCommandError>,
+        verb: String
+    ) -> CommandExecutionResult {
+        guard let name = Self.nameParam(params) else {
+            return CommandExecutionResult(success: false, message: "需要 params.name（应用名或 bundle id）")
+        }
+        switch action(name) {
+        case .success:
+            return CommandExecutionResult(success: true, message: "已\(verb) \(name)")
+        case let .failure(error):
+            return CommandExecutionResult(success: false, message: error.message)
+        }
+    }
+
+    private func listApplications() -> CommandExecutionResult {
+        let apps = appController.listRunningApplications()
+        return CommandExecutionResult(
+            success: true,
+            message: "运行中应用 \(apps.count) 个: \(apps.joined(separator: ", "))",
+            data: ["apps": apps.joined(separator: ","), "count": String(apps.count)]
+        )
+    }
+
+    /// 兼容数字/字符串两种 JSON 形式的 level 参数
+    private static func levelParam(_ params: [String: Any]) -> Float? {
+        if let value = params["level"] as? NSNumber { return value.floatValue }
+        if let value = params["level"] as? String { return Float(value) }
+        return nil
+    }
+
+    private static func nameParam(_ params: [String: Any]) -> String? {
+        guard let raw = params["name"] as? String else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func lockScreen() -> CommandExecutionResult {

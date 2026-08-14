@@ -10,6 +10,10 @@ private final class MockCommandGateway: CommandExecuting {
         executedCommands.append(rawCommand)
         return CommandExecutionResult(success: true, message: "ok")
     }
+
+    func execute(command rawCommand: String, params: [String: String]) -> CommandExecutionResult {
+        execute(command: rawCommand)
+    }
 }
 
 private final class MockNotifier: NotifierSending {
@@ -129,7 +133,7 @@ final class RelayDaemonServiceTests: XCTestCase {
             RelayMessageCodec.shortcutCommand(
                 "{\"type\":\"shortcut_command\",\"id\":\"fallback\",\"data\":{\"grantId\":\"grant-1\",\"command\":\"ping\"}}"
             ),
-            ShortcutRelayCommand(requestId: "fallback", grantId: "grant-1", command: "ping")
+            ShortcutRelayCommand(requestId: "fallback", grantId: "grant-1", command: "ping", params: [:])
         )
     }
 

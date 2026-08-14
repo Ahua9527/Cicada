@@ -1,5 +1,5 @@
 {
-  "protocol_version": 1,
+  "protocol_version": 2,
   "commands": [
     "lock",
     "bt_toggle",
@@ -14,6 +14,25 @@
     "sentry_stop",
     "sentry_status",
     "sentry_unlock",
-    "sentry_open"
+    "sentry_open",
+    "wake",
+    "restart",
+    "shutdown",
+    "bt_on",
+    "bt_off",
+    "bt_status",
+    "brightness_up",
+    "brightness_down",
+    "brightness_set",
+    "screenshot",
+    "mute",
+    "unmute",
+    "volume_up",
+    "volume_down",
+    "volume_set",
+    "app_open",
+    "app_close",
+    "app_switch",
+    "app_list"
   ]
 }

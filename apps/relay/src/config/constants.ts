@@ -264,43 +264,6 @@ export const WEBSOCKET_CONSTANTS = {
   } as const,
 } as const;
 
-// 默认命令列表
-export const DEFAULT_COMMANDS = {
-  SYSTEM: {
-    LOCK: 'lock',
-    UNLOCK: 'unlock',
-    SLEEP: 'sleep',
-    WAKE: 'wake',
-    RESTART: 'restart',
-    SHUTDOWN: 'shutdown',
-  },
-  BLUETOOTH: {
-    ON: 'bt_on',
-    OFF: 'bt_off',
-    TOGGLE: 'bt_toggle',
-    STATUS: 'bt_status',
-  },
-  DISPLAY: {
-    BRIGHTNESS_UP: 'brightness_up',
-    BRIGHTNESS_DOWN: 'brightness_down',
-    BRIGHTNESS_SET: 'brightness_set',
-    SCREENSHOT: 'screenshot',
-  },
-  AUDIO: {
-    MUTE: 'mute',
-    UNMUTE: 'unmute',
-    VOLUME_UP: 'volume_up',
-    VOLUME_DOWN: 'volume_down',
-    VOLUME_SET: 'volume_set',
-  },
-  APPLICATIONS: {
-    OPEN: 'app_open',
-    CLOSE: 'app_close',
-    SWITCH: 'app_switch',
-    LIST: 'app_list',
-  },
-} as const;
-
 // 环境相关常量
 export const ENV_CONSTANTS = {
   NODE_ENV: {
