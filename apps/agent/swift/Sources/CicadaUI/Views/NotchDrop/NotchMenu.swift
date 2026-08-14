@@ -32,7 +32,7 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
                 icon: "power",
                 label: String(localized: "退出", bundle: .module),
                 tint: .cicadaDanger,
-                requiresHoldConfirmation: true
+                holdCopy: .quitApp
             ) {
                 delegate.quitApp()
             }
@@ -53,7 +53,7 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
                 icon: "trash",
                 label: String(localized: "清空", bundle: .module),
                 tint: .cicadaDanger,
-                requiresHoldConfirmation: true
+                holdCopy: .clearTray
             ) {
                 delegate.clearTray()
             }
@@ -71,11 +71,11 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
         icon: String,
         label: String,
         tint: Color,
-        requiresHoldConfirmation: Bool = false,
+        holdCopy: HoldConfirmationCopy? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        if requiresHoldConfirmation {
-            HoldToConfirmButton(tint: tint, cornerRadius: cornerRadius, action: action) {
+        if let holdCopy {
+            HoldToConfirmButton(tint: tint, cornerRadius: cornerRadius, copy: holdCopy, action: action) {
                 MenuButtonContent(icon: icon, label: label, tint: tint, cornerRadius: cornerRadius)
             }
         } else {
@@ -95,6 +95,7 @@ private struct MenuButtonContent: View {
     let cornerRadius: CGFloat
 
     @State private var hover = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: DesignMetrics.Spacing.s2) {
@@ -111,8 +112,9 @@ private struct MenuButtonContent: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(tint.opacity(0.3), lineWidth: 1)
         )
-        .scaleEffect(hover ? CicadaMotion.hoverScale : 1)
-        .animation(CicadaMotion.hoverSpring, value: hover)
+        // 减弱动态效果时只保留颜色变化：缩放固定 1，弹簧动画置 nil。
+        .scaleEffect(CicadaMotion.hoverScale(isHovering: hover, reduceMotion: reduceMotion))
+        .animation(reduceMotion ? nil : CicadaMotion.hoverSpring, value: hover)
         .onHover { hover = $0 }
     }
 }

@@ -23,7 +23,7 @@ struct FolderGridButton: View {
 struct FolderButton: View {
     let action: FolderAction
     @State private var hover = false
-    @State private var hoverScale = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -43,9 +43,13 @@ struct FolderButton: View {
             }
         }
         .onHover { isHovering in
-            hover = isHovering
-            withAnimation(CicadaMotion.hoverSpring) {
-                hoverScale = isHovering
+            if reduceMotion {
+                // 减弱动态效果：只保留颜色变化，不做弹簧动画。
+                hover = isHovering
+            } else {
+                withAnimation(CicadaMotion.hoverSpring) {
+                    hover = isHovering
+                }
             }
         }
     }
@@ -70,7 +74,7 @@ struct FolderButton: View {
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.md))
-        .scaleEffect(hoverScale ? CicadaMotion.hoverScale : 1)
+        .scaleEffect(CicadaMotion.hoverScale(isHovering: hover, reduceMotion: reduceMotion))
     }
 }
 

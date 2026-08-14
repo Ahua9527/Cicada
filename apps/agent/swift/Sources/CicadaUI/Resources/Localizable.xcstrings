@@ -1510,6 +1510,36 @@
           }
         }
       }
+    },
+    "退出 Cicada？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit Cicada?"
+          }
+        }
+      }
+    },
+    "退出后远程控制和安防监控会停止。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitting stops remote control and security monitoring."
+          }
+        }
+      }
+    },
+    "按住两秒可退出 Cicada。通过键盘或 VoiceOver 激活后，需在确认窗口中再次确认。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold for two seconds to quit Cicada. When activated via keyboard or VoiceOver, confirm again in the dialog."
+          }
+        }
+      }
     }
   },
   "version": "2300"
