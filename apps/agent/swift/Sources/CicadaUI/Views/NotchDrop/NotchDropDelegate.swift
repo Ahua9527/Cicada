@@ -43,6 +43,11 @@ public protocol NotchDropDelegate: AnyObject, ObservableObject {
     /// 关闭刘海面板。宿主实现：`notchClose()`。
     func close()
 
+    /// 退出整个 App（刘海菜单「退出」长按确认后触发）。
+    /// 宿主实现：`NSApp.terminate(nil)`——走正常终止链路（`applicationWillTerminate`
+    /// 刷盘/停服务），不用 `exit(0)`。
+    func quitApp()
+
     /// 打开设置页。宿主实现：`showSettings()`（路由到控制中心设置 Tab）。
     func showSettings()
 
@@ -53,6 +58,13 @@ public protocol NotchDropDelegate: AnyObject, ObservableObject {
 
     /// 打开赞助页。宿主实现：`NSWorkspace.shared.open(sponsorPage); notchClose()`。
     func openSponsor()
+}
+
+// MARK: - 默认实现
+
+public extension NotchDropDelegate {
+    /// 默认空实现：库独立预览/单测 Mock 无需响应退出。
+    func quitApp() {}
 }
 
 // MARK: - 预览/单测用 Mock

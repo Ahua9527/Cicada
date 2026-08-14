@@ -18,9 +18,12 @@ struct CicadaTextField: View {
             Text(title)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.cicadaTextSecondary)
+                .accessibilityHidden(true)
             TextField("", text: $text)
                 .textFieldStyle(.plain)
                 .focused($isFocused)
+                .accessibilityLabel(Text(title))
+                .accessibilityHint(Text(hint ?? ""))
                 .padding(.horizontal, DesignMetrics.Spacing.s4)
                 .padding(.vertical, DesignMetrics.Spacing.s3)
                 .background(Color.cicadaBgBase)
@@ -30,10 +33,13 @@ struct CicadaTextField: View {
                         .stroke(isFocused ? AnyShapeStyle(.cicadaAccent) : AnyShapeStyle(.cicadaBorder), lineWidth: 1)
                 )
                 .shadow(color: isFocused ? .cicadaAccent.opacity(0.12) : .clear, radius: 6)
+                // 焦点边框/光晕以 0.15s ease-out 过渡,避免生硬瞬切。
+                .animation(CicadaMotion.focusGlow, value: isFocused)
             if let hint {
                 Text(hint)
                     .font(.caption2)
                     .foregroundStyle(.cicadaTextTertiary)
+                    .accessibilityHidden(true)
             }
         }
     }

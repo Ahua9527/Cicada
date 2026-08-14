@@ -60,6 +60,9 @@ struct ProgressRing: View {
         }
         .frame(width: size, height: size)
         .animation(.easeOut(duration: 0.5), value: progress)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "就绪度", bundle: .module))
+        .accessibilityValue("\(Int(progress * 100))%")
     }
 
     /// 环形 Shape。

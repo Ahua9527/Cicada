@@ -1,0 +1,14 @@
+import SwiftUI
+
+/// 动效 token(对齐 Design.md §10)。新代码引用此处,不在调用点手写数值;
+/// 存量站点随改动逐步收敛,不做大爆炸重写。
+enum CicadaMotion {
+    /// hover 缩放 spring(NotchMenu / FolderGrid 等)。
+    static let hoverSpring = Animation.spring(response: 0.2)
+    /// hover 缩放幅度(统一;原 NotchMenu 1.05 与 FolderGrid 1.02 并存)。
+    static let hoverScale: CGFloat = 1.02
+    /// 侧栏选中跟随(Design.md §10: easeInOut 0.15)。
+    static let selection = Animation.easeInOut(duration: 0.15)
+    /// 输入框焦点边框/光晕(进场用 ease-out)。
+    static let focusGlow = Animation.easeOut(duration: 0.15)
+}

@@ -23,7 +23,12 @@ final class CicadaUIPublicAPITests: XCTestCase {
 
         let notchDelegate = HostNotchDropDelegate()
         _ = NotchPanel(delegate: notchDelegate)
+        _ = NotchPanel(delegate: notchDelegate, onShowMenu: {})
         _ = NotchMenu(delegate: notchDelegate)
+
+        let requestCameraPermission: (() async -> CameraAuthorizationStatus)? = { .authorized }
+        _ = EmptyView()
+            .environment(\.requestCameraPermission, requestCameraPermission)
 
         await appModel.alarm.stop()
 

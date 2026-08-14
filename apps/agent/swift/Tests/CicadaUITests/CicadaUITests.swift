@@ -236,6 +236,44 @@ final class CicadaUITests: XCTestCase {
     }
 
     @MainActor
+    func testConfigModelRetriesFailedSentrySave() async throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let (suiteName, defaults) = try makeUserDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let blocker = directory.appendingPathComponent("not-a-directory")
+        try Data().write(to: blocker)
+        let sentryStore = SentryConfigStore(
+            path: blocker.appendingPathComponent("sentry-config.json").path,
+            legacyDefaults: defaults
+        )
+        let model = ConfigModel(
+            store: ConfigStore(path: directory.appendingPathComponent("config.json").path),
+            sentryStore: sentryStore
+        )
+
+        model.sentry.sentryRecordingEnabled = true
+
+        var failed = false
+        for _ in 0..<100 {
+            if case .err = model.sentrySaveState {
+                failed = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(failed, "写入路径不可用时应公开保存失败状态")
+
+        try FileManager.default.removeItem(at: blocker)
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: true)
+        await model.retrySentrySave()
+
+        XCTAssertEqual(model.sentrySaveState, .ok)
+        XCTAssertTrue(sentryStore.load().sentryRecordingEnabled)
+    }
+
+    @MainActor
     func testSleepHoldReachableWithZeroSessionsIsInactive() async {
         let model = SleepHoldModel(statusProvider: {
             SleepHoldControlResponse(ok: true, status: .canSleep, activeSessions: 0)
@@ -357,6 +395,42 @@ final class CicadaUITests: XCTestCase {
         // draft 同步为合并结果。
         XCTAssertEqual(model.draft.relayURL, "https://b.example.com")
         XCTAssertEqual(model.draft.deviceId, "MAC_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+    }
+
+    func testFolderActionDoesNotRequireHoldByDefault() {
+        let action = FolderAction(systemImage: "trash", label: "Clear", isDanger: true, action: {})
+
+        XCTAssertFalse(action.requiresHoldConfirmation)
+    }
+
+    func testHoldConfirmationDoesNotCompleteAfterCancellation() {
+        var confirmation = HoldConfirmationState()
+
+        confirmation.begin()
+        confirmation.cancel()
+
+        XCTAssertFalse(confirmation.complete())
+    }
+
+    func testHoldConfirmationCompletesOnlyOncePerPress() {
+        var confirmation = HoldConfirmationState()
+
+        confirmation.begin()
+
+        XCTAssertTrue(confirmation.complete())
+        XCTAssertFalse(confirmation.complete())
+        XCTAssertTrue(confirmation.hasCompleted)
+    }
+
+    func testDiagnosticMotionKeyIsStableForUnchangedDiagnostic() {
+        let baseline = Diagnostic(level: .warn, message: "sentinel unavailable")
+        let identical = Diagnostic(level: .warn, message: "sentinel unavailable")
+        let differentLevel = Diagnostic(level: .danger, message: "sentinel unavailable")
+        let differentMessage = Diagnostic(level: .warn, message: "sleephold unavailable")
+
+        XCTAssertEqual(baseline.motionKey, identical.motionKey)
+        XCTAssertNotEqual(baseline.motionKey, differentLevel.motionKey)
+        XCTAssertNotEqual(baseline.motionKey, differentMessage.motionKey)
     }
 
     private func makeTemporaryDirectory() throws -> URL {

@@ -1,16 +1,17 @@
 import SwiftUI
 
-/// 菜单栏下拉内容：状态卡 + 4 个操作按钮 + Divider。
+/// 菜单栏下拉内容:状态卡 + 4 个操作按钮 + Divider。
 ///
-/// `public` 暴露：宿主 `App.swift` 的 `MenuBarExtra` content 直接引用。
-/// 三个导航按钮先设 `router.selection` 再 `openWindow(id:"main")`（宿主窗口 id），
-/// 确保主窗口置顶时显示对应分区。退出按钮调可注入 `onQuit` 闭包：
-/// - CicadaUI 默认 `{ exit(0) }`（库独立预览/单测用，跳过 `applicationWillTerminate`）。
-/// - 宿主注入 `{ NSApp.terminate(nil) }`，走正常终止链路（`stopPolling`/servers.stop/...）。
+/// `public` 暴露:宿主 `App.swift` 的 `MenuBarExtra` content 直接引用。
+/// 三个导航按钮走 `\.openControlCenter` 注入(宿主 → `ControlCenterRouter.shared.open`,
+/// 单一 opener 链路,避免多 openWindow 来源造成重复窗口);注入为 nil 时回退为仅切
+/// `router.selection`(库独立预览)。退出按钮调可注入 `onQuit` 闭包:
+/// - CicadaUI 默认 `{ exit(0) }`(库独立预览/单测用,跳过 `applicationWillTerminate`)。
+/// - 宿主注入 `{ NSApp.terminate(nil) }`,走正常终止链路(`stopPolling`/servers.stop/...)。
 public struct MenuBarDropdown: View {
     @EnvironmentObject var appModel: AppModel
     @EnvironmentObject var router: ControlCenterRouter
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openControlCenter) private var openControlCenter
 
     /// 退出闭包。默认 `exit(0)` 保持库独立；宿主注入 `NSApp.terminate(nil)`。
     public var onQuit: () -> Void
@@ -26,16 +27,25 @@ public struct MenuBarDropdown: View {
                 detail: statusDetail
             )
             MenuBarButton(icon: "rectangle.split.2x1", title: String(localized: "打开控制中心", bundle: .module)) {
-                router.selection = .overview
-                openWindow(id: "main")
+                if let openControlCenter {
+                    openControlCenter(.overview)
+                } else {
+                    router.selection = .overview
+                }
             }
             MenuBarButton(icon: "slider.horizontal.3", title: String(localized: "设置…", bundle: .module)) {
-                router.selection = .settings
-                openWindow(id: "main")
+                if let openControlCenter {
+                    openControlCenter(.settings)
+                } else {
+                    router.selection = .settings
+                }
             }
             MenuBarButton(icon: "wrench.and.screwdriver", title: String(localized: "维护…", bundle: .module)) {
-                router.selection = .maintenance
-                openWindow(id: "main")
+                if let openControlCenter {
+                    openControlCenter(.maintenance)
+                } else {
+                    router.selection = .maintenance
+                }
             }
             Divider()
             MenuBarButton(icon: "arrow.right.square", title: String(localized: "退出 Cicada", bundle: .module), tint: .cicadaDanger) {
@@ -125,9 +135,26 @@ struct MenuBarButtonStyle: ButtonStyle {
     var tint: Color = .cicadaTextPrimary
 
     func makeBody(configuration: Configuration) -> some View {
+        MenuBarButtonStyleBody(configuration: configuration, tint: tint)
+    }
+}
+
+private struct MenuBarButtonStyleBody: View {
+    let configuration: ButtonStyle.Configuration
+    let tint: Color
+    @State private var isHovered = false
+
+    var body: some View {
         configuration.label
-            .background(configuration.isPressed ? tint.opacity(0.12) : Color.clear)
+            .background(backgroundColor)
             .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.sm))
+            .animation(.easeOut(duration: 0.1), value: isHovered)
+            .onHover { isHovered = $0 }
+    }
+
+    private var backgroundColor: Color {
+        if configuration.isPressed { return tint.opacity(0.12) }
+        return isHovered ? tint.opacity(0.08) : .clear
     }
 }
 

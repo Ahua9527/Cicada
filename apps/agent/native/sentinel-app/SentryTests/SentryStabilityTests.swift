@@ -435,6 +435,12 @@ final class SentryStabilityTests: XCTestCase {
     func testOpenMainWindowInvokesRegisteredWindowOpener() {
         let controller = SentinelController.shared
         controller.clearMainWindowOpenerForTesting()
+        // 前置条件:不存在已打开的控制中心窗口。测试宿主就是 App 本体,WindowGroup 在
+        // 启动时会自动呈现一个控制中心窗口;openMainWindow 的去重逻辑对已有可见
+        // 窗口只置前、不调 opener(这正是单窗口化修复的行为)。
+        NSApp.windows
+            .filter { SentinelController.isControlCenterWindow($0) }
+            .forEach { $0.close() }
         var openCount = 0
 
         controller.registerMainWindowOpener {
@@ -684,6 +690,63 @@ final class SentryStabilityTests: XCTestCase {
         coordinator.setInteractionActiveForTesting(false)
         XCTAssertEqual(presenter.presentedNotifications, [payload])
         XCTAssertEqual(coordinator.pendingNotificationCount, 0)
+    }
+
+    func testTrayEntryAnimationQueueConsumesEachItemOnce() {
+        let first = UUID()
+        let second = UUID()
+        var queue = TrayEntryAnimationQueue()
+
+        queue.register([first, second])
+
+        XCTAssertTrue(queue.contains(first))
+        XCTAssertTrue(queue.contains(second))
+        XCTAssertTrue(queue.consume(first))
+        XCTAssertFalse(queue.contains(first))
+        XCTAssertFalse(queue.consume(first))
+        XCTAssertTrue(queue.contains(second))
+    }
+
+    /// 刘海窗口几何护栏:窗口必须贴合交互区,不再用全屏宽 frame 横贯屏幕顶部
+    /// (旧 1512×200 透明无边框窗口吞掉其下方所有窗口的点击——控制中心顶部死区即此因)。
+    func testNotchWindowFramesHugInteractiveRegion() {
+        let screenFrame = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let notchRect = CGRect(x: 656, y: 945, width: 200, height: 37)
+
+        let compact = NotchWindowController.compactFrame(
+            screenFrame: screenFrame,
+            notchRect: notchRect,
+            dropRange: 32
+        )
+        XCTAssertTrue(compact.contains(notchRect))
+        XCTAssertLessThan(compact.width, 300)
+        XCTAssertEqual(compact.maxY, screenFrame.maxY)
+        XCTAssertEqual(compact.midX, screenFrame.midX, accuracy: 0.5)
+
+        let opened = NotchWindowController.openedFrame(
+            screenFrame: screenFrame,
+            openedSize: CGSize(width: 600, height: 160)
+        )
+        XCTAssertEqual(opened.size, CGSize(width: 700, height: 200))
+        XCTAssertEqual(opened.maxY, screenFrame.maxY)
+        XCTAssertEqual(opened.midX, screenFrame.midX, accuracy: 0.5)
+    }
+
+    @MainActor
+    func testNotchViewModelUsesExplicitMenuAndNotificationRoutes() {
+        let vm = NotchViewModel()
+
+        vm.showMenu()
+        XCTAssertEqual(vm.contentType, .normal)
+
+        vm.notchOpen(.click)
+        vm.showMenu()
+        XCTAssertEqual(vm.contentType, .menu)
+
+        vm.showNotification(.init(level: .info, title: "Ready", message: nil, durationMs: 500))
+        vm.dismissNotification()
+        XCTAssertEqual(vm.contentType, .normal)
+        XCTAssertNil(vm.notificationPayload)
     }
 
     @MainActor

@@ -33,7 +33,7 @@ struct NotchSection<Delegate: ObservableObject & NotchDropDelegate>: View {
     }
 
     var body: some View {
-        panel
+        interactivePanel
             // 收窄 UTI 为实际支持的 `.fileURL`，避免吞掉任意 pasteboard 类型；
             // providers 为空时拒绝 drop，由调用者据此决定是否接受。
             .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
@@ -41,10 +41,20 @@ struct NotchSection<Delegate: ObservableObject & NotchDropDelegate>: View {
                 handleDrop(providers)
                 return true
             }
-            .onTapGesture(perform: handleTap)
     }
 
     // MARK: - 视觉
+
+    @ViewBuilder
+    private var interactivePanel: some View {
+        switch kind {
+        case .airDrop:
+            Button(action: handleTap) { panel }
+                .buttonStyle(NotchSectionButtonStyle())
+        case .tray:
+            panel
+        }
+    }
 
     private var panel: some View {
         RoundedRectangle(cornerRadius: cornerRadius)
@@ -63,9 +73,10 @@ struct NotchSection<Delegate: ObservableObject & NotchDropDelegate>: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(DesignMetrics.Spacing.s4)
+                .foregroundStyle(isTargeted ? Color.cicadaAccent : Color.white)
             }
             .aspectRatio(1, contentMode: .fit)   // 对照 AirDropView: aspectRatio(1, .fit)
-            .animation(.spring(response: 0.3), value: isTargeted)
+            .animation(.easeOut(duration: 0.12), value: isTargeted)
     }
 
     // MARK: - 交互
@@ -91,6 +102,13 @@ struct NotchSection<Delegate: ObservableObject & NotchDropDelegate>: View {
             // 暂存区点击无动作（非空态列表交互留宿主 P4）。
             break
         }
+    }
+}
+
+private struct NotchSectionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
 

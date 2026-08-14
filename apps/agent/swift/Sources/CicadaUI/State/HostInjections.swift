@@ -96,7 +96,7 @@ extension EnvironmentValues {
 // MARK: - Camera Permission
 
 /// 相机授权状态的包内镜像（避免 CicadaUI 依赖 AVFoundation）。
-public enum CameraAuthorizationStatus {
+public enum CameraAuthorizationStatus: Equatable {
     case notDetermined
     case restricted
     case denied
@@ -109,7 +109,7 @@ private struct CameraAuthorizationStatusKey: EnvironmentKey {
 }
 
 private struct RequestCameraPermissionKey: EnvironmentKey {
-    static let defaultValue: (() -> Void)? = nil
+    static let defaultValue: (() async -> CameraAuthorizationStatus)? = nil
 }
 
 extension EnvironmentValues {
@@ -119,9 +119,9 @@ extension EnvironmentValues {
         set { self[CameraAuthorizationStatusKey.self] = newValue }
     }
 
-    /// 请求相机授权。`nil` 时 RecordingCard 不显示请求按钮；宿主注入
-    /// `AVCaptureDevice.requestAccess(for: .video)` 或 `CameraManager.requestPermission()`。
-    public var requestCameraPermission: (() -> Void)? {
+    /// 请求相机授权并返回系统最终状态。`nil` 时 RecordingCard 不显示请求按钮；
+    /// 宿主注入 `AVCaptureDevice.requestAccess(for: .video)` 的异步结果。
+    public var requestCameraPermission: (() async -> CameraAuthorizationStatus)? {
         get { self[RequestCameraPermissionKey.self] }
         set { self[RequestCameraPermissionKey.self] = newValue }
     }
@@ -203,6 +203,26 @@ extension EnvironmentValues {
     public var notchDropSettingsStore: NotchDropSettingsStore? {
         get { self[NotchDropSettingsStoreKey.self] }
         set { self[NotchDropSettingsStoreKey.self] = newValue }
+    }
+}
+
+// MARK: - Open Control Center
+
+private struct OpenControlCenterKey: EnvironmentKey {
+    /// 默认 `nil`:MenuBarDropdown 回退为仅切 `router.selection`(库独立可预览)。
+    /// 宿主注入 `ControlCenterRouter.shared.open(_:)` 走完整开窗口链路
+    /// (activate + 置前 + 去重)。
+    static let defaultValue: ((NavSection) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    /// 菜单栏「打开控制中心/设置…/维护…」按钮的宿主注入。
+    /// 统一走 `SentinelController.openMainWindow()` 单一 opener——openWindow(id:)
+    /// 若存在多个环境来源(label bridge / MenuBarExtra content),各自首调会各建一窗,
+    /// 用户看到两个控制中心重叠。
+    public var openControlCenter: ((NavSection) -> Void)? {
+        get { self[OpenControlCenterKey.self] }
+        set { self[OpenControlCenterKey.self] = newValue }
     }
 }
 

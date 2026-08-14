@@ -54,15 +54,6 @@ class NotchViewModel: NSObject, ObservableObject {
         )
     }
 
-    var headlineOpenedRect: CGRect {
-        .init(
-            x: screenRect.origin.x + (screenRect.width - notchOpenedSize.width) / 2,
-            y: screenRect.origin.y + screenRect.height - deviceNotchRect.height,
-            width: notchOpenedSize.width,
-            height: deviceNotchRect.height
-        )
-    }
-
     @Published private(set) var status: Status = .closed
     @Published var openReason: OpenReason = .unknown
     @Published var contentType: ContentType = .normal
@@ -110,6 +101,17 @@ class NotchViewModel: NSObject, ObservableObject {
         contentType = .notification
     }
 
+    func showMenu() {
+        guard status == .opened else { return }
+        contentType = .menu
+    }
+
+    func dismissNotification() {
+        guard contentType == .notification else { return }
+        notificationPayload = nil
+        contentType = .normal
+    }
+
     func clearNotificationIfNeeded() {
         guard contentType == .notification else { return }
         notificationPayload = nil
@@ -121,14 +123,4 @@ class NotchViewModel: NSObject, ObservableObject {
         status = .popping
     }
 
-    func cycleInteractiveContent() {
-        switch contentType {
-        case .normal:
-            contentType = .menu
-        case .menu:
-            showSettings()
-        case .notification:
-            contentType = .normal
-        }
-    }
 }

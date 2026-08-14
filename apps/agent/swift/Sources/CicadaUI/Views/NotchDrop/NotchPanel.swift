@@ -18,15 +18,26 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
     private let cornerRadius: CGFloat
     /// 内部间距，对齐 `NotchViewModel.spacing`。
     private let spacing: CGFloat
+    /// 宿主显式注入的菜单切换动作。
+    private let onShowMenu: () -> Void
+
+    /// 菜单按钮(⋯)悬停态:放大热区后的 hover 反馈。
+    @State private var menuHover = false
 
     /// 宿主注入的暂存区内容（既有 `TrayView`，覆盖空态 + 已暂存文件列表）。
     /// `nil` 时用库内空态拖放区（NotchSection .tray），保持库独立可预览。
     @Environment(\.trayContent) private var trayContent
 
-    public init(delegate: Delegate, cornerRadius: CGFloat = 16, spacing: CGFloat = 16) {
+    public init(
+        delegate: Delegate,
+        cornerRadius: CGFloat = 16,
+        spacing: CGFloat = 16,
+        onShowMenu: @escaping () -> Void = {}
+    ) {
         self.delegate = delegate
         self.cornerRadius = cornerRadius
         self.spacing = spacing
+        self.onShowMenu = onShowMenu
     }
 
     public var body: some View {
@@ -65,19 +76,26 @@ public struct NotchPanel<Delegate: ObservableObject & NotchDropDelegate>: View {
         }
     }
 
-    /// 标题行（对照 NotchHeaderView：标题 + ellipsis）。
+    /// 标题行(对照 NotchHeaderView:标题 + ellipsis)。
     ///
-    /// ellipsis 点击切菜单是宿主 `NotchViewModel.cycleInteractiveContent()`，由宿主
-    /// `NotchViewModel+Events` 的点击事件处理（现有逻辑：点 headline 区触发
-    /// `cycleInteractiveContent()`）。本轮协议不补 `cycleMenu()`，保持最小；
-    /// 此处 ellipsis **纯装饰**（不绑动作）。若需在 CicadaUI 内点击切菜单，
-    /// 可协议补 `func cycleMenu()`，但不推荐（增加协议面）。
+    /// 菜单动作由宿主显式注入,避免用不可聚焦的全局标题区域接管点击。
+    /// ⋯ 热区扩到 28×28(原热区只有省略号字形本身,约 17×5,太难点中)。
     private var notchHeader: some View {
         HStack {
             Text("NotchDrop")
                 .font(.system(.headline, design: .rounded))
             Spacer()
-            Image(systemName: "ellipsis")
+            Button(action: onShowMenu) {
+                Image(systemName: "ellipsis")
+                    .frame(width: 28, height: 28)
+                    .background(menuHover ? Color.white.opacity(0.08) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.sm))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { menuHover = $0 }
+            .animation(.easeOut(duration: 0.1), value: menuHover)
+            .accessibilityLabel(String(localized: "菜单", bundle: .module))
         }
     }
 }

@@ -19,25 +19,30 @@ struct AlarmLeftPanel: View {
                 .font(.largeTitle)
                 .bold()
                 .opacity(0.2)
+                .accessibilityHidden(true)
 
             Spacer()
 
-            // ② 标题
-            Text("Cicada 警戒已触发", bundle: .module)
-                .font(.system(size: 28, weight: .heavy))
-                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s2) {
+                // ② 标题
+                Text("Cicada 警戒已触发", bundle: .module)
+                    .font(.system(size: 28, weight: .heavy))
+                    .foregroundStyle(.white)
 
-            // ③ 触发原因（若有）
-            if !reason.isEmpty {
-                Text(reason)
+                // ③ 触发原因（若有）
+                if !reason.isEmpty {
+                    Text(reason)
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+
+                // ④ 描述
+                Text("此 Mac 已联网并正在监控你的行为。", bundle: .module)
                     .font(.body)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.7))
             }
-
-            // ④ 描述
-            Text("此 Mac 已联网并正在监控你的行为。", bundle: .module)
-                .font(.body)
-                .foregroundStyle(.white.opacity(0.7))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(alertSummary)
 
             // ⑤ 停止按钮
             Button(action: onStop) {
@@ -48,6 +53,11 @@ struct AlarmLeftPanel: View {
         }
         .padding(DesignMetrics.Spacing.s8)   // 32pt，对照现有 SentryView texts padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var alertSummary: String {
+        let title = String(localized: "Cicada 警戒已触发", bundle: .module)
+        return reason.isEmpty ? title : "\(title)：\(reason)"
     }
 }
 

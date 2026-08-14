@@ -22,8 +22,11 @@ struct SettingRow<Control: View>: View {
                     .font(.caption)
                     .foregroundStyle(.cicadaTextTertiary)
             }
+            .accessibilityHidden(true)
             Spacer(minLength: DesignMetrics.Spacing.s6)
             control()
+                .accessibilityLabel(Text(title))
+                .accessibilityHint(Text(desc))
         }
         .padding(.vertical, DesignMetrics.Spacing.s3)
         .overlay(alignment: .bottom) {

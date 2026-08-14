@@ -26,11 +26,6 @@ extension NotchViewModel {
                         // click where user open the panel
                     } else if deviceNotchRect.insetBy(dx: inset, dy: inset).contains(mouseLocation) {
                         notchClose()
-                        // for the same height as device notch, open the url of project
-                    } else if headlineOpenedRect.contains(mouseLocation) {
-                        // for clicking headline which mouse event may handled by another app
-                        // open the menu
-                        cycleInteractiveContent()
                     }
                 case .closed, .popping:
                     // touch inside, open

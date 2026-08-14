@@ -23,6 +23,15 @@ struct Diagnostic: Identifiable {
     let id = UUID()
     let level: DiagLevel   // .warn / .danger
     let message: String
+
+    /// 用于 UI 过渡的稳定标识，避免相同轮询结果因 `id` 变化而重复播放动效。
+    var motionKey: String {
+        let levelKey = switch level {
+        case .warn: "warn"
+        case .danger: "danger"
+        }
+        return "\(levelKey):\(message)"
+    }
 }
 
 /// 诊断级别。
@@ -49,12 +58,21 @@ public struct FolderAction: Identifiable {
     public let systemImage: String
     public let label: String
     public let isDanger: Bool
+    /// 是否需要按住确认。仅用于确实会删除用户文件的动作，不能由危险色样式推断。
+    public let requiresHoldConfirmation: Bool
     public let action: () -> Void
 
-    public init(systemImage: String, label: String, isDanger: Bool, action: @escaping () -> Void) {
+    public init(
+        systemImage: String,
+        label: String,
+        isDanger: Bool,
+        requiresHoldConfirmation: Bool = false,
+        action: @escaping () -> Void
+    ) {
         self.systemImage = systemImage
         self.label = label
         self.isDanger = isDanger
+        self.requiresHoldConfirmation = requiresHoldConfirmation
         self.action = action
     }
 }

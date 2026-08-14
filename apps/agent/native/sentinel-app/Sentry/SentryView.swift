@@ -16,12 +16,17 @@ struct SentryView: View {
     // 故通过参数直传 AppModel.shared（由 Sentry.makeDefaultWindowController 注入）。
     @ObservedObject var appModel: AppModel
 
-    @State private var globalOpacity: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
 
     var body: some View {
         ZStack {
             if sentry.isAlrming {
-                ColorfulView(color: .sunset, noise: .constant(64))
+                ColorfulView(
+                    color: .sunset,
+                    speed: .constant(reduceMotion ? 0 : 1),
+                    noise: .constant(64)
+                )
                     .transition(.opacity)
                     .ignoresSafeArea()
                 Rectangle().fill(.ultraThinMaterial).opacity(0.5)
@@ -40,11 +45,16 @@ struct SentryView: View {
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 32))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .opacity(globalOpacity)
-        .animation(.easeInOut(duration: 1), value: globalOpacity)
+        // 入场:Design.md §10 既定方案——spring(response: 0.4) + 轻微 scale + 淡入。
+        // 下一 runloop 启动(等 SkyLight 窗口上屏),替代原 0.25s 空等 + 1s easeInOut;
+        // 警报音与画面同帧到达。reduceMotion 退化为 0.2s 纯淡入。
+        .opacity(appeared ? 1 : 0)
+        .scaleEffect(reduceMotion ? 1 : (appeared ? 1 : 0.96))
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                globalOpacity = 1
+            DispatchQueue.main.async {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.4)) {
+                    appeared = true
+                }
             }
         }
     }

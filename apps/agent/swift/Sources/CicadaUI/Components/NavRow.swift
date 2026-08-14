@@ -32,6 +32,8 @@ struct NavRow: View {
             RoundedRectangle(cornerRadius: DesignMetrics.Radius.md)
                 .stroke(active ? AnyShapeStyle(.cicadaAccent.opacity(0.3)) : AnyShapeStyle(.clear), lineWidth: 1)
         )
+        // Design.md §10 既定:侧栏选中以 easeInOut 0.15 跟随 selection。
+        .animation(CicadaMotion.selection, value: active)
     }
 }
 

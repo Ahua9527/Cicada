@@ -3,6 +3,23 @@ import Combine
 import Foundation
 import OrderedCollections
 
+struct TrayEntryAnimationQueue: Equatable {
+    private(set) var pendingIDs: Set<UUID> = []
+
+    mutating func register<S: Sequence>(_ ids: S) where S.Element == UUID {
+        pendingIDs.formUnion(ids)
+    }
+
+    @discardableResult
+    mutating func consume(_ id: UUID) -> Bool {
+        pendingIDs.remove(id) != nil
+    }
+
+    func contains(_ id: UUID) -> Bool {
+        pendingIDs.contains(id)
+    }
+}
+
 class TrayDrop: ObservableObject {
     static let shared = TrayDrop()
 
@@ -56,6 +73,7 @@ class TrayDrop: ObservableObject {
     var customStorageTimeUnit: CustomstorageTimeUnit
 
     @Published var isLoading: Int = 0
+    @Published private(set) var entryAnimations = TrayEntryAnimationQueue()
 
     func load(_ providers: [NSItemProvider]) {
         assert(!Thread.isMainThread)
@@ -67,6 +85,10 @@ class TrayDrop: ObservableObject {
         do {
             let items = try urls.map { try DropItem(url: $0) }
             DispatchQueue.main.async {
+                let existingIDs = Set(self.items.map(\.id))
+                var entryAnimations = self.entryAnimations
+                entryAnimations.register(items.lazy.map(\.id).filter { !existingIDs.contains($0) })
+                self.entryAnimations = entryAnimations
                 items.forEach { self.items.updateOrInsert($0, at: 0) }
                 self.isLoading -= 1
             }
@@ -90,6 +112,12 @@ class TrayDrop: ObservableObject {
     func delete(_ item: DropItem.ID) {
         guard let item = items.first(where: { $0.id == item }) else { return }
         delete(item: item)
+    }
+
+    func consumeEntryAnimation(for id: DropItem.ID) {
+        var entryAnimations = entryAnimations
+        guard entryAnimations.consume(id) else { return }
+        self.entryAnimations = entryAnimations
     }
 
     private func delete(item: DropItem) {

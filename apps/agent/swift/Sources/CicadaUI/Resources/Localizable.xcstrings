@@ -21,6 +21,16 @@
         }
       }
     },
+    "取消": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
     "维护": {
       "localizations": {
         "en": {
@@ -851,6 +861,16 @@
         }
       }
     },
+    "退出": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit"
+          }
+        }
+      }
+    },
     "监控活跃": {
       "localizations": {
         "en": {
@@ -907,6 +927,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Clear"
+          }
+        }
+      }
+    },
+    "清空 NotchDrop 托盘": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear NotchDrop tray"
+          }
+        }
+      }
+    },
+    "清空 NotchDrop 托盘？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear NotchDrop tray?"
+          }
+        }
+      }
+    },
+    "按住两秒可清空托盘。通过键盘或 VoiceOver 激活后，需在确认窗口中再次确认。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold for two seconds to clear the tray. When using the keyboard or VoiceOver, confirm again in the dialog."
+          }
+        }
+      }
+    },
+    "此操作会永久删除托盘中的所有文件，且无法撤销。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently deletes all files in the tray and cannot be undone."
           }
         }
       }
@@ -1131,6 +1191,16 @@
         }
       }
     },
+    "状态：%@。%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status: %@. %@"
+          }
+        }
+      }
+    },
     "电源": {
       "localizations": {
         "en": {
@@ -1237,6 +1307,76 @@
           "stringUnit": {
             "state": "translated",
             "value": "Recording device"
+          }
+        }
+      }
+    },
+    "帮助": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        }
+      }
+    },
+    "菜单": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menu"
+          }
+        }
+      }
+    },
+    "重试": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        }
+      }
+    },
+    "正在检查相机权限": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking Camera Access"
+          }
+        }
+      }
+    },
+    "正在读取系统相机访问状态": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the system camera permission status"
+          }
+        }
+      }
+    },
+    "等待系统授权": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Camera Access"
+          }
+        }
+      }
+    },
+    "请在系统弹窗中选择允许或不允许": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Allow or Don't Allow in the system prompt"
           }
         }
       }

@@ -3,6 +3,13 @@ import SwiftUI
 /// 连接设置卡：Relay 地址输入 + 保存按钮 + InlineMessage。
 struct ConnectionCard: View {
     @ObservedObject var model: ConfigModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var presentedSaveState: ConfigModel.SaveState
+
+    init(model: ConfigModel) {
+        self.model = model
+        _presentedSaveState = State(initialValue: model.connectionSaveState)
+    }
 
     var body: some View {
         Card(title: String(localized: "连接", bundle: .module)) {
@@ -14,24 +21,43 @@ struct ConnectionCard: View {
                 )
                 HStack {
                     Button(String(localized: "保存", bundle: .module)) {
-                        Task { await model.saveConnection() }
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            presentedSaveState = .saving
+                        }
+                        Task { @MainActor in
+                            await model.saveConnection()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                presentedSaveState = model.connectionSaveState
+                            }
+                        }
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     if let msg = inlineMessage {
                         InlineMessage(kind: msg.kind, text: msg.text)
+                            .transition(inlineMessageTransition)
                     }
                 }
+            }
+        }
+        .onChange(of: model.draft.relayURL) { _ in
+            guard presentedSaveState != .idle else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                presentedSaveState = .idle
             }
         }
     }
 
     private var inlineMessage: (kind: InlineMessage.Kind, text: String)? {
-        switch model.connectionSaveState {
+        switch presentedSaveState {
         case .ok:     return (.ok, String(localized: "配置已保存", bundle: .module))
         case .saving: return nil
         case .err(let e): return (.err, String(localized: "保存失败：", bundle: .module) + e)
         case .idle:   return nil
         }
+    }
+
+    private var inlineMessageTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 }
 

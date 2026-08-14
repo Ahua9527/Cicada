@@ -23,31 +23,54 @@ struct FolderGridButton: View {
 struct FolderButton: View {
     let action: FolderAction
     @State private var hover = false
+    @State private var hoverScale = false
 
     var body: some View {
-        Button(action: action.action) {
-            VStack(spacing: DesignMetrics.Spacing.s2) {
-                Image(systemName: action.systemImage)
-                    .font(.title3)
-                    .foregroundStyle(action.isDanger ? .cicadaDanger : .cicadaTextPrimary)
-                Text(action.label)
-                    .font(.caption)
-                    .foregroundStyle(.cicadaTextSecondary)
+        Group {
+            if action.requiresHoldConfirmation {
+                HoldToConfirmButton(
+                    tint: .cicadaDanger,
+                    cornerRadius: DesignMetrics.Radius.md,
+                    action: action.action
+                ) {
+                    content
+                }
+            } else {
+                Button(action: action.action) {
+                    content
+                }
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity)
-            .padding(DesignMetrics.Spacing.s4)
-            .background(hover ? Color.cicadaAccent.opacity(0.12) : Color.cicadaBgBase)
-            .overlay(
-                RoundedRectangle(cornerRadius: DesignMetrics.Radius.md)
-                    .stroke(
-                        hover ? AnyShapeStyle(.cicadaAccent.opacity(0.3)) : AnyShapeStyle(.cicadaBorderSubtle),
-                        lineWidth: 1
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.md))
         }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
+        .onHover { isHovering in
+            hover = isHovering
+            withAnimation(CicadaMotion.hoverSpring) {
+                hoverScale = isHovering
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: DesignMetrics.Spacing.s2) {
+            Image(systemName: action.systemImage)
+                .font(.title3)
+                .foregroundStyle(action.isDanger ? .cicadaDanger : .cicadaTextPrimary)
+            Text(action.label)
+                .font(.caption)
+                .foregroundStyle(.cicadaTextSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(DesignMetrics.Spacing.s4)
+        .background(hover ? Color.cicadaAccent.opacity(0.12) : Color.cicadaBgBase)
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignMetrics.Radius.md)
+                .stroke(
+                    hover ? AnyShapeStyle(.cicadaAccent.opacity(0.3)) : AnyShapeStyle(.cicadaBorderSubtle),
+                    lineWidth: 1
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.md))
+        .scaleEffect(hoverScale ? CicadaMotion.hoverScale : 1)
     }
 }
 

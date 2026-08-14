@@ -10,6 +10,7 @@ import SwiftUI
 struct NotchView: View {
     @StateObject var vm: NotchViewModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State var dropTargeting: Bool = false
 
     var notchSize: CGSize {
@@ -64,15 +65,20 @@ struct NotchView: View {
                 }
             }
             .transition(
-                .scale.combined(
-                    with: .opacity
-                ).combined(
-                    with: .offset(y: -vm.notchOpenedSize.height / 2)
-                ).animation(vm.animation)
+                // P2-4:scale 从 0.92(anchor .top)起跳而非 0——无物自虚无中来,
+                // 外壳形变承担主运动;offset 保留「内容从刘海缝降下」的空间叙事。
+                // P2-1:reduceMotion 退化为纯淡入,外壳瞬时改形。
+                (reduceMotion
+                    ? AnyTransition.opacity
+                    : AnyTransition.scale(scale: 0.92, anchor: .top).combined(
+                        with: .opacity
+                    ).combined(
+                        with: .offset(y: -vm.notchOpenedSize.height / 2)
+                    )).animation(reduceMotion ? .easeOut(duration: 0.2) : vm.animation)
             )
         }
         .background(dragDetector)
-        .animation(vm.animation, value: vm.status)
+        .animation(reduceMotion ? nil : vm.animation, value: vm.status)
         .preferredColorScheme(.dark)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -146,7 +152,13 @@ struct NotchView: View {
             .foregroundStyle(Color.black.opacity(0.001)) // fuck you apple and 0.001 is the smallest we can have
             .contentShape(Rectangle())
             .frame(width: notchSize.width + vm.dropDetectorRange, height: notchSize.height + vm.dropDetectorRange)
-            .onDrop(of: [.data], isTargeted: $dropTargeting) { _ in true }
+            .onDrop(of: [.data], isTargeted: $dropTargeting) { providers in
+                // P0-1:死区兜底——落在面板非拖放区(标题行/间距)或未打开时直接丢向
+                // 刘海本体的文件,转发暂存托盘,不再「接受但吞掉」。模式同 TrayView。
+                guard !providers.isEmpty else { return false }
+                DispatchQueue.global().async { TrayDrop.shared.load(providers) }
+                return true
+            }
             .onChange(of: dropTargeting) { isTargeted in
                 if isTargeted, vm.status == .closed {
                     // Open the notch when a file is dragged over it

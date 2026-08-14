@@ -117,7 +117,28 @@ final class SentinelController: ObservableObject, AlarmEngineDelegate {
         return result(ok: true, code: nil, message: "Sentry alarm unlocked")
     }
 
+    /// 控制中心窗口特征:常规层级、可成 key、非面板(排除 NSOpenPanel/NSAlert/菜单栏
+    /// 面板)、非子窗口(排除 sheet)、宽度 ≥800(控制中心 minWidth 880;警戒窗 700、
+    /// 刘海窗 level 33 均不命中)。internal 供 @testable 测试复用同一谓词。
+    static func isControlCenterWindow(_ window: NSWindow) -> Bool {
+        window.level == .normal
+            && window.canBecomeKey
+            && !(window is NSPanel)
+            && window.parent == nil
+            && window.frame.width >= 800
+    }
+
     func openMainWindow() -> SentinelCommandResult {
+        // 去重:已有可见控制中心窗口则只置前,不再调 opener 新建
+        // (历史上 openWindow 有 label bridge / MenuBarExtra content 两个环境来源,
+        // 各自首调各建一窗,用户会看到两个控制中心重叠)。
+        if let existing = NSApp.windows.first(where: { Self.isControlCenterWindow($0) && $0.isVisible }) {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            existing.makeKeyAndOrderFront(nil)
+            return result(ok: true, code: nil, message: "Sentry window focused")
+        }
+
         let hadOpenableWindow = NSApp.windows.contains { $0.canBecomeKey || $0.isVisible }
         mainWindowOpener?()
 
@@ -127,9 +148,10 @@ final class SentinelController: ObservableObject, AlarmEngineDelegate {
 
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        // 仅对主控制中心窗口（WindowGroup id "main"）置前，
-        // 避免菜单栏 Extra/警戒窗口等被意外抬升。
-        for window in NSApp.windows where window.identifier?.rawValue == "main" {
+        // 仅对主控制中心窗口置前,避免菜单栏 Extra/警戒窗口等被意外抬升。
+        // (原实现按 `identifier == "main"` 匹配——SwiftUI 不会把 WindowGroup id 写到
+        // NSWindow.identifier,从未生效;改用特征谓词。)
+        for window in NSApp.windows where Self.isControlCenterWindow(window) {
             window.makeKeyAndOrderFront(nil)
         }
         return result(ok: true, code: nil, message: "Sentry window opened")

@@ -1036,7 +1036,7 @@ struct AlarmEye: View {
 规则：
 - `reduceMotion == true` 时，所有 `repeatForever` 动画传 `nil`，元素停在终态/静态构图，不消失。
 - hover 缩放（FolderButton / NotchMenu）保留——属于即时反馈，不属于持续动效，不影响前庭敏感用户。
-- 进度环、Toggle、进场 transition 等短动画可保留；系统本身在 reduceMotion 下会简化 spring。
+- 进度环、Toggle、进场 transition 等短动画可保留。注意：系统**不会**自动简化自定义 `.animation`/`spring`(AlarmEye 手动传 `nil` 即为此);大幅位移/缩放动画须自行门控——刘海外壳开合已在 `NotchView` 手动接 reduceMotion(外壳瞬时改形 + 内容纯淡入)。
 - VoiceOver：警戒窗口、状态徽章、进度环都要给 `accessibilityLabel`（如「警戒已触发：合盖」/「就绪度 80%」），眼睛的纯装饰旋转层加 `.accessibilityHidden(true)`。
 
 ---

@@ -12,6 +12,7 @@ struct MaintenancePane: View {
     @EnvironmentObject var appModel: AppModel
     @Environment(\.launchAtLoginToggle) private var launchAtLoginToggle
     @Environment(\.runStartupChecks) private var runStartupChecks
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showHelp = false
 
     var body: some View {
@@ -20,7 +21,10 @@ struct MaintenancePane: View {
                 PaneHeader(
                     title: String(localized: "维护", bundle: .module),
                     subtitle: String(localized: "运行时路径、睡眠保持会话与诊断", bundle: .module),
-                    trailing: { HelpButton { showHelp = true } }
+                    trailing: {
+                        HelpButton { showHelp = true }
+                            .popover(isPresented: $showHelp, arrowEdge: .top) { HelpSheet() }
+                    }
                 )
 
                 Card(title: String(localized: "运行时", bundle: .module)) {
@@ -35,9 +39,14 @@ struct MaintenancePane: View {
 
                 Card(title: String(localized: "SleepHold 状态", bundle: .module)) {
                     SleepHoldCells(model: appModel.sleepHold)
-                    if let d = appModel.sleepHold.diagnostic {
-                        DiagnosticStrip(diag: d)
+                    Group {
+                        if let d = appModel.sleepHold.diagnostic {
+                            DiagnosticStrip(diag: d)
+                                .id(d.motionKey)
+                                .transition(diagnosticTransition)
+                        }
                     }
+                    .animation(.easeOut(duration: 0.2), value: appModel.sleepHold.diagnostic?.motionKey)
                 }
 
                 Card(title: String(localized: "诊断", bundle: .module)) {
@@ -50,18 +59,26 @@ struct MaintenancePane: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                 } content: {
-                    if let d = appModel.startupDiagnostic {
-                        DiagnosticStrip(diag: d)
-                    } else {
-                        Text(String(localized: "暂无诊断信息", bundle: .module))
-                            .font(.caption)
-                            .foregroundStyle(.cicadaTextTertiary)
+                    Group {
+                        if let d = appModel.startupDiagnostic {
+                            DiagnosticStrip(diag: d)
+                                .id(d.motionKey)
+                                .transition(diagnosticTransition)
+                        } else {
+                            Text(String(localized: "暂无诊断信息", bundle: .module))
+                                .font(.caption)
+                                .foregroundStyle(.cicadaTextTertiary)
+                        }
                     }
+                    .animation(.easeOut(duration: 0.2), value: appModel.startupDiagnostic?.motionKey)
                 }
             }
             .padding(DesignMetrics.Spacing.s6)
         }
-        .sheet(isPresented: $showHelp) { HelpSheet() }
+    }
+
+    private var diagnosticTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 }
 

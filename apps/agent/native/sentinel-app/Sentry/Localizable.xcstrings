@@ -3074,6 +3074,36 @@
         }
       }
     },
+    "Delete stored file": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除暂存文件"
+          }
+        }
+      }
+    },
+    "Back to tray": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回暂存区"
+          }
+        }
+      }
+    },
+    "Open file": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件"
+          }
+        }
+      }
+    },
     "Open Config": {
       "localizations": {
         "zh-Hans": {

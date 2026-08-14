@@ -93,6 +93,13 @@ public final class ConfigModel: ObservableObject {
         }
     }
 
+    /// 用户从设置页重试最近一次失败的防护配置写入。
+    func retrySentrySave() async {
+        saveSentryTask?.cancel()
+        saveSentryTask = nil
+        await persistSentry()
+    }
+
     /// 退出前同步刷盘：取消防抖任务并立即同步落盘，避免在 150ms 防抖窗口内退出丢失改动。
     /// `applicationWillTerminate` 调用——此时进程即将退出，不再走 `Task.detached` 异步写盘。
     public func flushPendingSentrySave() {

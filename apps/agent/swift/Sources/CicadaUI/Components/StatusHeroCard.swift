@@ -5,21 +5,12 @@ struct StatusHeroCard: View {
     let state: SentinelState
 
     var body: some View {
-        HStack(spacing: DesignMetrics.Spacing.s5) {
-            StatusIcon(state: state, size: 56)
-            VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s1) {
-                HStack(spacing: DesignMetrics.Spacing.s3) {
-                    Text(state.title)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.cicadaTextPrimary)
-                    StatusBadge(state: state)
-                }
-                Text(state.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.cicadaTextSecondary)
-            }
-            Spacer()
+        ZStack {
+            content
+                .id(state.systemImage)
+                .transition(.opacity)
         }
+        .animation(.easeOut(duration: 0.2), value: state.systemImage)
         .padding(DesignMetrics.Spacing.s6)
         .background {
             ZStack {
@@ -43,6 +34,31 @@ struct StatusHeroCard: View {
                 .stroke(.cicadaBorderSubtle, lineWidth: 1)
         )
     }
+
+    private var content: some View {
+        HStack(spacing: DesignMetrics.Spacing.s5) {
+            StatusIcon(state: state, size: 56)
+            VStack(alignment: .leading, spacing: DesignMetrics.Spacing.s1) {
+                HStack(spacing: DesignMetrics.Spacing.s3) {
+                    Text(state.title)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.cicadaTextPrimary)
+                    StatusBadge(state: state)
+                }
+                Text(state.description)
+                    .font(.subheadline)
+                    .foregroundStyle(.cicadaTextSecondary)
+            }
+            Spacer()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilitySummary)
+    }
+
+    private var accessibilitySummary: String {
+        let format = String(localized: "状态：%@。%@", bundle: .module)
+        return String(format: format, locale: .current, state.title, state.description)
+    }
 }
 
 /// 状态图标（SF Symbol + 状态色圆背景）。
@@ -60,6 +76,7 @@ struct StatusIcon: View {
                 .foregroundStyle(state.badgeColor)
         }
         .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }
 

@@ -54,6 +54,13 @@ struct CicadaApp: SwiftUI.App {
             MenuBarDropdown(onQuit: { NSApp.terminate(nil) })
                 .environmentObject(AppModel.shared)
                 .environmentObject(ControlCenterRouter.shared)
+                .environment(\.openControlCenter) { section in
+                    // ControlCenterRouter 共享单例是 @MainActor;nonisolated 闭包同步调
+                    // @MainActor 方法会触发并发硬错误,Task 派发(同 showSettings 模式)。
+                    Task { @MainActor in
+                        _ = ControlCenterRouter.shared.open(section)
+                    }
+                }
         } label: {
             ZStack {
                 Image(systemName: "eye")

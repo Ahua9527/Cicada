@@ -39,6 +39,7 @@ public struct AlarmOverlayContent: View {
             AlarmEye()
                 .frame(width: 200)
                 .padding(DesignMetrics.Spacing.s8)
+                .accessibilityHidden(true)
         }
         .frame(width: 700, height: 400, alignment: .center)
         .foregroundStyle(.white)

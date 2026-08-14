@@ -43,6 +43,7 @@ struct HelpButton: View {
                 .foregroundStyle(.cicadaTextSecondary)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "帮助", bundle: .module))
     }
 }
 

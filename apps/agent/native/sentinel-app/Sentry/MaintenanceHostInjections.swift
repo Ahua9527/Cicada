@@ -48,7 +48,12 @@ enum MaintenanceHostInjections {
                     SentinelController.shared.openNotchDropFolder()
                 }
             },
-            FolderAction(systemImage: "trash", label: String(localized: "Clear NotchDrop Tray"), isDanger: true) {
+            FolderAction(
+                systemImage: "trash",
+                label: String(localized: "Clear NotchDrop Tray"),
+                isDanger: true,
+                requiresHoldConfirmation: true
+            ) {
                 Task { @MainActor in
                     SentinelController.shared.clearNotchDropTray()
                 }
@@ -88,9 +93,10 @@ enum MaintenanceHostInjections {
         }
     }
 
-    /// 触发系统相机授权弹窗（`.notDetermined` 时才真正弹窗）。
-    static func requestCameraPermission() {
-        AVCaptureDevice.requestAccess(for: .video) { _ in }
+    /// 等待系统相机授权弹窗结束并返回最终权限状态。
+    static func requestCameraPermission() async -> CameraAuthorizationStatus {
+        _ = await AVCaptureDevice.requestAccess(for: .video)
+        return cameraAuthorizationStatus()
     }
 
     /// 可用相机列表（映射 AVCaptureDevice.DiscoverySession → 包内 CameraOption）。
@@ -145,7 +151,7 @@ struct HostMaintenanceInjectionsModifier: ViewModifier {
             .environment(\.cameraAuthorizationStatus, MaintenanceHostInjections.cameraAuthorizationStatus)
             .environment(\.notchDropSettingsStore, .shared)
             .environment(\.requestCameraPermission) {
-                MaintenanceHostInjections.requestCameraPermission()
+                await MaintenanceHostInjections.requestCameraPermission()
             }
             .environment(\.cameraOptions) {
                 MaintenanceHostInjections.availableCameraOptions()

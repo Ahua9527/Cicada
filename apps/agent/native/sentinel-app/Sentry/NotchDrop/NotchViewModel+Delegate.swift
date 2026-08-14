@@ -26,26 +26,26 @@ extension NotchViewModel: NotchDropDelegate {
     // MARK: - AirDrop 引擎
 
     func airDrop(providers: [NSItemProvider]) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.notchClose() }
+        notchClose()
         // interfaceConvert() 用 DispatchSemaphore 同步阻塞，禁止主线程调用（会卡 UI）。
         DispatchQueue.global().async {
             guard let urls = providers.interfaceConvert() else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.async {
                 AirDrop(files: urls).begin()
             }
         }
     }
 
     func airDrop(urls: [URL]) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.notchClose() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        notchClose()
+        DispatchQueue.main.async {
             AirDrop(files: urls).begin()
         }
     }
 
     func openTrayPicker() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.notchClose() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        notchClose()
+        DispatchQueue.main.async {
             let picker = NSOpenPanel()
             picker.allowsMultipleSelection = true
             picker.canChooseDirectories = true
@@ -62,6 +62,12 @@ extension NotchViewModel: NotchDropDelegate {
 
     func close() {
         notchClose()
+    }
+
+    /// 刘海菜单「退出」（长按确认）：走正常终止链路（applicationWillTerminate 刷盘/停服务），
+    /// 与菜单栏「退出 Cicada」一致。
+    func quitApp() {
+        NSApp.terminate(nil)
     }
 
     // showSettings() 已在 NotchViewModel 自身实现（路由到控制中心设置 Tab），

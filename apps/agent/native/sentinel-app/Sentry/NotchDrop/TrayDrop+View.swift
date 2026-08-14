@@ -11,6 +11,7 @@ struct TrayView: View {
     @StateObject var vm: NotchViewModel
     @StateObject var tvm = TrayDrop.shared
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var targeting = false
 
     var storageTime: String {
@@ -44,25 +45,29 @@ struct TrayView: View {
     var panel: some View {
         RoundedRectangle(cornerRadius: vm.cornerRadius)
             .strokeBorder(style: StrokeStyle(lineWidth: 4, dash: [10]))
-            .foregroundStyle(.white.opacity(0.1))
+            .foregroundStyle(targeting ? Color.blue.opacity(0.8) : Color.white.opacity(0.1))
             .background(loading)
             .overlay {
                 content
                     .padding()
             }
-            .animation(vm.animation, value: tvm.items)
             .animation(vm.animation, value: tvm.isLoading)
+            .animation(.easeOut(duration: 0.12), value: targeting)
     }
 
     var loading: some View {
         RoundedRectangle(cornerRadius: vm.cornerRadius)
-            .foregroundStyle(.white.opacity(0.1))
+            .foregroundStyle(
+                targeting
+                    ? Color.blue.opacity(0.15)
+                    : (reduceMotion && tvm.isLoading > 0 ? Color.blue.opacity(0.25) : Color.white.opacity(0.1))
+            )
             .conditionalEffect(
                 .repeat(
                     .glow(color: .blue, radius: 50),
                     every: 1.5
                 ),
-                condition: tvm.isLoading > 0
+                condition: tvm.isLoading > 0 && !reduceMotion
             )
     }
 
@@ -75,17 +80,28 @@ struct TrayView: View {
                     Text(NSLocalizedString("Drag files here to keep them for", comment: "") + " " + storageTime + " " + NSLocalizedString("& Press Option to delete", comment: ""))
                         .font(.system(.headline, design: .rounded))
                 }
+                .foregroundStyle(targeting ? Color.blue : Color.white)
             } else {
                 ScrollView(.horizontal) {
                     HStack(spacing: vm.spacing) {
-                        ForEach(tvm.items) { item in
-                            DropItemView(item: item, vm: vm, tvm: tvm)
+                        ForEach(Array(tvm.items.enumerated()), id: \.element.id) { index, item in
+                            DropItemView(
+                                item: item,
+                                index: index,
+                                animateEntry: tvm.entryAnimations.contains(item.id),
+                                vm: vm,
+                                tvm: tvm
+                            )
                         }
                     }
                     .padding(vm.spacing)
                 }
                 .padding(-vm.spacing)
                 .scrollIndicators(.never)
+                // P1-2:items 变更进入动画事务——激活 DropItemView 声明的 poof 移除过渡,
+                // 同时让兄弟项以同一 spring 让位/补位,重排不再瞬移。
+                // 入场仍由 DropItemView 的手动 hasEntered 方案负责(独立事务,互不干扰)。
+                .animation(reduceMotion ? .easeOut(duration: 0.2) : vm.animation, value: tvm.items)
             }
         }
     }

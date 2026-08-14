@@ -65,3 +65,17 @@ for user-visible, daemon, deployment, or configuration changes.
 Do not commit secrets, `.env`, `.dev.vars`, `.mcp.json`, Wrangler state, build
 outputs, coverage, or local `.cicada` runtime files. Use example values in docs
 and keep real API keys in the local environment or deployment platform.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specifications are tracked in GitHub Issues for this repository. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five canonical triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a multi-context repository: `apps/relay`, `apps/agent`, and `packages/shared` each have their own domain context. See `docs/agents/domain.md`.

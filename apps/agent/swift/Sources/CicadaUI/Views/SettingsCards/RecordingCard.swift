@@ -11,8 +11,10 @@ struct RecordingCard: View {
     @Environment(\.cameraAuthorizationStatus) private var cameraAuthorizationStatus
     @Environment(\.requestCameraPermission) private var requestCameraPermission
     @Environment(\.cameraOptions) private var cameraOptions
+    @Environment(\.scenePhase) private var scenePhase
 
-    @State private var authStatus: CameraAuthorizationStatus = .authorized
+    @State private var authStatus: CameraAuthorizationStatus?
+    @State private var isRequestingPermission = false
     @State private var cameras: [CameraOption] = []
 
     var body: some View {
@@ -25,11 +27,18 @@ struct RecordingCard: View {
                 }
                 cameraContent
                     .frame(height: 200)
+                    .id(permissionPhase)
+                    .transition(.opacity)
             }
         }
-        .onAppear {
-            authStatus = cameraAuthorizationStatus()
-            cameras = cameraOptions()
+        .animation(.easeOut(duration: 0.2), value: permissionPhase)
+        .task {
+            refreshAuthorizationState()
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                refreshAuthorizationState()
+            }
         }
     }
 
@@ -47,8 +56,18 @@ struct RecordingCard: View {
 
     @ViewBuilder
     private var cameraContent: some View {
-        switch authStatus {
-        case .notDetermined:
+        switch permissionPhase {
+        case .checking:
+            CameraPreviewPlaceholder(
+                title: String(localized: "正在检查相机权限", bundle: .module),
+                subtitle: String(localized: "正在读取系统相机访问状态", bundle: .module)
+            )
+        case .requesting:
+            CameraPreviewPlaceholder(
+                title: String(localized: "等待系统授权", bundle: .module),
+                subtitle: String(localized: "请在系统弹窗中选择允许或不允许", bundle: .module)
+            )
+        case .status(.notDetermined):
             CameraPreviewPlaceholder(
                 title: String(localized: "需要相机权限", bundle: .module),
                 subtitle: String(localized: "授权后警戒触发时才能录制画面", bundle: .module)
@@ -59,9 +78,9 @@ struct RecordingCard: View {
                         .tint(.cicadaAccent)
                 }
             }
-        case .restricted, .denied:
+        case .status(.restricted), .status(.denied):
             CameraPreviewPlaceholder()
-        case .authorized:
+        case .status(.authorized):
             // 实时预览是既定观察点（见 overview-P4.2 已知限制），授权后先给中性占位 +
             // 设备选择器：多摄像头 Mac 可切换 sentryRecordingDevice，否则静默回退内置/默认。
             CameraPreviewPlaceholder(
@@ -86,12 +105,30 @@ struct RecordingCard: View {
     }
 
     private func requestPermission() {
-        requestCameraPermission?()
-        // 系统授权弹窗异步完成，稍后重新查询状态
+        guard let requestCameraPermission else { return }
+        isRequestingPermission = true
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            authStatus = cameraAuthorizationStatus()
+            authStatus = await requestCameraPermission()
+            cameras = cameraOptions()
+            isRequestingPermission = false
         }
+    }
+
+    private func refreshAuthorizationState() {
+        authStatus = cameraAuthorizationStatus()
+        cameras = cameraOptions()
+    }
+
+    private var permissionPhase: PermissionPhase {
+        if isRequestingPermission { return .requesting }
+        guard let authStatus else { return .checking }
+        return .status(authStatus)
+    }
+
+    private enum PermissionPhase: Hashable {
+        case checking
+        case requesting
+        case status(CameraAuthorizationStatus)
     }
 }
 

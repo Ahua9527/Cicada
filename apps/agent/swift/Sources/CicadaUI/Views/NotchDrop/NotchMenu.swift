@@ -2,7 +2,8 @@ import SwiftUI
 
 /// 刘海面板菜单态（`contentType == .menu` 的内容）——横向 6 方块按钮。
 ///
-/// 6 个按钮：关闭 / AirDrop / GitHub / 赞助 / 设置 / 清空。
+/// 6 个按钮：退出 / AirDrop / GitHub / 赞助 / 设置 / 清空。
+/// 「退出」真正退出整个 App（长按确认，防误退导致安防失效），不是只关面板。
 ///
 /// 纯 SwiftUI，可 `swift build` 验证。
 /// 宿主 `NotchContentView` 在 `.menu` 分支用 `NotchMenu(delegate: vm)`。
@@ -27,8 +28,13 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
 
     public var body: some View {
         HStack(spacing: spacing) {
-            menuButton(icon: "xmark", label: String(localized: "关闭", bundle: .module), tint: .cicadaDanger) {
-                delegate.close()
+            menuButton(
+                icon: "power",
+                label: String(localized: "退出", bundle: .module),
+                tint: .cicadaDanger,
+                requiresHoldConfirmation: true
+            ) {
+                delegate.quitApp()
             }
             menuButton(icon: "airplayaudio", label: "AirDrop", tint: .cicadaAccent) {
                 // 点 AirDrop 弹文件选择器（NSOpenPanel），选中后 airDrop(urls:)。
@@ -43,7 +49,12 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
             menuButton(icon: "gearshape", label: String(localized: "设置", bundle: .module), tint: .cicadaAccent) {
                 delegate.showSettings()
             }
-            menuButton(icon: "trash", label: String(localized: "清空", bundle: .module), tint: .cicadaDanger) {
+            menuButton(
+                icon: "trash",
+                label: String(localized: "清空", bundle: .module),
+                tint: .cicadaDanger,
+                requiresHoldConfirmation: true
+            ) {
                 delegate.clearTray()
             }
         }
@@ -60,12 +71,19 @@ public struct NotchMenu<Delegate: ObservableObject & NotchDropDelegate>: View {
         icon: String,
         label: String,
         tint: Color,
+        requiresHoldConfirmation: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            MenuButtonContent(icon: icon, label: label, tint: tint, cornerRadius: cornerRadius)
+        if requiresHoldConfirmation {
+            HoldToConfirmButton(tint: tint, cornerRadius: cornerRadius, action: action) {
+                MenuButtonContent(icon: icon, label: label, tint: tint, cornerRadius: cornerRadius)
+            }
+        } else {
+            Button(action: action) {
+                MenuButtonContent(icon: icon, label: label, tint: tint, cornerRadius: cornerRadius)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -93,8 +111,8 @@ private struct MenuButtonContent: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(tint.opacity(0.3), lineWidth: 1)
         )
-        .scaleEffect(hover ? 1.05 : 1)
-        .animation(.spring(response: 0.2), value: hover)
+        .scaleEffect(hover ? CicadaMotion.hoverScale : 1)
+        .animation(CicadaMotion.hoverSpring, value: hover)
         .onHover { hover = $0 }
     }
 }
