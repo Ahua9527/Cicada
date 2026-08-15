@@ -103,17 +103,26 @@ final class RelayDaemonServiceTests: XCTestCase {
     }
 
     func testPongTimeoutPolicyPreservesStrictThreshold() {
-        let lastPong = Date(timeIntervalSince1970: 10)
+        // 无未完成 ping：永不超时。
         XCTAssertFalse(
             RelayConnectionLifecycle.isPongTimedOut(
-                lastPongAt: lastPong,
+                awaitingPongSince: nil,
+                now: Date(timeIntervalSince1970: 1_000_000),
+                timeoutMs: 2_000
+            )
+        )
+        // 有未完成 ping：严格阈值，超过 timeoutMs 才算超时。
+        let sentAt = Date(timeIntervalSince1970: 10)
+        XCTAssertFalse(
+            RelayConnectionLifecycle.isPongTimedOut(
+                awaitingPongSince: sentAt,
                 now: Date(timeIntervalSince1970: 12),
                 timeoutMs: 2_000
             )
         )
         XCTAssertTrue(
             RelayConnectionLifecycle.isPongTimedOut(
-                lastPongAt: lastPong,
+                awaitingPongSince: sentAt,
                 now: Date(timeIntervalSince1970: 12.001),
                 timeoutMs: 2_000
             )
@@ -335,7 +344,7 @@ final class RelayDaemonServiceTests: XCTestCase {
         )
 
         service.debugSetConnectionState(.connected)
-        service.debugSetLastPong(Date(timeIntervalSince1970: 0))
+        service.debugSetAwaitingPong(Date(timeIntervalSince1970: 0))
         service.debugCheckConnectionHealth(now: Date(timeIntervalSince1970: 3))
 
         XCTAssertEqual(service.connectionState, .reconnectWait)

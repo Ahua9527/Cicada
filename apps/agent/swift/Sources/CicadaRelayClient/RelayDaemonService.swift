@@ -67,6 +67,8 @@ public final class RelayDaemonService: NSObject {
     private var reconnectWorkItem: DispatchWorkItem?
     private var reconnectAttempts = 0
     private var lastPongAt = Date.distantPast
+    /// 已发出但未收到 pong 的 ping 时刻；nil 表示无未完成心跳。
+    private var awaitingPongSince: Date?
     private var isStopping = false
     public private(set) var connectionState: RelayConnectionState = .stopped
 #if DEBUG
@@ -222,6 +224,7 @@ public final class RelayDaemonService: NSObject {
     private func processRawMessage(_ raw: String) {
         if RelayMessageCodec.isPong(raw) {
             lastPongAt = Date()
+            awaitingPongSince = nil
             return
         }
 
@@ -345,6 +348,7 @@ public final class RelayDaemonService: NSObject {
     private func handleConnected() {
         reconnectAttempts = 0
         lastPongAt = Date()
+        awaitingPongSince = nil
         startPingLoop()
         startHealthLoop()
         transition(to: .connected, reason: "connected")
@@ -375,6 +379,7 @@ public final class RelayDaemonService: NSObject {
         pingTimer = nil
         healthTimer?.cancel()
         healthTimer = nil
+        awaitingPongSince = nil
 
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
@@ -423,7 +428,8 @@ public final class RelayDaemonService: NSObject {
         pingTimer?.cancel()
 
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
-        timer.schedule(deadline: .now() + .seconds(config.heartbeatInterval / 1000), repeating: .seconds(config.heartbeatInterval / 1000))
+        // 连接后立即发首个 ping 验证往返，之后按 heartbeatInterval 周期发送。
+        timer.schedule(deadline: .now(), repeating: .seconds(config.heartbeatInterval / 1000))
         timer.setEventHandler { [weak self] in
             self?.sendPing()
         }
@@ -450,6 +456,7 @@ public final class RelayDaemonService: NSObject {
         guard let text = RelayMessageCodec.ping(
             timestamp: Int64(Date().timeIntervalSince1970 * 1000)
         ) else { return }
+        awaitingPongSince = Date()
         sendRelayText(text)
     }
 
@@ -481,14 +488,14 @@ public final class RelayDaemonService: NSObject {
         guard connectionState == .connected else { return }
 
         if !RelayConnectionLifecycle.isPongTimedOut(
-            lastPongAt: lastPongAt,
+            awaitingPongSince: awaitingPongSince,
             now: now,
             timeoutMs: config.connectionTimeout
         ) {
             return
         }
 
-        let elapsedMs = now.timeIntervalSince(lastPongAt) * 1000
+        let elapsedMs = awaitingPongSince.map { now.timeIntervalSince($0) * 1000 } ?? 0
 
         Logger.warn(
             "RelayDaemon",
@@ -548,8 +555,8 @@ public final class RelayDaemonService: NSObject {
         debugOutgoingMessagesStorage
     }
 
-    func debugSetLastPong(_ date: Date) {
-        lastPongAt = date
+    func debugSetAwaitingPong(_ date: Date?) {
+        awaitingPongSince = date
     }
 
     func debugSetConnectionState(_ state: RelayConnectionState) {
