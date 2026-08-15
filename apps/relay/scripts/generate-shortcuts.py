@@ -100,8 +100,8 @@ def post_action(command: str, extra_params=None):
     return action, action_uuid
 
 
-def extract_message_action() -> tuple[dict, str]:
-    """Get Dictionary Value：取响应里的 message 字段。"""
+def extract_message_action():
+    """Get Dictionary Value：取响应里的 message 字段（隐式输入=上一动作输出）。"""
     action_uuid = _uuid()
     return {
         "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
@@ -113,23 +113,49 @@ def extract_message_action() -> tuple[dict, str]:
     }, action_uuid
 
 
-def notify_action(body_output_uuid: str, title: str) -> dict:
+def extract_key_action(key: str, input_uuid: str):
+    """Get Dictionary Value：从指定动作的输出（而非上一动作）取指定键。"""
+    action_uuid = _uuid()
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
+        "WFWorkflowActionParameters": {
+            "UUID": action_uuid,
+            "WFInput": action_output(input_uuid),
+            "WFDictionaryKey": key,
+            "WFGetDictionaryValueType": "Value",
+        },
+    }, action_uuid
+
+
+def notify_action(title: str, body_output_uuids: list) -> dict:
+    """通知。body_output_uuids 为 1~2 个动作输出引用，按行拼接。"""
+    if len(body_output_uuids) == 1:
+        string = "\ufffc"
+        ranges = {"{0, 1}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[0]}}
+    else:
+        string = "\ufffc\n\ufffc"
+        ranges = {
+            "{0, 1}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[0]},
+            "{2, 3}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[1]},
+        }
     return {
         "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
         "WFWorkflowActionParameters": {
             "WFNotificationActionTitle": title,
             "WFNotificationActionBody": {
                 "WFSerializationType": "WFTextTokenString",
-                "Value": {
-                    "string": "￼",
-                    "attachmentsByRange": {
-                        "{0, 1}": {
-                            "Type": "ActionOutput",
-                            "OutputUUID": body_output_uuid,
-                        }
-                    },
-                },
+                "Value": {"string": string, "attachmentsByRange": ranges},
             },
+        },
+    }
+
+
+def notify_static_action(title: str, body: str) -> dict:
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
+        "WFWorkflowActionParameters": {
+            "WFNotificationActionTitle": title,
+            "WFNotificationActionBody": body,
         },
     }
 
@@ -188,64 +214,174 @@ def build_workflow(name: str, color: str, actions: list) -> dict:
     }
 
 
+def result_actions(command: str, extra_params=None):
+    """POST + 提取 message/data + 通知（两行：人话 + 结构化数据）。
+    返回 (actions, post_uuid)——调用方需要自定义后续时取 post_uuid。"""
+    post, post_uuid = post_action(command, extra_params)
+    extract_msg, msg_uuid = extract_message_action()
+    extract_data, data_uuid = extract_key_action("data", post_uuid)
+    return [post, extract_msg, extract_data, notify_action("Cicada", [msg_uuid, data_uuid])], post_uuid
+
+
 def simple_command_actions(command: str) -> list:
-    post, _ = post_action(command)
-    extract, extract_uuid = extract_message_action()
-    return [post, extract, notify_action(extract_uuid, "Cicada")]
+    actions, _ = result_actions(command)
+    return actions
 
 
 def percent_command_actions(command: str, prompt: str) -> list:
     ask, ask_uuid = ask_number_action(prompt)
     calc, calc_uuid = calculate_divide_action(ask_uuid, 100)
-    post, _ = post_action(command, [("level", action_output(calc_uuid))])
-    extract, extract_uuid = extract_message_action()
-    return [ask, calc, post, extract, notify_action(extract_uuid, "Cicada")]
+    post, post_uuid = post_action(command, [("level", action_output(calc_uuid))])
+    extract_msg, msg_uuid = extract_message_action()
+    extract_data, data_uuid = extract_key_action("data", post_uuid)
+    return [ask, calc, post, extract_msg, extract_data,
+            notify_action("Cicada", [msg_uuid, data_uuid])]
 
 
 def app_open_actions() -> list:
     ask, ask_uuid = ask_text_action("应用名（如 Calculator / 微信）")
-    post, _ = post_action("app_open", [("name", action_output(ask_uuid))])
-    extract, extract_uuid = extract_message_action()
-    return [ask, post, extract, notify_action(extract_uuid, "Cicada")]
+    post, post_uuid = post_action("app_open", [("name", action_output(ask_uuid))])
+    extract_msg, msg_uuid = extract_message_action()
+    extract_data, data_uuid = extract_key_action("data", post_uuid)
+    return [ask, post, extract_msg, extract_data,
+            notify_action("Cicada", [msg_uuid, data_uuid])]
 
 
-# (文件名, 显示命令, 颜色, 动作构造)
-SHORTCUTS: list[tuple[str, str, str, list]] = [
-    ("蝉·Ping", "ping", "gray", simple_command_actions("ping")),
-    ("蝉·系统状态", "status", "blue", simple_command_actions("status")),
-    ("蝉·锁屏", "lock", "red", simple_command_actions("lock")),
-    ("蝉·屏幕休眠", "sleep_displays", "purple", simple_command_actions("sleep_displays")),
-    ("蝉·唤醒屏幕", "wake", "yellow", simple_command_actions("wake")),
-    ("蝉·静音", "mute", "orange", simple_command_actions("mute")),
-    ("蝉·取消静音", "unmute", "orange", simple_command_actions("unmute")),
-    ("蝉·音量加", "volume_up", "green", simple_command_actions("volume_up")),
-    ("蝉·音量减", "volume_down", "green", simple_command_actions("volume_down")),
-    ("蝉·音量设置", "volume_set", "green",
-     percent_command_actions("volume_set", "音量百分比（0-100）")),
-    ("蝉·亮度加", "brightness_up", "yellow", simple_command_actions("brightness_up")),
-    ("蝉·亮度减", "brightness_down", "yellow", simple_command_actions("brightness_down")),
-    ("蝉·亮度设置", "brightness_set", "yellow",
-     percent_command_actions("brightness_set", "亮度百分比（0-100）")),
-    ("蝉·防休眠开", "caffeinate", "teal", simple_command_actions("caffeinate")),
-    ("蝉·防休眠关", "decaffeinate", "teal", simple_command_actions("decaffeinate")),
-    ("蝉·截屏", "screenshot", "blue", simple_command_actions("screenshot")),
-    ("蝉·运行中应用", "app_list", "blue", simple_command_actions("app_list")),
-    ("蝉·打开应用", "app_open", "purple", app_open_actions()),
-    ("蝉·安防开", "sentry_start", "red", simple_command_actions("sentry_start")),
-    ("蝉·安防关", "sentry_stop", "red", simple_command_actions("sentry_stop")),
-    ("蝉·安防状态", "sentry_status", "red", simple_command_actions("sentry_status")),
+def screenshot_actions() -> list:
+    """截屏：daemon 回传 image_base64（JPEG），解码后存入相册。"""
+    post, post_uuid = post_action("screenshot")
+    get_data, data_uuid = extract_key_action("data", post_uuid)
+    get_b64, b64_uuid = extract_key_action("image_base64", data_uuid)
+    decode_uuid = _uuid()
+    decode = {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.base64encode",
+        "WFWorkflowActionParameters": {
+            "UUID": decode_uuid,
+            "WFEncodeMode": "Decode",
+            "WFInput": action_output(b64_uuid),
+        },
+    }
+    save = {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.savecameraroll",
+        "WFWorkflowActionParameters": {"WFInput": action_output(decode_uuid)},
+    }
+    return [post, get_data, get_b64, decode, save,
+            notify_static_action("Cicada", "截图已存入相册（Mac 原件在 ~/.cicada/screenshots）")]
+
+
+# ---------- 菜单动作 ----------
+
+def menu_begin(title: str, items: list) -> dict:
+    """「从菜单中选取」起始（WFControlFlowMode=0）。items 为菜单项标题列表。"""
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
+        "WFWorkflowActionParameters": {
+            "WFControlFlowMode": 0,
+            "WFMenuActionTitle": title,
+            "WFMenuItems": items,
+        },
+    }
+
+
+def menu_item_begin(title: str) -> dict:
+    """菜单项内容块起始（WFControlFlowMode=1）。"""
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
+        "WFWorkflowActionParameters": {
+            "WFControlFlowMode": 1,
+            "WFMenuItemTitle": title,
+        },
+    }
+
+
+def menu_end() -> dict:
+    """菜单结束（WFControlFlowMode=2）。"""
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
+        "WFWorkflowActionParameters": {"WFControlFlowMode": 2},
+    }
+
+
+# ---------- 命令分组（单指令与菜单共用同一份数据） ----------
+# (叶子标题, 命令, 颜色, 动作列表)
+GROUPS: list = [
+    ("状态查询", [
+        ("Ping", "ping", "gray", simple_command_actions("ping")),
+        ("系统状态", "status", "blue", simple_command_actions("status")),
+        ("运行中应用", "app_list", "blue", simple_command_actions("app_list")),
+        ("安防状态", "sentry_status", "red", simple_command_actions("sentry_status")),
+    ]),
+    ("屏幕与锁", [
+        ("锁屏", "lock", "red", simple_command_actions("lock")),
+        ("屏幕休眠", "sleep_displays", "purple", simple_command_actions("sleep_displays")),
+        ("唤醒屏幕", "wake", "yellow", simple_command_actions("wake")),
+        ("截屏", "screenshot", "blue", screenshot_actions()),
+    ]),
+    ("音量", [
+        ("静音", "mute", "orange", simple_command_actions("mute")),
+        ("取消静音", "unmute", "orange", simple_command_actions("unmute")),
+        ("音量加", "volume_up", "green", simple_command_actions("volume_up")),
+        ("音量减", "volume_down", "green", simple_command_actions("volume_down")),
+        ("音量设置", "volume_set", "green",
+         percent_command_actions("volume_set", "音量百分比（0-100）")),
+    ]),
+    ("亮度", [
+        ("亮度加", "brightness_up", "yellow", simple_command_actions("brightness_up")),
+        ("亮度减", "brightness_down", "yellow", simple_command_actions("brightness_down")),
+        ("亮度设置", "brightness_set", "yellow",
+         percent_command_actions("brightness_set", "亮度百分比（0-100）")),
+    ]),
+    ("电源", [
+        ("防休眠开", "caffeinate", "teal", simple_command_actions("caffeinate")),
+        ("防休眠关", "decaffeinate", "teal", simple_command_actions("decaffeinate")),
+    ]),
+    ("应用", [
+        ("打开应用", "app_open", "purple", app_open_actions()),
+    ]),
+    ("安防", [
+        ("安防开", "sentry_start", "red", simple_command_actions("sentry_start")),
+        ("安防关", "sentry_stop", "red", simple_command_actions("sentry_stop")),
+    ]),
 ]
+
+
+def build_menu_actions() -> list:
+    """两级菜单装配：主菜单 → 分组子菜单 → 叶子命令动作。"""
+    actions = [menu_begin("蝉·远程控制", [group for group, _ in GROUPS])]
+    for group, leaves in GROUPS:
+        actions.append(menu_item_begin(group))
+        actions.append(menu_begin(group, [title for title, _, _, _ in leaves]))
+        for title, _command, _color, leaf_actions in leaves:
+            actions.append(menu_item_begin(title))
+            actions.extend(leaf_actions)
+        actions.append(menu_end())
+    actions.append(menu_end())
+    return actions
+
+
+MENU_SHORTCUT_NAME = "蝉·远程控制"
 
 
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
-    for name, command, _color, actions in SHORTCUTS:
-        workflow = build_workflow(name, _color, actions)
-        path = os.path.join(OUT_DIR, f"{name}.shortcut")
-        with open(path, "wb") as f:
-            plistlib.dump(workflow, f, fmt=plistlib.FMT_BINARY)
-        print(f"生成 {path}  [{command}]")
-    print(f"\n共 {len(SHORTCUTS)} 个。签名：")
+    count = 0
+    # 1) 独立单指令（可放主屏幕一键直达）
+    for _group, leaves in GROUPS:
+        for title, _command, color, actions in leaves:
+            workflow = build_workflow(f"蝉·{title}", color, actions)
+            path = os.path.join(OUT_DIR, f"蝉·{title}.shortcut")
+            with open(path, "wb") as f:
+                plistlib.dump(workflow, f, fmt=plistlib.FMT_BINARY)
+            print(f"生成 {path}")
+            count += 1
+    # 2) 多级菜单合一版
+    menu_workflow = build_workflow(MENU_SHORTCUT_NAME, "blue", build_menu_actions())
+    menu_path = os.path.join(OUT_DIR, f"{MENU_SHORTCUT_NAME}.shortcut")
+    with open(menu_path, "wb") as f:
+        plistlib.dump(menu_workflow, f, fmt=plistlib.FMT_BINARY)
+    print(f"生成 {menu_path}  [两级菜单，共 {count} 个操作]")
+    count += 1
+    print(f"\n共 {count} 个。签名：")
     print(f"  for f in '{OUT_DIR}'/*.shortcut; do")
     print("    shortcuts sign -m anyone -i \"$f\" -o \"${f%.shortcut}-signed.shortcut\"; done")
 
