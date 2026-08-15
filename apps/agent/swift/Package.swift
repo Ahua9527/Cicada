@@ -27,7 +27,7 @@ let package = Package(
         ),
         .target(
             name: "CicadaSleepHoldCore",
-            linkerSettings: [.linkedFramework("IOKit")]
+            linkerSettings: [.linkedFramework("IOKit"), .linkedFramework("SystemConfiguration")]
         ),
         .target(
             name: "CicadaSystem",
