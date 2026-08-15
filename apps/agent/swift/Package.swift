@@ -32,7 +32,7 @@ let package = Package(
         .target(
             name: "CicadaSystem",
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaBluetoothBridge", "CicadaSleepHoldCore"],
-            linkerSettings: [.linkedFramework("SystemConfiguration")]
+            linkerSettings: [.linkedFramework("SystemConfiguration"), .linkedFramework("CoreBluetooth")]
         ),
         .target(name: "CicadaRelayClient", dependencies: ["CicadaCore", "CicadaIPC", "CicadaSystem"]),
         .target(

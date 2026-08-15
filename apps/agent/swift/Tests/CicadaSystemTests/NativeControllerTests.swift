@@ -234,3 +234,25 @@ final class NativeAppControllerTests: XCTestCase {
         return root
     }
 }
+
+final class NativeBluetoothControllerTests: XCTestCase {
+    /// 未授权时必须直接失败，不得触碰 IOBluetooth——裸 Mach-O 在 macOS 15 上调用
+    /// IOBluetooth 会被 TCC 以缺 NSBluetoothAlwaysUsageDescription 为由 SIGABRT。
+    func testPowerStateFailsWithoutAuthorization() {
+        let controller = NativeBluetoothController(authorizationState: { .notAllowed })
+
+        guard case let .failure(error) = controller.powerState() else {
+            return XCTFail("未授权时应失败")
+        }
+        XCTAssertTrue(error.message.contains("蓝牙权限"), "\(error.message)")
+    }
+
+    func testSetPowerStateFailsWithoutAuthorization() {
+        let controller = NativeBluetoothController(authorizationState: { .notAllowed })
+
+        guard case let .failure(error) = controller.setPowerState(true) else {
+            return XCTFail("未授权时应失败")
+        }
+        XCTAssertTrue(error.message.contains("蓝牙权限"), "\(error.message)")
+    }
+}
