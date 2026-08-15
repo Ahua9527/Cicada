@@ -12,7 +12,7 @@ import {
   ShortcutGrantRecord,
   Env,
 } from '../../../types';
-import { ErrorCode, constantTimeStringEqual } from '@cicada/shared';
+import { ErrorCode, constantTimeStringEqual, isValidDeviceId } from '@cicada/shared';
 import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
 import {
   createPublicServerErrorResponse,
@@ -1615,6 +1615,36 @@ export class SessionManagerDO {
     return copy;
   }
 
+  /// 运维解绑：删除设备的首见身份绑定（TOFU），允许设备以新密钥重新注册。
+  /// worker 侧已校验管理员令牌；DO 不对公网暴露，无需二次鉴权。
+  private async handleRegistryAdminResetDevice(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return methodNotAllowed(['POST']);
+    }
+
+    let payload: { deviceId?: string };
+    try {
+      payload = (await request.json()) as { deviceId?: string };
+    } catch {
+      return this.jsonResponse(
+        { ok: false, error: 'Request body must be JSON', code: 'invalid_body' },
+        { status: 400 }
+      );
+    }
+    if (!payload.deviceId || !isValidDeviceId(payload.deviceId)) {
+      return this.jsonResponse(
+        { ok: false, error: 'Valid deviceId is required.', code: 'invalid_device_id' },
+        { status: 400 }
+      );
+    }
+
+    const existed = this.registryDevices.delete(payload.deviceId);
+    if (existed) {
+      await this.saveRegistryDevices();
+    }
+    return this.jsonResponse({ ok: true, deviceId: payload.deviceId, existed });
+  }
+
   private handleRegistryDevices(request: Request): Response {
     if (request.method !== 'GET') {
       return methodNotAllowed(['GET']);
@@ -1745,6 +1775,9 @@ export class SessionManagerDO {
           break;
         case '/registry/devices':
           response = this.handleRegistryDevices(request);
+          break;
+        case '/registry/admin-reset-device':
+          response = await this.handleRegistryAdminResetDevice(request);
           break;
         case '/registry/status':
           response = this.handleRegistryStatus(request);

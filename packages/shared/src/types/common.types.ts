@@ -75,6 +75,8 @@ export interface Env {
   ENABLE_CACHING?: string;
   ALLOWED_ORIGINS?: string;
   USE_DDD_ARCHITECTURE?: string;
+  /** 运维管理端点令牌（/v1/admin/*）。未配置时管理端点关闭（404）。 */
+  CICADA_ADMIN_TOKEN?: string;
 }
 
 /**

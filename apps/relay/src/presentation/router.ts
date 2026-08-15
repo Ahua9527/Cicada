@@ -10,6 +10,7 @@ import {
   handleDeviceListRoute,
   handleHealthRoute,
   handleShortcutCommandRoute,
+  handleAdminDeviceResetRoute,
 } from './routes';
 import { sanitizeRequestUrl } from './request-url-sanitizer';
 import { createPublicServerErrorResponse } from './public-error-response';
@@ -38,6 +39,7 @@ export class Router {
       { pattern: /^\/favicon\.ico$/, methods: ['GET'], handler: additionalHandlers.handleFavicon },
       { pattern: /^\/relay\/[^/]+$/, methods: ['GET'], handler: handleWebSocketRoute },
       { pattern: /^\/v1\/shortcuts\/command$/, methods: ['POST'], handler: handleShortcutCommandRoute },
+      { pattern: /^\/v1\/admin\/device-reset$/, methods: ['POST'], handler: handleAdminDeviceResetRoute },
       { pattern: /^\/status$/, methods: ['GET'], handler: handleStatusRoute },
       { pattern: /^\/devices$/, methods: ['GET'], handler: handleDeviceListRoute },
       { pattern: /^\/health$/, methods: ['GET'], handler: handleHealthRoute },

@@ -398,4 +398,59 @@ describe('API Integration Tests', () => {
       expect(limited.headers.get('X-RateLimit-Remaining')).toBe('0');
     });
   });
+
+  describe('POST /v1/admin/device-reset', () => {
+    const deviceId = 'MAC_2C501BC5B5D74431ADB19AFE30CD9CD3';
+    const ADMIN_TOKEN = 'test-admin-token';
+
+    const resetRequest = (token: string | undefined, bodyDeviceId: string = deviceId) =>
+      new Request('http://localhost/v1/admin/device-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ device_id: bodyDeviceId }),
+      });
+
+    it('returns 404 when CICADA_ADMIN_TOKEN is not configured', async () => {
+      const response = await app.handle(resetRequest(ADMIN_TOKEN), mockEnv, mockCtx);
+      expect(response.status).toBe(404);
+    });
+
+    it('returns 401 for a wrong or missing bearer token', async () => {
+      const env = { ...mockEnv, CICADA_ADMIN_TOKEN: ADMIN_TOKEN };
+
+      const wrong = await app.handle(resetRequest('wrong-token'), env, mockCtx);
+      const missing = await app.handle(resetRequest(undefined), env, mockCtx);
+
+      expect(wrong.status).toBe(401);
+      expect(missing.status).toBe(401);
+    });
+
+    it('returns 400 for an invalid device_id', async () => {
+      const env = { ...mockEnv, CICADA_ADMIN_TOKEN: ADMIN_TOKEN };
+      const response = await app.handle(resetRequest(ADMIN_TOKEN, 'bogus'), env, mockCtx);
+      expect(response.status).toBe(400);
+    });
+
+    it('forwards the reset to the registry DO with the right token', async () => {
+      let hitPath = '';
+      const env = {
+        ...withRegistry(url => {
+          hitPath = url.pathname;
+          return Response.json({ ok: true, deviceId, existed: true });
+        }),
+        CICADA_ADMIN_TOKEN: ADMIN_TOKEN,
+      };
+
+      const response = await app.handle(resetRequest(ADMIN_TOKEN), env, mockCtx);
+      const data = (await response.json()) as { ok: boolean; existed: boolean };
+
+      expect(response.status).toBe(200);
+      expect(data.ok).toBe(true);
+      expect(data.existed).toBe(true);
+      expect(hitPath).toBe('/registry/admin-reset-device');
+    });
+  });
 });
