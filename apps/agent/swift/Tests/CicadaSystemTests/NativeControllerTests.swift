@@ -224,6 +224,54 @@ final class NativeAppControllerTests: XCTestCase {
         XCTAssertFalse(openerCalled)
     }
 
+    // MARK: - 运行中应用匹配（本地化免疫）
+
+    /// 中文系统下运行中的 Calculator localizedName 是「计算器」，远程指令传英文名；
+    /// 走名称→包→bundle id 解析链路后按 bid 匹配必须命中。
+    func testRunningAppMatchesViaResolvedBundleIDDespiteLocalizedName() {
+        XCTAssertTrue(
+            NativeAppController.matchesRunningApp(
+                localizedName: "计算器",
+                bundleIdentifier: "com.apple.calculator",
+                needle: "Calculator",
+                resolvedBundleID: "com.apple.calculator"
+            )
+        )
+    }
+
+    func testRunningAppMatchesViaLiteralBundleIDNeedle() {
+        XCTAssertTrue(
+            NativeAppController.matchesRunningApp(
+                localizedName: "计算器",
+                bundleIdentifier: "com.apple.calculator",
+                needle: "com.apple.CALCULATOR",
+                resolvedBundleID: nil
+            )
+        )
+    }
+
+    func testRunningAppMatchesViaLocalizedNameFallback() {
+        XCTAssertTrue(
+            NativeAppController.matchesRunningApp(
+                localizedName: "计算器",
+                bundleIdentifier: "com.apple.calculator",
+                needle: "计算器",
+                resolvedBundleID: nil
+            )
+        )
+    }
+
+    func testRunningAppRejectsUnrelatedApp() {
+        XCTAssertFalse(
+            NativeAppController.matchesRunningApp(
+                localizedName: "Safari浏览器",
+                bundleIdentifier: "com.apple.Safari",
+                needle: "Calculator",
+                resolvedBundleID: "com.apple.calculator"
+            )
+        )
+    }
+
     private func makeSearchRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cicada-appsearch-\(UUID().uuidString)", isDirectory: true)

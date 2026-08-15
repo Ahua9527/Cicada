@@ -31,7 +31,11 @@ final class NativeAppController: NativeAppControlling {
         self.searchRoots = searchRoots ?? Self.defaultSearchRoots
         self.openTimeout = openTimeout
         self.opener = opener ?? { url, completion in
-            workspace.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            let configuration = NSWorkspace.OpenConfiguration()
+            // 置前并创建窗口：无窗启动的 GUI 应用会被 macOS Automatic Termination
+            // 约 30 秒后回收（真机复现：app_open 返回成功但进程很快消失）。
+            configuration.activates = true
+            workspace.openApplication(at: url, configuration: configuration) { _, error in
                 completion(error)
             }
         }
@@ -85,12 +89,37 @@ final class NativeAppController: NativeAppControlling {
     }
 
     private func runningRegularApps(named name: String) -> [NSRunningApplication] {
-        let needle = name.lowercased()
+        // 先把名称解析成 bundle id（名称 → 安装包 → bid），再按 bid 匹配运行中应用——
+        // 本地化系统下 localizedName 是「计算器」这类本地名，远程传来的「Calculator」
+        // 字面匹配永远落空（真机复现）。
+        let resolvedBundleID = appURL(for: name).flatMap { Bundle(url: $0)?.bundleIdentifier }
         return workspace.runningApplications.filter { app in
             guard app.activationPolicy == .regular else { return false }
-            return app.localizedName?.lowercased() == needle
-                || app.bundleIdentifier?.lowercased() == needle
+            return Self.matchesRunningApp(
+                localizedName: app.localizedName,
+                bundleIdentifier: app.bundleIdentifier,
+                needle: name,
+                resolvedBundleID: resolvedBundleID
+            )
         }
+    }
+
+    /// 运行中应用匹配（纯函数便于单测）：优先按解析链路的 bundle id 精确匹配；
+    /// 未命中回退 localizedName / bundleIdentifier 与输入的字面（忽略大小写）等值比较。
+    static func matchesRunningApp(
+        localizedName: String?,
+        bundleIdentifier: String?,
+        needle: String,
+        resolvedBundleID: String?
+    ) -> Bool {
+        if let resolvedBundleID,
+           bundleIdentifier?.caseInsensitiveCompare(resolvedBundleID) == .orderedSame
+        {
+            return true
+        }
+        let lowered = needle.lowercased()
+        return localizedName?.lowercased() == lowered
+            || bundleIdentifier?.lowercased() == lowered
     }
 
     /// 先按 bundle id 查询（LaunchServices 精确匹配，支持仅知 bundle id 的调用方），
