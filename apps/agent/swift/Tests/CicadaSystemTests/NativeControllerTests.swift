@@ -283,6 +283,57 @@ final class NativeAppControllerTests: XCTestCase {
     }
 }
 
+/// 截图内联回传：JPEG base64 编码与尺寸上限降级。
+final class ScreenshotInlineTests: XCTestCase {
+    private func writePNG(width: Int, height: Int, noise: Bool) throws -> String {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: width,
+            pixelsHigh: height,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ), let pixels = rep.bitmapData else {
+            throw NSError(domain: "ScreenshotInlineTests", code: 1)
+        }
+        for i in 0 ..< (rep.bytesPerRow * height) {
+            pixels[i] = noise ? UInt8.random(in: 0 ... 255) : 200
+        }
+        let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        let path = NSTemporaryDirectory() + "cicada-shot-\(UUID().uuidString).png"
+        try png.write(to: URL(fileURLWithPath: path))
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: path) }
+        return path
+    }
+
+    func testSmallScreenshotEncodesToValidJPEGBase64() throws {
+        let path = try writePNG(width: 120, height: 80, noise: false)
+
+        let encoded = try XCTUnwrap(MacOSCommandGateway.inlineScreenshotBase64(path: path))
+        let data = try XCTUnwrap(Data(base64Encoded: encoded), "必须是合法 base64")
+        XCTAssertNotNil(NSBitmapImageRep(data: data), "必须能按 JPEG 解码")
+    }
+
+    /// 噪声图是 JPEG 最坏情况：也必须压到上限以内。
+    func testNoisyScreenshotStaysUnderInlineLimit() throws {
+        let path = try writePNG(width: 1600, height: 1200, noise: true)
+
+        let encoded = try XCTUnwrap(MacOSCommandGateway.inlineScreenshotBase64(path: path))
+        XCTAssertLessThanOrEqual(
+            encoded.utf8.count,
+            MacOSCommandGateway.screenshotInlineMaxBase64Bytes
+        )
+    }
+
+    func testUnreadableFileReturnsNil() {
+        XCTAssertNil(MacOSCommandGateway.inlineScreenshotBase64(path: "/nonexistent/x.png"))
+    }
+}
+
 final class NativeBluetoothControllerTests: XCTestCase {
     /// 未授权时必须直接失败，不得触碰 IOBluetooth——裸 Mach-O 在 macOS 15 上调用
     /// IOBluetooth 会被 TCC 以缺 NSBluetoothAlwaysUsageDescription 为由 SIGABRT。

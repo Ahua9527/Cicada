@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import CicadaCore
@@ -214,13 +215,46 @@ public final class MacOSCommandGateway {
         }
     }
 
+    /// 截图内联回传的 base64 字符数上限。relay 的 WebSocket 单帧上限 1MiB，
+    /// 留足 JSON 包装与字段余量。
+    static let screenshotInlineMaxBase64Bytes = 900_000
+
+    /// 读截图文件并转成内联 JPEG base64；超过上限逐级降质量重压。
+    /// 文件不可读/无法编码时返回 nil，调用方退化为只回路径。
+    static func inlineScreenshotBase64(
+        path: String,
+        maxBase64Bytes: Int = screenshotInlineMaxBase64Bytes
+    ) -> String? {
+        guard let image = NSImage(contentsOfFile: path),
+              let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff)
+        else { return nil }
+        for quality in [0.6, 0.45, 0.3, 0.2] {
+            guard let jpeg = bitmap.representation(
+                using: .jpeg,
+                properties: [.compressionFactor: quality]
+            ) else { continue }
+            let encoded = jpeg.base64EncodedString()
+            if encoded.utf8.count <= maxBase64Bytes {
+                return encoded
+            }
+        }
+        return nil
+    }
+
     private func captureScreen() -> CommandExecutionResult {
         switch displayController.captureScreen(to: RuntimePaths.cicadaHome + "/screenshots") {
         case let .success(path):
+            var data = ["path": path]
+            // 内联 JPEG base64 回传：快捷指令可直接解码存相册；超限自动降质量。
+            if let inline = Self.inlineScreenshotBase64(path: path) {
+                data["image_base64"] = inline
+                data["mime"] = "image/jpeg"
+            }
             return CommandExecutionResult(
                 success: true,
                 message: "截屏已保存: \(path)",
-                data: ["path": path]
+                data: data
             )
         case let .failure(error):
             return CommandExecutionResult(success: false, message: error.message)
