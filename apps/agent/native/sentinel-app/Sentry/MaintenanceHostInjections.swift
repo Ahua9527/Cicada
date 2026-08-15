@@ -114,9 +114,9 @@ enum MaintenanceHostInjections {
 
     /// 维护页 SleepHold 手动安装命令（沙箱下 App 无法自动注册 root LaunchDaemon，
     /// 退化为可复制的终端命令，见 issue #9）。路径取当前运行包内的 CLI helper，
-    /// 无论 App 装在哪都正确。
+    /// 无论 App 装在哪都正确。不加 sudo 前缀：install 内部按需 sudo 并提示密码。
     static var sleepHoldInstallCommand: String {
-        "sudo \"\(Bundle.main.bundlePath)/Contents/Helpers/cicada\" advanced sleep install"
+        "\"\(Bundle.main.bundlePath)/Contents/Helpers/cicada\" advanced sleep install"
     }
 
     /// 「复制命令」按钮行为：写入系统剪贴板。

@@ -97,7 +97,10 @@ extension EnvironmentValues {
 
 private struct SleepHoldInstallCommandKey: EnvironmentKey {
     /// 库默认：假定 `cicada` 已在 PATH。宿主注入包内 helper 的绝对路径版本。
-    static let defaultValue = "sudo cicada advanced sleep install"
+    /// 库默认：假定 `cicada` 已在 PATH。宿主注入包内 helper 的绝对路径版本。
+    /// 不加 sudo 前缀：install 内部按需调用 sudo 并提示密码；整体加 sudo 会让
+    /// 进程以 root 运行，路径/属主解析需依赖 SUDO_* 还原（已兼容，但直接运行为正路径）。
+    static let defaultValue = "cicada advanced sleep install"
 }
 
 private struct CopyTextToPasteboardKey: EnvironmentKey {

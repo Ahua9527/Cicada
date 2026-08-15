@@ -206,9 +206,11 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
         try client.terminateSession(sessionId)
     }
 
-    private func sleepHoldPlist() -> String {
-        let uid = getuid()
-        let gid = getgid()
+    /// 生成 launchd plist。socket/日志路径与属主取 `context`（发起安装的登录用户），
+    /// 不能用 RuntimePaths 静态值——sudo 运行时它们解析到 /var/root。
+    private func sleepHoldPlist(context: SleepHoldInstallContext) -> String {
+        let uid = context.uid
+        let gid = context.gid
         return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -220,7 +222,7 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
           <array>
             <string>\(RuntimePaths.sleepHoldBinaryPath)</string>
             <string>--socket</string>
-            <string>\(RuntimePaths.sleepHoldSocketPath)</string>
+            <string>\(context.socketPath)</string>
             <string>--uid</string>
             <string>\(uid)</string>
             <string>--gid</string>
@@ -234,9 +236,9 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
             <true/>
           </dict>
           <key>StandardOutPath</key>
-          <string>\(RuntimePaths.sleepHoldStdoutPath)</string>
+          <string>\(context.stdoutPath)</string>
           <key>StandardErrorPath</key>
-          <string>\(RuntimePaths.sleepHoldStderrPath)</string>
+          <string>\(context.stderrPath)</string>
         </dict>
         </plist>
         """
@@ -249,16 +251,25 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
     /// 自行以 root 身份把该 plist 拷到 `RuntimePaths.sleepHoldPlistPath` 并装载
     /// （本层不允许直接调用外部提权二进制，见 CommandExecutionDependencyTests）。
     public func prepareInstall() throws -> String {
-        try fm.createDirectory(atPath: RuntimePaths.cicadaHome, withIntermediateDirectories: true)
-        try fm.createDirectory(atPath: RuntimePaths.runDir, withIntermediateDirectories: true)
+        let context = try SleepHoldInstallContext.resolve()
+        try fm.createDirectory(atPath: context.cicadaHome, withIntermediateDirectories: true)
+        try fm.createDirectory(atPath: context.runDir, withIntermediateDirectories: true)
+        if getuid() == 0 {
+            // sudo/提权运行：目录归还给目标用户，否则 App 端无法写入 ~/.cicada/run。
+            chown(context.cicadaHome, context.uid, context.gid)
+            chown(context.runDir, context.uid, context.gid)
+        }
 
         let binaryPath = RuntimePaths.sleepHoldBinaryPath
         guard fm.fileExists(atPath: binaryPath) else {
             throw CicadaError.io("SleepHold helper 不存在: \(binaryPath)。请先将 Cicada.app 安装到 /Applications")
         }
 
-        let plistPath = RuntimePaths.runDir + "/com.cicada.sleephold.plist"
-        try sleepHoldPlist().write(toFile: plistPath, atomically: true, encoding: .utf8)
+        let plistPath = context.runDir + "/com.cicada.sleephold.plist"
+        try sleepHoldPlist(context: context).write(toFile: plistPath, atomically: true, encoding: .utf8)
+        if getuid() == 0 {
+            chown(plistPath, context.uid, context.gid)
+        }
         return plistPath
     }
 
