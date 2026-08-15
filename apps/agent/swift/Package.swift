@@ -27,7 +27,7 @@ let package = Package(
         ),
         .target(
             name: "CicadaSleepHoldCore",
-            linkerSettings: [.linkedFramework("IOKit"), .linkedFramework("SystemConfiguration")]
+            linkerSettings: [.linkedFramework("IOKit")]
         ),
         .target(
             name: "CicadaSystem",
@@ -37,8 +37,7 @@ let package = Package(
         .target(
             name: "CicadaUI",
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaSleepHoldCore", "CicadaSystem"],
-            resources: [.process("Resources")],
-            linkerSettings: [.linkedFramework("ServiceManagement")]
+            resources: [.process("Resources")]
         ),
         .target(
             name: "CicadaCLI",

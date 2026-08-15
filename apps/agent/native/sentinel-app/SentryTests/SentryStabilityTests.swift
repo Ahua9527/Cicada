@@ -3,7 +3,6 @@ import CicadaCore
 import CicadaUI
 import Combine
 import Darwin
-import ServiceManagement
 import XCTest
 @testable import Sentry
 
@@ -118,23 +117,6 @@ final class SentryStabilityTests: XCTestCase {
                 bundle: Bundle(for: AppDelegate.self)
             ))
         )
-    }
-
-    /// SleepHold 安装：SMAppService 状态 → 错误分类映射（issue #9）。
-    /// .enabled 无错误；.requiresApproval 引导用户去系统设置批准；
-    /// .notRegistered/.notFound 归为注册失败。
-    func testSleepHoldInstallErrorMapsServiceStatus() {
-        XCTAssertNil(MaintenanceHostInjections.installError(for: .enabled))
-
-        guard case .requiresApproval = MaintenanceHostInjections.installError(for: .requiresApproval) else {
-            return XCTFail(".requiresApproval 应映射为 SleepHoldInstallError.requiresApproval")
-        }
-
-        for status: SMAppService.Status in [.notRegistered, .notFound] {
-            guard case .registrationFailed = MaintenanceHostInjections.installError(for: status) else {
-                return XCTFail("\(status) 应映射为 .registrationFailed")
-            }
-        }
     }
 
     func testLocalUnsignedReleaseLaunchWithoutSandboxAllowsWithDiagnostic() {

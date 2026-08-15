@@ -93,30 +93,30 @@ extension EnvironmentValues {
     }
 }
 
-// MARK: - Install SleepHold Service
+// MARK: - SleepHold Manual Install
 
-/// SleepHold 安装流程的失败分类（CicadaUI 包内契约，镜像 `CameraAuthorizationStatus`
-/// 的做法：视图层按分类翻译成本地化文案，宿主只回传分类不拼文案）。
-public enum SleepHoldInstallError: Error {
-    /// SMAppService register()/unregister() 抛错，附带系统错误描述。
-    case registrationFailed(String)
-    /// 已注册但等待用户在 系统设置 → 通用 → 登录项与扩展 中批准。
-    case requiresApproval
-    /// 注册成功且已 enabled，但服务未响应 socket 探活。
-    case serviceNotResponding
+private struct SleepHoldInstallCommandKey: EnvironmentKey {
+    /// 库默认：假定 `cicada` 已在 PATH。宿主注入包内 helper 的绝对路径版本。
+    static let defaultValue = "sudo cicada advanced sleep install"
 }
 
-private struct InstallSleepHoldServiceKey: EnvironmentKey {
-    /// 默认 `nil`：维护页「安装 SleepHold 服务」按钮置灰（库独立预览无安装能力）。
-    static let defaultValue: (() async -> Result<Void, SleepHoldInstallError>)? = nil
+private struct CopyTextToPasteboardKey: EnvironmentKey {
+    /// 默认 `nil`：仅展示可选中命令文本，不显示复制按钮（库独立预览无 AppKit 依赖）。
+    static let defaultValue: ((String) -> Void)? = nil
 }
 
 extension EnvironmentValues {
-    /// 维护页「安装 SleepHold 服务」按钮行为。宿主注入 SMAppService 注册链路；
-    /// 失败返回 `SleepHoldInstallError` 分类，由视图层翻译为本地化文案。
-    public var installSleepHoldService: (() async -> Result<Void, SleepHoldInstallError>)? {
-        get { self[InstallSleepHoldServiceKey.self] }
-        set { self[InstallSleepHoldServiceKey.self] = newValue }
+    /// 维护页 SleepHold 手动安装命令（可复制）。
+    /// 沙箱应用无法自动注册 root LaunchDaemon（见 issue #9），入口退化为命令行指引。
+    public var sleepHoldInstallCommand: String {
+        get { self[SleepHoldInstallCommandKey.self] }
+        set { self[SleepHoldInstallCommandKey.self] = newValue }
+    }
+
+    /// 「复制命令」按钮行为。宿主注入 NSPasteboard 实现；nil 时隐藏按钮，仅保留可选中文本。
+    public var copyTextToPasteboard: ((String) -> Void)? {
+        get { self[CopyTextToPasteboardKey.self] }
+        set { self[CopyTextToPasteboardKey.self] = newValue }
     }
 }
 

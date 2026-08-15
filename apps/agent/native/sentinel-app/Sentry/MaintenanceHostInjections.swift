@@ -7,7 +7,8 @@
 //  - `folderActions`：FolderGrid 6 个按钮的真实 NSWorkspace / NotchDropCoordinator 行为。
 //  - `launchAtLoginToggle`：真实 `LaunchAtLogin.Toggle`（写 SMLoginItemSetEnabled）。
 //  - `runStartupChecks`：`AppDelegate.runStartupChecks()` 走启动诊断链路。
-//  - `installSleepHoldService`：SleepHold 后台服务的 SMAppService 注册链路。
+//  - `installSleepHoldService`：无。沙箱应用无法注册 root LaunchDaemon（issue #9），
+//    维护页退化为可复制命令指引（`sleepHoldInstallCommand` + `copyTextToPasteboard`）。
 //
 //  通过 ViewModifier `hostMaintenanceInjections(appDelegate:)` 一次性注入，
 //  在 App.swift 的 WindowGroup 上应用。CicadaUI 库默认占位保持库独立可预览/单测。
@@ -15,10 +16,8 @@
 
 import AppKit
 import AVFoundation
-import CicadaSystem
 import CicadaUI
 import LaunchAtLogin
-import ServiceManagement
 import SwiftUI
 
 enum MaintenanceHostInjections {
@@ -113,76 +112,18 @@ enum MaintenanceHostInjections {
         return session.devices.map { CameraOption(id: $0.uniqueID, name: $0.localizedName) }
     }
 
-    /// 安装/修复 SleepHold 后台服务：SMAppService 注册内嵌 daemon plist（macOS 13+）。
-    ///
-    /// 为什么不再用 osascript `with administrator privileges`：沙箱进程的提权调用被
-    /// Authorization Services 拦截，必返回 -60005（管理员用户名或密码不正确），与密码
-    /// 是否正确无关——沙箱签名构建下该链路永远失败（见 issue #9）。SMAppService 是
-    /// 沙箱应用安装 launchd daemon 的受支持路径：注册内嵌在
-    /// Contents/Library/LaunchDaemons 的静态 plist（BundleProgram 指向包内 helper），
-    /// 用户经系统设置批准，无密码弹窗。
-    ///
-    /// 幂等/修复语义：探活已通过（含旧 CLI sudo 安装）→ 直接成功，不做多余注册；
-    /// 已注册但无响应（部分安装/服务挂掉）→ unregister + register 强制重建；
-    /// 未注册 → register。修复入口沿用 CicadaUI `recoveryAction`，不增加卸载或迁移流程。
-    static func installSleepHoldService() async -> Result<Void, SleepHoldInstallError> {
-        await Task.detached(priority: .userInitiated) { () -> Result<Void, SleepHoldInstallError> in
-            let service = SMAppService.daemon(plistName: sleepHoldDaemonPlistName)
-            let manager = SleepHoldServiceManager()
-
-            // 服务已健康（含旧 CLI 安装）：幂等成功。
-            if (try? manager.ping())?.ok == true {
-                return .success(())
-            }
-
-            do {
-                // 已注册但无响应：先注销再注册，强制 launchd 重建。
-                if service.status == .enabled {
-                    try service.unregister()
-                }
-                try service.register()
-            } catch {
-                return .failure(.registrationFailed(error.localizedDescription))
-            }
-
-            if let statusError = installError(for: service.status) {
-                if case .requiresApproval = statusError {
-                    // 待批准：顺手打开系统设置对应面板，减少用户找入口的成本。
-                    Task { @MainActor in SMAppService.openSystemSettingsLoginItems() }
-                }
-                return .failure(statusError)
-            }
-
-            // 探活：launchd 拉起需要一点时间。
-            for attempt in 0 ..< 5 {
-                if attempt > 0 { Thread.sleep(forTimeInterval: 0.4) }
-                if let response = try? manager.ping(), response.ok {
-                    return .success(())
-                }
-            }
-            return .failure(.serviceNotResponding)
-        }.value
+    /// 维护页 SleepHold 手动安装命令（沙箱下 App 无法自动注册 root LaunchDaemon，
+    /// 退化为可复制的终端命令，见 issue #9）。路径取当前运行包内的 CLI helper，
+    /// 无论 App 装在哪都正确。
+    static var sleepHoldInstallCommand: String {
+        "sudo \"\(Bundle.main.bundlePath)/Contents/Helpers/cicada\" advanced sleep install"
     }
 
-    /// SMAppService 状态 → 安装错误分类（纯函数，供单测）。
-    static func installError(for status: SMAppService.Status) -> SleepHoldInstallError? {
-        switch status {
-        case .enabled:
-            return nil
-        case .requiresApproval:
-            return .requiresApproval
-        case .notRegistered:
-            return .registrationFailed("register() 后服务仍未注册")
-        case .notFound:
-            return .registrationFailed("应用包内缺少内嵌 daemon plist（Contents/Library/LaunchDaemons）")
-        @unknown default:
-            return .registrationFailed("未知注册状态: \(status.rawValue)")
-        }
+    /// 「复制命令」按钮行为：写入系统剪贴板。
+    static func copyTextToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
-
-    /// SMAppService 注册用的内嵌 daemon plist 文件名
-    ///（来源：Resources/LaunchDaemons/，build.sh 嵌入 Contents/Library/LaunchDaemons/）。
-    private static let sleepHoldDaemonPlistName = "com.cicada.sleephold.plist"
 
     // MARK: - Path Helpers
 
@@ -227,9 +168,8 @@ struct HostMaintenanceInjectionsModifier: ViewModifier {
             .environment(\.requestCameraPermission) {
                 await MaintenanceHostInjections.requestCameraPermission()
             }
-            .environment(\.installSleepHoldService) {
-                await MaintenanceHostInjections.installSleepHoldService()
-            }
+            .environment(\.sleepHoldInstallCommand, MaintenanceHostInjections.sleepHoldInstallCommand)
+            .environment(\.copyTextToPasteboard, MaintenanceHostInjections.copyTextToPasteboard)
             .environment(\.cameraOptions) {
                 MaintenanceHostInjections.availableCameraOptions()
             }

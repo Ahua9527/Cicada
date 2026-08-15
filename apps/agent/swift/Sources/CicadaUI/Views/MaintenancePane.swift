@@ -12,10 +12,10 @@ struct MaintenancePane: View {
     @EnvironmentObject var appModel: AppModel
     @Environment(\.launchAtLoginToggle) private var launchAtLoginToggle
     @Environment(\.runStartupChecks) private var runStartupChecks
-    @Environment(\.installSleepHoldService) private var installSleepHoldService
+    @Environment(\.sleepHoldInstallCommand) private var sleepHoldInstallCommand
+    @Environment(\.copyTextToPasteboard) private var copyTextToPasteboard
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showHelp = false
-    @State private var installingSleepHold = false
 
     var body: some View {
         ScrollView {
@@ -51,24 +51,33 @@ struct MaintenancePane: View {
                     .animation(.easeOut(duration: 0.2), value: appModel.sleepHold.diagnostic?.motionKey)
 
                     if let recoveryAction = appModel.sleepHold.recoveryAction {
+                        // 沙箱应用无法自动注册 root LaunchDaemon（issue #9），
+                        // 安装/修复退化为可复制命令 + 可选中文本。
                         SettingRow(
                             title: recoveryAction == .install
                                 ? String(localized: "安装 SleepHold 服务", bundle: .module)
                                 : String(localized: "重新安装 SleepHold 服务", bundle: .module),
                             desc: recoveryAction == .install
-                                ? String(localized: "安装后台服务，登录后自动运行；需要输入一次管理员密码", bundle: .module)
-                                : String(localized: "服务已安装但无响应，重新安装可修复；需要输入一次管理员密码", bundle: .module)
+                                ? String(localized: "沙箱限制无法自动安装，请在终端执行命令：", bundle: .module)
+                                : String(localized: "服务已安装但无响应，请在终端执行命令重装：", bundle: .module)
                         ) {
-                            Button(installingSleepHold
-                                   ? String(localized: "安装中…", bundle: .module)
-                                   : (recoveryAction == .install
-                                      ? String(localized: "安装…", bundle: .module)
-                                      : String(localized: "重新安装…", bundle: .module))) {
-                                installSleepHold()
+                            if let copyTextToPasteboard {
+                                Button(String(localized: "复制命令", bundle: .module)) {
+                                    copyTextToPasteboard(sleepHoldInstallCommand)
+                                }
+                                .buttonStyle(PrimaryButtonStyle())
                             }
-                            .buttonStyle(PrimaryButtonStyle())
-                            .disabled(installingSleepHold || installSleepHoldService == nil)
                         }
+                        Text(sleepHoldInstallCommand)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.cicadaTextSecondary)
+                            .textSelection(.enabled)
+                            .padding(.horizontal, DesignMetrics.Spacing.s3)
+                            .padding(.vertical, DesignMetrics.Spacing.s2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.cicadaBgBase)
+                            .clipShape(RoundedRectangle(cornerRadius: DesignMetrics.Radius.sm))
+                            .accessibilityLabel(sleepHoldInstallCommand)
                     }
                 }
 
@@ -104,37 +113,6 @@ struct MaintenancePane: View {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 
-    /// 点「安装…/重新安装…」：走宿主注入的 SMAppService 注册链路（重装由宿主
-    ///  unregister+register 幂等覆盖，不增加卸载或迁移流程）。
-    /// 安装结束后先刷新实际状态——服务可能迟到恢复；只有服务仍不可用
-    /// （`recoveryAction != nil`）时才记录「注册失败/待系统批准/服务未响应」具体错误，
-    /// 避免服务已恢复却继续显示失败。
-    private func installSleepHold() {
-        guard let installSleepHoldService, !installingSleepHold else { return }
-        installingSleepHold = true
-        // 开始重试：清除旧安装错误。
-        appModel.sleepHold.clearInstallDiagnostic()
-        Task {
-            let result = await installSleepHoldService()
-            // 先刷新实际状态；成功恢复的 refresh 会顺带清除安装诊断。
-            await appModel.refreshAll()
-            if case .failure(let error) = result, appModel.sleepHold.recoveryAction != nil {
-                appModel.sleepHold.setInstallDiagnostic(sleepHoldInstallMessage(error))
-            }
-            installingSleepHold = false
-        }
-    }
-
-    private func sleepHoldInstallMessage(_ error: SleepHoldInstallError) -> String {
-        switch error {
-        case .requiresApproval:
-            return String(localized: "等待系统批准：请在 系统设置 → 通用 → 登录项与扩展 中允许 Cicada", bundle: .module)
-        case .registrationFailed(let detail):
-            return String(localized: "注册失败：\(detail)", bundle: .module)
-        case .serviceNotResponding:
-            return String(localized: "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log", bundle: .module)
-        }
-    }
 }
 
 #Preview {

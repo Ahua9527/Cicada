@@ -2,6 +2,12 @@ import Darwin
 import Foundation
 import CicadaSleepHoldCore
 
+struct SleepHoldServiceOptions {
+    let socketPath: String
+    let ownerUID: uid_t
+    let ownerGID: gid_t
+}
+
 final class SleepHoldControlServer {
     private let socketPath: String
     private let ownerUID: uid_t
@@ -164,10 +170,7 @@ private enum ServerError: Error, CustomStringConvertible {
     }
 }
 
-/// 三个参数均可选：任一缺省时由 console 用户推导补齐
-///（SMAppService 静态内嵌 plist 无法携带 per-machine 的 uid/gid/socket 路径）。
-/// CLI sudo 安装生成的旧 plist 三参数齐全，行为与之前一致。
-private func parseOptionOverrides(_ args: [String]) throws -> (socketPath: String?, uid: uid_t?, gid: gid_t?) {
+private func parseOptions(_ args: [String]) throws -> SleepHoldServiceOptions {
     var socketPath: String?
     var uid: uid_t?
     var gid: gid_t?
@@ -196,16 +199,11 @@ private func parseOptionOverrides(_ args: [String]) throws -> (socketPath: Strin
         }
     }
 
-    return (socketPath, uid, gid)
-}
+    guard let socketPath, let uid, let gid else {
+        throw ServerError.message("--socket, --uid and --gid are required")
+    }
 
-/// 运行时推导模式下，内嵌静态 plist 没有 per-user 的 StandardOut/ErrPath，
-/// daemon 解析出 home 后自行把 stdout/stderr 追加重定向到既有日志路径（路径契约不变）。
-private func redirectStandardLogs(homeDirectory: String) {
-    let cicadaHome = homeDirectory + "/.cicada"
-    try? FileManager.default.createDirectory(atPath: cicadaHome, withIntermediateDirectories: true)
-    freopen(cicadaHome + "/sleephold.stdout.log", "a", stdout)
-    freopen(cicadaHome + "/sleephold.stderr.log", "a", stderr)
+    return SleepHoldServiceOptions(socketPath: socketPath, ownerUID: uid, ownerGID: gid)
 }
 
 private func copySocketPath(_ path: String, into addr: inout sockaddr_un) throws {
@@ -228,24 +226,7 @@ guard getuid() == 0 else {
 }
 
 do {
-    let overrides = try parseOptionOverrides(Array(CommandLine.arguments.dropFirst()))
-    // 开机 RunAtLoad 早于用户登录：console 用户不可得时每 5s 重试直到拿到真实会话。
-    var resolved: ResolvedSleepHoldServiceOptions?
-    while resolved == nil {
-        resolved = SleepHoldServiceOptionsResolver.resolve(
-            socketPath: overrides.socketPath,
-            ownerUID: overrides.uid,
-            ownerGID: overrides.gid
-        ) { SleepHoldServiceOptionsResolver.currentConsoleUser() }
-        if resolved == nil {
-            sleep(5)
-        }
-    }
-    guard let options = resolved else { exit(1) } // 不可达：循环只在解析成功后退出
-    if let home = options.homeDirectory {
-        redirectStandardLogs(homeDirectory: home)
-    }
-
+    let options = try parseOptions(Array(CommandLine.arguments.dropFirst()))
     let manager = SleepHoldSessionManager()
     let server = SleepHoldControlServer(
         socketPath: options.socketPath,

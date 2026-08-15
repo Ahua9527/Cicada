@@ -3,8 +3,8 @@ import XCTest
 import CicadaSleepHoldCore
 import CicadaSystem
 
-/// SleepHold 安装失败恢复：serviceInstalled / serviceResponding 双状态、
-/// 安装诊断与轮询诊断分离（安装错误不被 3 秒轮询覆盖，恢复后自动清除）。
+/// SleepHold 安装失败恢复入口：serviceInstalled / serviceResponding 双状态
+/// 驱动维护页「手动安装指引」的展示与隐藏（安装本身走终端命令，见 issue #9）。
 @MainActor
 final class SleepHoldRecoveryTests: XCTestCase {
     func testNotInstalledShowsInstallAction() async {
@@ -61,58 +61,7 @@ final class SleepHoldRecoveryTests: XCTestCase {
         XCTAssertNil(model.recoveryAction)
     }
 
-    func testInstallDiagnosticSurvivesPollingFailures() async {
-        let model = SleepHoldModel(
-            statusProvider: { throw SleepHoldControlError.unavailable("No such file or directory") },
-            isInstalled: { true }
-        )
-        model.setInstallDiagnostic("授权已取消或超时")
-
-        // 多次轮询失败不得覆盖具体安装错误。
-        for _ in 0 ..< 3 {
-            await model.refresh()
-        }
-
-        XCTAssertEqual(model.diagnostic?.message, "授权已取消或超时")
-    }
-
-    func testInstallDiagnosticClearsAfterRecovery() async {
-        var reachable = false
-        let model = SleepHoldModel(
-            statusProvider: {
-                if reachable {
-                    return SleepHoldControlResponse(ok: true, status: .canSleep, activeSessions: 0)
-                }
-                throw SleepHoldControlError.unavailable("No such file or directory")
-            },
-            isInstalled: { true }
-        )
-        model.setInstallDiagnostic("安装失败：command failed")
-        await model.refresh()
-        XCTAssertEqual(model.diagnostic?.message, "安装失败：command failed")
-
-        // 服务迟到恢复：refresh 成功后安装错误自动清除，修复入口隐藏。
-        reachable = true
-        await model.refresh()
-
-        XCTAssertNil(model.diagnostic)
-        XCTAssertNil(model.recoveryAction)
-    }
-
-    func testRetryStartClearsStaleInstallDiagnostic() async {
-        let model = SleepHoldModel(
-            statusProvider: { throw SleepHoldControlError.unavailable("No such file or directory") },
-            isInstalled: { true }
-        )
-        model.setInstallDiagnostic("授权已取消或超时")
-        XCTAssertEqual(model.diagnostic?.message, "授权已取消或超时")
-
-        model.clearInstallDiagnostic()
-
-        XCTAssertNil(model.diagnostic)
-    }
-
-    func testPollingDiagnosticShowsWhenNoInstallDiagnostic() async {
+    func testPollingDiagnosticShowsConnectionFailureDetail() async {
         let model = SleepHoldModel(
             statusProvider: { throw SleepHoldControlError.unavailable("No such file or directory") },
             isInstalled: { true }
@@ -120,7 +69,7 @@ final class SleepHoldRecoveryTests: XCTestCase {
 
         await model.refresh()
 
-        // 无安装诊断时展示轮询诊断（连接失败细节）。
+        // 连接失败的轮询诊断给出可读细节，不泄露内部错误类型名。
         XCTAssertTrue(
             model.diagnostic?.message.hasSuffix("No such file or directory") == true,
             "\(String(describing: model.diagnostic))"

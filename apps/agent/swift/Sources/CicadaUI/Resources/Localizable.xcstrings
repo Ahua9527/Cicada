@@ -1401,36 +1401,6 @@
         }
       }
     },
-    "安装后台服务，登录后自动运行；需要输入一次管理员密码": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installs the background service that runs at login; requires your administrator password once."
-          }
-        }
-      }
-    },
-    "安装…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Install…"
-          }
-        }
-      }
-    },
-    "安装中…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installing…"
-          }
-        }
-      }
-    },
     "SleepHold 服务未安装": {
       "localizations": {
         "en": {
@@ -1451,42 +1421,12 @@
         }
       }
     },
-    "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installed but the service is not responding; see ~/.cicada/sleephold.stderr.log"
-          }
-        }
-      }
-    },
     "重新安装 SleepHold 服务": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
             "value": "Reinstall SleepHold Service"
-          }
-        }
-      }
-    },
-    "服务已安装但无响应，重新安装可修复；需要输入一次管理员密码": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The service is installed but not responding; reinstall to repair. Requires your administrator password once."
-          }
-        }
-      }
-    },
-    "重新安装…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reinstall…"
           }
         }
       }
@@ -1521,22 +1461,32 @@
         }
       }
     },
-    "等待系统批准：请在 系统设置 → 通用 → 登录项与扩展 中允许 Cicada": {
+    "沙箱限制无法自动安装，请在终端执行命令：": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for approval: allow Cicada in System Settings → General → Login Items & Extensions."
+            "value": "Sandbox restrictions prevent automatic install; run this command in Terminal:"
           }
         }
       }
     },
-    "注册失败：%@": {
+    "服务已安装但无响应，请在终端执行命令重装：": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Registration failed: %@"
+            "value": "The service is installed but not responding; reinstall by running this command in Terminal:"
+          }
+        }
+      }
+    },
+    "复制命令": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Command"
           }
         }
       }
