@@ -3,7 +3,7 @@
  */
 
 import type { Middleware, MiddlewareResult } from './types';
-import { extractResponse } from './types';
+import { extractResponse, isWebSocketUpgradeResponse } from './types';
 import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
 
 /**
@@ -18,8 +18,8 @@ export function securityHeadersMiddleware(): Middleware {
       return result;
     }
 
-    // WebSocket 升级响应（101）头部不可变，直接返回
-    if (response.status === 101) {
+    // WebSocket 升级响应头部不可变，直接返回
+    if (isWebSocketUpgradeResponse(response)) {
       return result;
     }
 
@@ -156,6 +156,10 @@ function addSecurityHeaders(
   headers: Record<string, string>
 ): MiddlewareResult {
   if (result instanceof Response) {
+    // WebSocket 升级响应头部不可变且不可重建，原样透传（同 CORS 中间件）。
+    if (isWebSocketUpgradeResponse(result)) {
+      return result;
+    }
     const newHeaders = new Headers(result.headers);
     Object.entries(headers).forEach(([key, value]) => {
       if (!newHeaders.has(key)) {

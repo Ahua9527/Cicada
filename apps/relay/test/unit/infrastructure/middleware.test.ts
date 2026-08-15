@@ -38,6 +38,17 @@ function createUpgradeResponse(): Response {
   return response;
 }
 
+/**
+ * 模拟生产环境 DO 经 stub.fetch() 返回的升级响应：status 不表现为 101、
+ * 但附着 webSocket——101 守卫会被击穿，必须按 webSocket 特征识别。
+ */
+function createSocketAttachedResponse(): Response {
+  const response = Object.create(Response.prototype) as Response;
+  Object.defineProperty(response, 'status', { value: 200 });
+  Object.defineProperty(response, 'webSocket', { value: {} });
+  return response;
+}
+
 describe('Middleware', () => {
   describe('MiddlewarePipeline', () => {
     it('executes middleware in order and returns 404 when no response exists', async () => {
@@ -265,6 +276,16 @@ describe('Middleware', () => {
   });
 
   describe('securityHeadersMiddleware', () => {
+    it('passes WebSocket upgrade responses through untouched (101 and socket-attached)', async () => {
+      for (const upgrade of [createUpgradeResponse(), createSocketAttachedResponse()]) {
+        const result = await securityHeadersMiddleware()(createContext(), async () => ({
+          continue: false,
+          response: upgrade,
+        }));
+        expect((result as { response: Response }).response).toBe(upgrade);
+      }
+    });
+
     it('calls the next middleware', async () => {
       const response = new Response('test');
       const result = await securityHeadersMiddleware()(createContext(), async () => ({
@@ -277,6 +298,15 @@ describe('Middleware', () => {
   });
 
   describe('corsMiddleware', () => {
+    it('passes WebSocket upgrade responses through untouched (101 and socket-attached)', async () => {
+      for (const upgrade of [createUpgradeResponse(), createSocketAttachedResponse()]) {
+        const result = await corsMiddleware({ allowedOrigins: ['*'] })(
+          createContext(),
+          async () => upgrade
+        );
+        expect(result).toBe(upgrade);
+      }
+    });
     it('bypasses processing when disabled', async () => {
       const next = jest.fn<Promise<MiddlewareResult>, []>().mockResolvedValue({ continue: true });
       const result = await corsMiddleware({ enabled: false })(createContext(), next);
@@ -362,12 +392,24 @@ describe('Middleware', () => {
   });
 
   describe('rateLimitMiddleware', () => {
+    it('passes WebSocket upgrade responses through untouched (101 and socket-attached)', async () => {
+      // 生产环境 DO 返回的升级响应头部不可变，headers.set 会抛
+      // "Can't modify immutable headers"——两种形态都必须原样透传。
+      for (const upgrade of [createUpgradeResponse(), createSocketAttachedResponse()]) {
+        const middleware = rateLimitMiddleware({ windowMs: 60_000, maxRequests: 10 });
+        const result = await middleware(createContext(), async () => upgrade);
+        expect(result).toBe(upgrade);
+      }
+    });
     afterEach(() => {
       jest.useRealTimers();
       jest.restoreAllMocks();
     });
 
-    it('adds headers and returns the existing response', async () => {
+    it('adds headers via an immutable-safe rebuilt response', async () => {
+      // 原地修改会在不可变响应（DO/fetch 返回、Response.json 工厂）上抛
+      // "Can't modify immutable headers"——中间件改为重建响应，断言新对象的
+      // 头部与状态而不是对象同一性。
       const response = new Response('ok');
       const middleware = rateLimitMiddleware({ windowMs: 1_000, maxRequests: 2 });
 
@@ -376,9 +418,11 @@ describe('Middleware', () => {
         async () => response
       );
 
-      expect(result).toBe(response);
-      expect(response.headers.get('X-RateLimit-Limit')).toBe('2');
-      expect(response.headers.get('X-RateLimit-Remaining')).toBe('1');
+      expect(result).toBeInstanceOf(Response);
+      const decorated = result as Response;
+      expect(decorated.headers.get('X-RateLimit-Limit')).toBe('2');
+      expect(decorated.headers.get('X-RateLimit-Remaining')).toBe('1');
+      await expect(decorated.text()).resolves.toBe('ok');
     });
 
     it('uses a custom key and preserves control response shape', async () => {
@@ -391,8 +435,9 @@ describe('Middleware', () => {
       }));
 
       expect(keyGenerator).toHaveBeenCalled();
-      expect(result).toEqual({ continue: false, response });
-      expect(response.headers.get('X-RateLimit-Remaining')).toBe('1');
+      expect(result).toMatchObject({ continue: false });
+      const decorated = (result as { response: Response }).response;
+      expect(decorated.headers.get('X-RateLimit-Remaining')).toBe('1');
     });
 
     it('falls back through forwarding headers and unknown clients', async () => {

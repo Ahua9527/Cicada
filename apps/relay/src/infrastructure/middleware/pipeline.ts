@@ -3,7 +3,7 @@
  */
 
 import type { MiddlewareContext, Middleware, MiddlewareResult } from './types';
-import { extractResponse } from './types';
+import { extractResponse, isWebSocketUpgradeResponse } from './types';
 import { createPublicServerErrorResponse } from '../../presentation/public-error-response';
 
 /**
@@ -40,9 +40,9 @@ export class MiddlewarePipeline {
 
       const response = extractResponse(result);
       if (response) {
-        // 如果是 WebSocket 升级响应（101），不再执行后续中间件
+        // 如果是 WebSocket 升级响应，不再执行后续中间件
         // 因为 WebSocket 响应的头是不可变的，后续中间件尝试修改会导致错误
-        if (response.status === 101) {
+        if (isWebSocketUpgradeResponse(response)) {
           return response;
         }
         return response;

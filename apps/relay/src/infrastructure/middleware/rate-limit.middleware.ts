@@ -3,7 +3,7 @@
  */
 
 import type { Middleware, MiddlewareContext } from './types';
-import { extractResponse } from './types';
+import { extractResponse, isControlResult, isWebSocketUpgradeResponse } from './types';
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -106,44 +106,42 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
     // 添加限流信息到响应头
     const result = await next();
 
-    // 处理Response格式的结果
-    if (result instanceof Response) {
-      // WebSocket 升级响应（101）头部不可变，跳过
-      if (result.status === 101) {
-        return result;
-      }
-
-      const current = requests.get(key);
-      if (current) {
-        result.headers.set('X-RateLimit-Limit', maxRequests.toString());
-        result.headers.set(
-          'X-RateLimit-Remaining',
-          Math.max(0, maxRequests - current.count).toString()
-        );
-        result.headers.set('X-RateLimit-Reset', current.resetTime.toString());
-      }
+    const response = extractResponse(result);
+    if (!response) {
+      return result;
+    }
+    // WebSocket 升级响应：头部不可变且重建会丢失 socket，原样透传。
+    if (isWebSocketUpgradeResponse(response)) {
       return result;
     }
 
-    // 处理其他格式的结果
-    const response = extractResponse(result);
-    if (response) {
-      // WebSocket 升级响应（101）头部不可变，跳过
-      if (response.status === 101) {
-        return result;
-      }
-
-      const current = requests.get(key);
-      if (current) {
-        response.headers.set('X-RateLimit-Limit', maxRequests.toString());
-        response.headers.set(
-          'X-RateLimit-Remaining',
-          Math.max(0, maxRequests - current.count).toString()
-        );
-        response.headers.set('X-RateLimit-Reset', current.resetTime.toString());
-      }
+    const after = requests.get(key);
+    if (!after) {
+      return result;
     }
 
+    // 头部可能不可变（DO/fetch 返回的响应、Response.json 工厂产物——原地
+    // headers.set 会抛 "Can't modify immutable headers"，真机复现 DO 429 被
+    // 掩盖成 500），读取拷贝后重建响应。
+    const headers = new Headers(response.headers);
+    headers.set('X-RateLimit-Limit', maxRequests.toString());
+    headers.set(
+      'X-RateLimit-Remaining',
+      Math.max(0, maxRequests - after.count).toString()
+    );
+    headers.set('X-RateLimit-Reset', after.resetTime.toString());
+    const decorated = new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+
+    if (result instanceof Response) {
+      return decorated;
+    }
+    if (isControlResult(result)) {
+      return { ...result, response: decorated };
+    }
     return result;
   };
 }

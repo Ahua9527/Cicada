@@ -3,7 +3,7 @@
  */
 
 import type { Middleware, MiddlewareResult } from './types';
-import { extractResponse } from './types';
+import { extractResponse, isWebSocketUpgradeResponse } from './types';
 
 export interface CorsOptions {
   allowedOrigins?: string[];
@@ -52,8 +52,8 @@ export function corsMiddleware(options: CorsOptions = {}): Middleware {
       return result;
     }
 
-    // WebSocket 升级响应（101）头部不可变，直接返回
-    if (response.status === 101) {
+    // WebSocket 升级响应头部不可变，直接返回
+    if (isWebSocketUpgradeResponse(response)) {
       return result;
     }
 
@@ -107,6 +107,12 @@ function addCorsHeaders(
   headers: Record<string, string>
 ): MiddlewareResult {
   if (result instanceof Response) {
+    // WebSocket 升级响应：生产环境头部不可变（读写都会抛
+    // TypeError: Can't modify immutable headers），且重建 Response 会丢失
+    // webSocket 附着——CORS 头对已升级连接无意义，原样透传。
+    if (isWebSocketUpgradeResponse(result)) {
+      return result;
+    }
     const newHeaders = new Headers(result.headers);
     Object.entries(headers).forEach(([key, value]) => {
       newHeaders.set(key, value);

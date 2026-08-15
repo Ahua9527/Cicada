@@ -64,3 +64,16 @@ export function extractResponse(value: MiddlewareResult): Response | undefined {
 
   return undefined;
 }
+
+/**
+ * 判定 WebSocket 升级响应。生产环境 DO 经 stub.fetch() 返回的升级响应，
+ * status 读取不一定为 101（真机 tail 确认 101 守卫被击穿后 headers.set 抛
+ * "Can't modify immutable headers"）；附着 webSocket 才是升级响应的确定性特征。
+ * 该响应头部不可变且不可重建（重建会丢失 socket），中间件必须原样透传。
+ */
+export function isWebSocketUpgradeResponse(response: Response): boolean {
+  return (
+    response.status === 101 ||
+    (response as unknown as { webSocket?: unknown }).webSocket != null
+  );
+}
