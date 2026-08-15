@@ -1451,26 +1451,6 @@
         }
       }
     },
-    "授权已取消或超时": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Authorization was cancelled or timed out"
-          }
-        }
-      }
-    },
-    "安装失败：%@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installation failed: %@"
-          }
-        }
-      }
-    },
     "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log": {
       "localizations": {
         "en": {
@@ -1537,6 +1517,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hold for two seconds to quit Cicada. When activated via keyboard or VoiceOver, confirm again in the dialog."
+          }
+        }
+      }
+    },
+    "等待系统批准：请在 系统设置 → 通用 → 登录项与扩展 中允许 Cicada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for approval: allow Cicada in System Settings → General → Login Items & Extensions."
+          }
+        }
+      }
+    },
+    "注册失败：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registration failed: %@"
           }
         }
       }

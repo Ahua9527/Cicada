@@ -7,7 +7,7 @@
 //  - `folderActions`：FolderGrid 6 个按钮的真实 NSWorkspace / NotchDropCoordinator 行为。
 //  - `launchAtLoginToggle`：真实 `LaunchAtLogin.Toggle`（写 SMLoginItemSetEnabled）。
 //  - `runStartupChecks`：`AppDelegate.runStartupChecks()` 走启动诊断链路。
-//  - `installSleepHoldService`：SleepHold 后台服务的系统授权弹窗安装链路。
+//  - `installSleepHoldService`：SleepHold 后台服务的 SMAppService 注册链路。
 //
 //  通过 ViewModifier `hostMaintenanceInjections(appDelegate:)` 一次性注入，
 //  在 App.swift 的 WindowGroup 上应用。CicadaUI 库默认占位保持库独立可预览/单测。
@@ -15,10 +15,10 @@
 
 import AppKit
 import AVFoundation
-import CicadaCore
 import CicadaSystem
 import CicadaUI
 import LaunchAtLogin
+import ServiceManagement
 import SwiftUI
 
 enum MaintenanceHostInjections {
@@ -113,55 +113,48 @@ enum MaintenanceHostInjections {
         return session.devices.map { CameraOption(id: $0.uniqueID, name: $0.localizedName) }
     }
 
-    /// 安装 SleepHold 后台服务：系统授权弹窗输入一次密码，以 root 装载 launchd 服务。
+    /// 安装/修复 SleepHold 后台服务：SMAppService 注册内嵌 daemon plist（macOS 13+）。
     ///
-    /// 为什么不用 CLI 的 `SleepHoldServiceManager.install()`（sudo 路径）：GUI 进程没有
-    /// tty，sudo 无法提示密码（会挂到超时）；且 sudo 凭证按 tty 记账，用户在终端跑过
-    /// `sudo -v` 也不会惠及本进程。故这里用 AppleScript `with administrator privileges`
-    /// 弹系统授权窗，一次性以 root 执行全部安装命令。
+    /// 为什么不再用 osascript `with administrator privileges`：沙箱进程的提权调用被
+    /// Authorization Services 拦截，必返回 -60005（管理员用户名或密码不正确），与密码
+    /// 是否正确无关——沙箱签名构建下该链路永远失败（见 issue #9）。SMAppService 是
+    /// 沙箱应用安装 launchd daemon 的受支持路径：注册内嵌在
+    /// Contents/Library/LaunchDaemons 的静态 plist（BundleProgram 指向包内 helper），
+    /// 用户经系统设置批准，无密码弹窗。
     ///
-    /// 提权命令只能在宿主层发起：CicadaSystem 不允许直接调用 osascript 等外部二进制
-    /// （CommandExecutionDependencyTests 架构约束），所以库侧只暴露 `prepareInstall()`
-    /// （建目录 + 写 plist），cp/chown/launchctl 的提权拼装在这里完成。
-    ///
-    /// 授权弹窗阻塞等用户输入（最长 120s），整体放 `Task.detached` 避免卡主线程。
-    /// 失败按 `SleepHoldInstallError` 分类透传给 CicadaUI 视图层做本地化。
+    /// 幂等/修复语义：探活已通过（含旧 CLI sudo 安装）→ 直接成功，不做多余注册；
+    /// 已注册但无响应（部分安装/服务挂掉）→ unregister + register 强制重建；
+    /// 未注册 → register。修复入口沿用 CicadaUI `recoveryAction`，不增加卸载或迁移流程。
     static func installSleepHoldService() async -> Result<Void, SleepHoldInstallError> {
         await Task.detached(priority: .userInitiated) { () -> Result<Void, SleepHoldInstallError> in
+            let service = SMAppService.daemon(plistName: sleepHoldDaemonPlistName)
             let manager = SleepHoldServiceManager()
-            let plistPath: String
+
+            // 服务已健康（含旧 CLI 安装）：幂等成功。
+            if (try? manager.ping())?.ok == true {
+                return .success(())
+            }
+
             do {
-                plistPath = try manager.prepareInstall()
+                // 已注册但无响应：先注销再注册，强制 launchd 重建。
+                if service.status == .enabled {
+                    try service.unregister()
+                }
+                try service.register()
             } catch {
-                return .failure(.commandFailed(error.localizedDescription))
+                return .failure(.registrationFailed(error.localizedDescription))
             }
 
-            let target = shellQuoted(RuntimePaths.sleepHoldPlistPath)
-            let script = [
-                "/bin/cp -f \(shellQuoted(plistPath)) \(target)",
-                "/usr/sbin/chown root:wheel \(target)",
-                "/bin/chmod 644 \(target)",
-                "/bin/launchctl unload \(target) 2>/dev/null || true",
-                "/bin/launchctl load \(target)",
-            ].joined(separator: " && ")
-            let prompt = String(localized: "Cicada needs to install the SleepHold background service (keeps your Mac awake when needed). Administrator permission is required.")
-            let source = "do shell script \"\(appleScriptEscaped(script))\""
-                + " with prompt \"\(appleScriptEscaped(prompt))\""
-                + " with administrator privileges"
-
-            let result = ProcessRunner().run("/usr/bin/osascript", args: ["-e", source], timeoutMs: 120_000)
-            guard result.code == 0 else {
-                if result.code == 124 {
-                    return .failure(.authorizationTimedOut)
+            if let statusError = installError(for: service.status) {
+                if case .requiresApproval = statusError {
+                    // 待批准：顺手打开系统设置对应面板，减少用户找入口的成本。
+                    Task { @MainActor in SMAppService.openSystemSettingsLoginItems() }
                 }
-                if result.stderr.contains("-128") || result.stderr.contains("User canceled") {
-                    return .failure(.authorizationCancelled)
-                }
-                return .failure(.commandFailed(result.stderr.isEmpty ? result.stdout : result.stderr))
+                return .failure(statusError)
             }
 
-            // 探活：launchctl load 后服务应立即可连；给 launchd 一点拉起时间再判失败。
-            for attempt in 0..<5 {
+            // 探活：launchd 拉起需要一点时间。
+            for attempt in 0 ..< 5 {
                 if attempt > 0 { Thread.sleep(forTimeInterval: 0.4) }
                 if let response = try? manager.ping(), response.ok {
                     return .success(())
@@ -171,15 +164,25 @@ enum MaintenanceHostInjections {
         }.value
     }
 
-    /// shell 单引号包裹（脚本经 `do shell script` 过一层 shell，路径必须引用）。
-    private static func shellQuoted(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    /// SMAppService 状态 → 安装错误分类（纯函数，供单测）。
+    static func installError(for status: SMAppService.Status) -> SleepHoldInstallError? {
+        switch status {
+        case .enabled:
+            return nil
+        case .requiresApproval:
+            return .requiresApproval
+        case .notRegistered:
+            return .registrationFailed("register() 后服务仍未注册")
+        case .notFound:
+            return .registrationFailed("应用包内缺少内嵌 daemon plist（Contents/Library/LaunchDaemons）")
+        @unknown default:
+            return .registrationFailed("未知注册状态: \(status.rawValue)")
+        }
     }
 
-    /// AppleScript 字符串字面量转义（`do shell script "..."` 内嵌双引号串）。
-    private static func appleScriptEscaped(_ text: String) -> String {
-        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-    }
+    /// SMAppService 注册用的内嵌 daemon plist 文件名
+    ///（来源：Resources/LaunchDaemons/，build.sh 嵌入 Contents/Library/LaunchDaemons/）。
+    private static let sleepHoldDaemonPlistName = "com.cicada.sleephold.plist"
 
     // MARK: - Path Helpers
 

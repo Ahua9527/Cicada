@@ -53,4 +53,15 @@ else
   echo "[sentinel] helper source directory not found; skipping helper embedding"
 fi
 
+# 嵌入 SleepHold launchd daemon plist（SMAppService 注册来源；随包签名一体生效）。
+DAEMON_PLIST_SRC="$ROOT_DIR/Resources/LaunchDaemons/com.cicada.sleephold.plist"
+DAEMON_PLIST_DIR="$APP_PATH/Contents/Library/LaunchDaemons"
+if [ ! -f "$DAEMON_PLIST_SRC" ]; then
+  echo "❌ missing daemon plist: $DAEMON_PLIST_SRC"
+  exit 1
+fi
+mkdir -p "$DAEMON_PLIST_DIR"
+cp -f "$DAEMON_PLIST_SRC" "$DAEMON_PLIST_DIR/com.cicada.sleephold.plist"
+echo "✅ SleepHold daemon plist embedded in $DAEMON_PLIST_DIR"
+
 echo "✅ Sentinel app artifact: $APP_PATH"

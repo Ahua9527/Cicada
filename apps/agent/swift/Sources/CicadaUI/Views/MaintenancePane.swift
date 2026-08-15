@@ -104,10 +104,10 @@ struct MaintenancePane: View {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 
-    /// 点「安装…/重新安装…」：走宿主注入的授权弹窗安装链路（重装复用同一链路，
-    /// 脚本内 launchctl unload+load 幂等覆盖，不增加卸载或迁移流程）。
+    /// 点「安装…/重新安装…」：走宿主注入的 SMAppService 注册链路（重装由宿主
+    ///  unregister+register 幂等覆盖，不增加卸载或迁移流程）。
     /// 安装结束后先刷新实际状态——服务可能迟到恢复；只有服务仍不可用
-    /// （`recoveryAction != nil`）时才记录「授权取消/命令失败/服务未响应」具体错误，
+    /// （`recoveryAction != nil`）时才记录「注册失败/待系统批准/服务未响应」具体错误，
     /// 避免服务已恢复却继续显示失败。
     private func installSleepHold() {
         guard let installSleepHoldService, !installingSleepHold else { return }
@@ -127,10 +127,10 @@ struct MaintenancePane: View {
 
     private func sleepHoldInstallMessage(_ error: SleepHoldInstallError) -> String {
         switch error {
-        case .authorizationCancelled, .authorizationTimedOut:
-            return String(localized: "授权已取消或超时", bundle: .module)
-        case .commandFailed(let detail):
-            return String(localized: "安装失败：\(detail)", bundle: .module)
+        case .requiresApproval:
+            return String(localized: "等待系统批准：请在 系统设置 → 通用 → 登录项与扩展 中允许 Cicada", bundle: .module)
+        case .registrationFailed(let detail):
+            return String(localized: "注册失败：\(detail)", bundle: .module)
         case .serviceNotResponding:
             return String(localized: "已安装但服务未响应，请查看 ~/.cicada/sleephold.stderr.log", bundle: .module)
         }

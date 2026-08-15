@@ -2,6 +2,7 @@ import CicadaCore
 import CicadaSleepHoldCore
 import CicadaSystem
 import Foundation
+import ServiceManagement
 
 /// 连接 sleephold IPC，提供只读维护状态。
 @MainActor
@@ -58,8 +59,20 @@ final class SleepHoldModel: ObservableObject {
         self.isInstalledProvider = isInstalled
     }
 
+    /// 已安装判定：SMAppService 注册态（`.enabled`/`.requiresApproval`）或旧 CLI
+    /// sudo 安装的遗留 plist 落盘。注意 SMAppService daemon 不会在
+    /// /Library/LaunchDaemons 落文件，仅查 plist 会把已注册服务误判为未安装。
     nonisolated static func defaultIsInstalled() -> Bool {
-        FileManager.default.fileExists(atPath: RuntimePaths.sleepHoldPlistPath)
+        let status = SMAppService.daemon(plistName: "com.cicada.sleephold.plist").status
+        switch status {
+        case .enabled, .requiresApproval:
+            return true
+        case .notRegistered, .notFound:
+            break
+        @unknown default:
+            break
+        }
+        return FileManager.default.fileExists(atPath: RuntimePaths.sleepHoldPlistPath)
     }
 
     /// 轮询刷新状态。连接失败时设为 inactive 并生成轮询诊断警告（不覆盖安装诊断）。

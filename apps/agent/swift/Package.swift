@@ -37,7 +37,8 @@ let package = Package(
         .target(
             name: "CicadaUI",
             dependencies: ["CicadaCore", "CicadaIPC", "CicadaSleepHoldCore", "CicadaSystem"],
-            resources: [.process("Resources")]
+            resources: [.process("Resources")],
+            linkerSettings: [.linkedFramework("ServiceManagement")]
         ),
         .target(
             name: "CicadaCLI",
