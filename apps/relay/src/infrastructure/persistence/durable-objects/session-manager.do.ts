@@ -66,6 +66,7 @@ type PendingShortcutCommand = {
   timer: Timer;
   clientRequestId: string;
   command: string;
+  dispatchedAt: number;
 };
 
 export interface SessionManagerOptions {
@@ -740,13 +741,23 @@ export class SessionManagerDO {
     this.pendingShortcutCommands.delete(dispatchId);
 
     const ok = data?.ok !== false;
+    const latencyMs = Date.now() - pending.dispatchedAt;
+    const rawResultData =
+      typeof data?.resultData === 'object' && data.resultData !== null
+        ? data.resultData
+        : typeof data?.data === 'object' && data.data !== null
+          ? data.data
+          : undefined;
+    // 设备往返时延（relay 发出到收到结果）合并进 data，供快捷指令展示 ping 值。
+    const resultData = { ...(rawResultData as Record<string, unknown>), latency_ms: latencyMs };
     const body = {
       ok,
       request_id: pending.clientRequestId,
       command: typeof data?.command === 'string' ? data.command : pending.command,
       success: data?.success === true,
       message: typeof data?.message === 'string' ? data.message : undefined,
-      data: typeof data?.resultData === 'object' ? data.resultData : data?.data,
+      data: resultData,
+      latency_ms: latencyMs,
       code: typeof data?.code === 'string' ? data.code : undefined,
       error: typeof data?.error === 'string' ? data.error : undefined,
       timestamp: Date.now(),
@@ -1085,6 +1096,7 @@ export class SessionManagerDO {
         timer,
         clientRequestId,
         command,
+        dispatchedAt: Date.now(),
       });
 
       try {

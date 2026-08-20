@@ -278,7 +278,7 @@ def screenshot_actions() -> list:
         },
     }
     save = {
-        "WFWorkflowActionIdentifier": "is.workflow.actions.savecameraroll",
+        "WFWorkflowActionIdentifier": "is.workflow.actions.savetocameraroll",
         "WFWorkflowActionParameters": {"WFInput": action_output(decode_uuid)},
     }
     return [post, get_data, get_b64, decode, save,
