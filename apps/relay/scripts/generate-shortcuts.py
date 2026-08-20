@@ -100,17 +100,9 @@ def post_action(command: str, extra_params=None):
     return action, action_uuid
 
 
-def extract_message_action():
-    """Get Dictionary Value：取响应里的 message 字段（隐式输入=上一动作输出）。"""
-    action_uuid = _uuid()
-    return {
-        "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
-        "WFWorkflowActionParameters": {
-            "UUID": action_uuid,
-            "WFDictionaryKey": "message",
-            "WFGetDictionaryValueType": "Value",
-        },
-    }, action_uuid
+def extract_message_action(input_uuid: str):
+    """Get Dictionary Value：从指定动作的输出取 message 字段。"""
+    return extract_key_action("message", input_uuid)
 
 
 def extract_key_action(key: str, input_uuid: str):
@@ -127,24 +119,44 @@ def extract_key_action(key: str, input_uuid: str):
     }, action_uuid
 
 
-def notify_action(title: str, body_output_uuids: list) -> dict:
-    """通知。body_output_uuids 为 1~2 个动作输出引用，按行拼接。"""
-    if len(body_output_uuids) == 1:
+def text_action(text_uuids: list):
+    """「文本」动作：把多个变量拼成一段文本（Shortcuts 最可靠的变量拼装模式）。"""
+    action_uuid = _uuid()
+    if len(text_uuids) == 1:
         string = "\ufffc"
-        ranges = {"{0, 1}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[0]}}
+        ranges = {"{0, 1}": {"Type": "ActionOutput", "OutputUUID": text_uuids[0]}}
     else:
         string = "\ufffc\n\ufffc"
         ranges = {
-            "{0, 1}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[0]},
-            "{2, 3}": {"Type": "ActionOutput", "OutputUUID": body_output_uuids[1]},
+            "{0, 1}": {"Type": "ActionOutput", "OutputUUID": text_uuids[0]},
+            "{2, 3}": {"Type": "ActionOutput", "OutputUUID": text_uuids[1]},
         }
+    return {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.gettext",
+        "WFWorkflowActionParameters": {
+            "UUID": action_uuid,
+            "WFTextActionText": {
+                "WFSerializationType": "WFTextTokenString",
+                "Value": {"string": string, "attachmentsByRange": ranges},
+            },
+        },
+    }, action_uuid
+
+
+def notify_from_text_action(text_action_uuid: str, title: str) -> dict:
+    """通知正文直接引用「文本」动作的输出（不再内嵌多附件字符串）。"""
     return {
         "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
         "WFWorkflowActionParameters": {
             "WFNotificationActionTitle": title,
             "WFNotificationActionBody": {
                 "WFSerializationType": "WFTextTokenString",
-                "Value": {"string": string, "attachmentsByRange": ranges},
+                "Value": {
+                    "string": "\ufffc",
+                    "attachmentsByRange": {
+                        "{0, 1}": {"Type": "ActionOutput", "OutputUUID": text_action_uuid}
+                    },
+                },
             },
         },
     }
@@ -215,12 +227,14 @@ def build_workflow(name: str, color: str, actions: list) -> dict:
 
 
 def result_actions(command: str, extra_params=None):
-    """POST + 提取 message/data + 通知（两行：人话 + 结构化数据）。
+    """POST + 提取 message/data + 文本拼装 + 通知。
     返回 (actions, post_uuid)——调用方需要自定义后续时取 post_uuid。"""
     post, post_uuid = post_action(command, extra_params)
-    extract_msg, msg_uuid = extract_message_action()
+    extract_msg, msg_uuid = extract_message_action(post_uuid)
     extract_data, data_uuid = extract_key_action("data", post_uuid)
-    return [post, extract_msg, extract_data, notify_action("Cicada", [msg_uuid, data_uuid])], post_uuid
+    text, text_uuid = text_action([msg_uuid, data_uuid])
+    return [post, extract_msg, extract_data, text,
+            notify_from_text_action(text_uuid, "Cicada")], post_uuid
 
 
 def simple_command_actions(command: str) -> list:
@@ -232,19 +246,21 @@ def percent_command_actions(command: str, prompt: str) -> list:
     ask, ask_uuid = ask_number_action(prompt)
     calc, calc_uuid = calculate_divide_action(ask_uuid, 100)
     post, post_uuid = post_action(command, [("level", action_output(calc_uuid))])
-    extract_msg, msg_uuid = extract_message_action()
+    extract_msg, msg_uuid = extract_message_action(post_uuid)
     extract_data, data_uuid = extract_key_action("data", post_uuid)
-    return [ask, calc, post, extract_msg, extract_data,
-            notify_action("Cicada", [msg_uuid, data_uuid])]
+    text, text_uuid = text_action([msg_uuid, data_uuid])
+    return [ask, calc, post, extract_msg, extract_data, text,
+            notify_from_text_action(text_uuid, "Cicada")]
 
 
 def app_open_actions() -> list:
     ask, ask_uuid = ask_text_action("应用名（如 Calculator / 微信）")
     post, post_uuid = post_action("app_open", [("name", action_output(ask_uuid))])
-    extract_msg, msg_uuid = extract_message_action()
+    extract_msg, msg_uuid = extract_message_action(post_uuid)
     extract_data, data_uuid = extract_key_action("data", post_uuid)
-    return [ask, post, extract_msg, extract_data,
-            notify_action("Cicada", [msg_uuid, data_uuid])]
+    text, text_uuid = text_action([msg_uuid, data_uuid])
+    return [ask, post, extract_msg, extract_data, text,
+            notify_from_text_action(text_uuid, "Cicada")]
 
 
 def screenshot_actions() -> list:
