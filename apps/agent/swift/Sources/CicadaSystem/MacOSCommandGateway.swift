@@ -134,7 +134,33 @@ public final class MacOSCommandGateway {
             return appAction(params: params, action: appController.switchToApplication, verb: "切换到")
         case .appList:
             return listApplications()
+        case .daemonExit:
+            return daemonExit()
         }
+    }
+
+    private func daemonExit() -> CommandExecutionResult {
+        // 一次性关闭：先解除两层防休眠，再延迟退出（给 relay 回包留窗口）。
+        // KeepAlive=1 的 job 直接 exit 会被 launchd 复活；先 disable 再 exit
+        // 就不会复活（已实测）。重新 cicada start / 打开 Cicada 可正常恢复，
+        // 恢复后 daemon 启动时自动重新防休眠，无需手动操作。
+        _ = powerController.stopNoSleepAssertion()
+        _ = sleepHoldLeaseController.stop()
+        let label = RuntimePaths.daemonLabel
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+            // bootout 把 job 从 launchd 移除，进程随 job 一起被回收——无复活可能。
+            // 回收有数秒延迟（实测），属预期。disable+exit 方案已证伪：
+            // KeepAlive=1 时 clean exit 即使 disabled 也会复活。
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["bootout", "gui/\(getuid())/\(label)"]
+            try? process.run()
+            process.waitUntilExit()
+        }
+        return CommandExecutionResult(
+            success: true,
+            message: "蝉正在退出：防休眠已解除，重新打开 Cicada 即自动恢复"
+        )
     }
 
     private func wakeDisplays() -> CommandExecutionResult {

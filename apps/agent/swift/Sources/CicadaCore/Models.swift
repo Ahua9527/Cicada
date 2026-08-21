@@ -91,6 +91,7 @@ public enum RemoteCommand: String, CaseIterable {
     case appClose = "app_close"
     case appSwitch = "app_switch"
     case appList = "app_list"
+    case daemonExit = "daemon_exit"
 }
 
 public extension RemoteCommand {

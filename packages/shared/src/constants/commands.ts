@@ -65,13 +65,14 @@ export const COMMAND_DESCRIPTIONS: Readonly<Record<CommandType, string>> = {
   app_close: '关闭应用',
   app_switch: '切换到应用',
   app_list: '列出运行中应用',
+  daemon_exit: '退出远程控制服务',
 } as const;
 
 /**
  * 命令分类
  */
 export const COMMAND_CATEGORIES = {
-  SYSTEM: ['lock', 'sleep', 'sleep_displays', 'wake', 'restart', 'shutdown'] as const,
+  SYSTEM: ['lock', 'sleep', 'sleep_displays', 'wake', 'restart', 'shutdown', 'daemon_exit'] as const,
   POWER: ['caffeinate', 'decaffeinate'] as const,
   HARDWARE: ['bt_toggle', 'bt_on', 'bt_off', 'bt_status', 'volume_mute', 'mute', 'unmute', 'volume_up', 'volume_down', 'volume_set', 'brightness_up', 'brightness_down', 'brightness_set'] as const,
   DISPLAY: ['screenshot'] as const,

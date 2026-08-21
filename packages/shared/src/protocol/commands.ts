@@ -34,4 +34,5 @@ export const COMMANDS = [
   'app_close',
   'app_switch',
   'app_list',
+  'daemon_exit',
 ] as const;
