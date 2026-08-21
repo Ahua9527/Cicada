@@ -21,6 +21,17 @@ final class DaemonRuntime {
 
         let gateway = MacOSCommandGateway()
         let notifier = UdsNotifier(autoStart: true)
+
+        // 启动即防休眠：daemon 运行期间阻止系统休眠（原生断言 + SleepHold 合盖租约），
+        // 与远程 caffeinate 命令同路径；远程 decaffeinate 可解除，解除后 Mac 可正常
+        // 睡眠、远控随之中断。失败不阻塞启动。
+        let caffeinateResult = gateway.execute(command: "caffeinate")
+        Logger.info(
+            "Daemon",
+            "启动自动防休眠",
+            data: ["success": "\(caffeinateResult.success)", "message": caffeinateResult.message]
+        )
+
         let relayService = RelayDaemonService(config: config, commandGateway: gateway, notifier: notifier)
         service = relayService
         relayService.start()
