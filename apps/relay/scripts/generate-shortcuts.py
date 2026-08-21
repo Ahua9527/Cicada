@@ -323,8 +323,7 @@ GROUPS: list = [
          percent_command_actions("brightness_set", "亮度百分比（0-100）")),
     ]),
     ("电源", [
-        ("防休眠开", "caffeinate", "teal", simple_command_actions("caffeinate")),
-        ("防休眠关", "decaffeinate", "teal", simple_command_actions("decaffeinate")),
+        ("退出蝉", "daemon_exit", "red", simple_command_actions("daemon_exit")),
     ]),
     ("安防", [
         ("安防开", "sentry_start", "red", simple_command_actions("sentry_start")),
