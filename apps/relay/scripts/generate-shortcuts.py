@@ -187,11 +187,11 @@ def ask_number_action(prompt: str) -> tuple[dict, str]:
 def calculate_divide_action(input_uuid: str, divisor: int) -> tuple[dict, str]:
     action_uuid = _uuid()
     return {
-        "WFWorkflowActionIdentifier": "is.workflow.actions.calculate",
+        "WFWorkflowActionIdentifier": "is.workflow.actions.math",
         "WFWorkflowActionParameters": {
             "UUID": action_uuid,
             "WFMathOperation": "÷",
-            "WFMathOperand2": divisor,
+            "WFMathOperand": divisor,
             "WFInput": action_output(input_uuid),
         },
     }, action_uuid
