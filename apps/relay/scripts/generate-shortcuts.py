@@ -325,10 +325,6 @@ GROUPS: list = [
     ("电源", [
         ("退出蝉", "daemon_exit", "red", simple_command_actions("daemon_exit")),
     ]),
-    ("安防", [
-        ("安防开", "sentry_start", "red", simple_command_actions("sentry_start")),
-        ("安防关", "sentry_stop", "red", simple_command_actions("sentry_stop")),
-    ]),
 ]
 
 

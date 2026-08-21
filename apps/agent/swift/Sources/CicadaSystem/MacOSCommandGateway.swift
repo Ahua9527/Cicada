@@ -148,6 +148,12 @@ public final class MacOSCommandGateway {
         _ = sleepHoldLeaseController.stop()
         let label = RuntimePaths.daemonLabel
         DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+            // 连同 GUI App 一起退出（用户语义里的「退出蝉」是整个应用，不只是 daemon）。
+            let killApp = Process()
+            killApp.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            killApp.arguments = ["Cicada"]
+            try? killApp.run()
+            killApp.waitUntilExit()
             // bootout 把 job 从 launchd 移除，进程随 job 一起被回收——无复活可能。
             // 回收有数秒延迟（实测），属预期。disable+exit 方案已证伪：
             // KeepAlive=1 时 clean exit 即使 disabled 也会复活。
