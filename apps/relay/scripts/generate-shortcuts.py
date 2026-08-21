@@ -324,13 +324,10 @@ GROUPS: list = [
     ("状态查询", [
         ("Ping", "ping", "gray", simple_command_actions("ping")),
         ("系统状态", "status", "blue", simple_command_actions("status")),
-        ("运行中应用", "app_list", "blue", simple_command_actions("app_list")),
         ("安防状态", "sentry_status", "red", simple_command_actions("sentry_status")),
     ]),
     ("屏幕与锁", [
         ("锁屏", "lock", "red", simple_command_actions("lock")),
-        ("屏幕休眠", "sleep_displays", "purple", simple_command_actions("sleep_displays")),
-        ("唤醒屏幕", "wake", "yellow", simple_command_actions("wake")),
         ("截屏", "screenshot", "blue", screenshot_actions()),
     ]),
     ("音量", [
