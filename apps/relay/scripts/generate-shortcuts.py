@@ -184,18 +184,6 @@ def ask_number_action(prompt: str) -> tuple[dict, str]:
     }, action_uuid
 
 
-def ask_text_action(prompt: str) -> tuple[dict, str]:
-    action_uuid = _uuid()
-    return {
-        "WFWorkflowActionIdentifier": "is.workflow.actions.ask",
-        "WFWorkflowActionParameters": {
-            "UUID": action_uuid,
-            "WFAskActionPrompt": prompt,
-            "WFAskActionType": "Text",
-        },
-    }, action_uuid
-
-
 def calculate_divide_action(input_uuid: str, divisor: int) -> tuple[dict, str]:
     action_uuid = _uuid()
     return {
@@ -250,16 +238,6 @@ def percent_command_actions(command: str, prompt: str) -> list:
     extract_data, data_uuid = extract_key_action("data", post_uuid)
     text, text_uuid = text_action([msg_uuid, data_uuid])
     return [ask, calc, post, extract_msg, extract_data, text,
-            notify_from_text_action(text_uuid, "Cicada")]
-
-
-def app_open_actions() -> list:
-    ask, ask_uuid = ask_text_action("应用名（如 Calculator / 微信）")
-    post, post_uuid = post_action("app_open", [("name", action_output(ask_uuid))])
-    extract_msg, msg_uuid = extract_message_action(post_uuid)
-    extract_data, data_uuid = extract_key_action("data", post_uuid)
-    text, text_uuid = text_action([msg_uuid, data_uuid])
-    return [ask, post, extract_msg, extract_data, text,
             notify_from_text_action(text_uuid, "Cicada")]
 
 
@@ -347,9 +325,6 @@ GROUPS: list = [
     ("电源", [
         ("防休眠开", "caffeinate", "teal", simple_command_actions("caffeinate")),
         ("防休眠关", "decaffeinate", "teal", simple_command_actions("decaffeinate")),
-    ]),
-    ("应用", [
-        ("打开应用", "app_open", "purple", app_open_actions()),
     ]),
     ("安防", [
         ("安防开", "sentry_start", "red", simple_command_actions("sentry_start")),
