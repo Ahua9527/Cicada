@@ -9,6 +9,13 @@ import AppKit
 import Foundation
 
 let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+let isManagedLaunch = StartupRegistrationPolicy.isManagedLaunch(
+    environment: ProcessInfo.processInfo.environment
+)
+
+if !isRunningTests, !SingleInstanceLaunchCoordinator.shouldLaunch(isManagedLaunch: isManagedLaunch) {
+    exit(EXIT_SUCCESS)
+}
 
 #if DEBUG
     let isDebugBuild = true
