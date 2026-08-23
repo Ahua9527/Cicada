@@ -12,6 +12,85 @@ final class SentryStabilityTests: XCTestCase {
         super.tearDown()
     }
 
+    func testProcessLockAllowsOnlyOneCicadaInstance() throws {
+        let directory = try temporaryTestDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("sentinel-instance.lock").path
+        var firstLock: SingleInstanceProcessLock? = SingleInstanceProcessLock()
+        let secondLock = SingleInstanceProcessLock()
+
+        XCTAssertEqual(firstLock?.acquire(at: path), .acquired)
+        XCTAssertEqual(secondLock.acquire(at: path), .contended)
+
+        firstLock = nil
+        XCTAssertEqual(secondLock.acquire(at: path), .acquired)
+    }
+
+    func testManagedLaunchReplacesExistingInstance() {
+        let decision = SingleInstanceLaunchPolicy.evaluate(
+            currentProcessIdentifier: 200,
+            isManagedLaunch: true,
+            runningProcessIdentifiers: [100, 200]
+        )
+
+        XCTAssertEqual(decision, .replaceExisting([100]))
+    }
+
+    func testLoginItemDuplicateActivatesExistingInstance() {
+        let decision = SingleInstanceLaunchPolicy.evaluate(
+            currentProcessIdentifier: 200,
+            isManagedLaunch: false,
+            runningProcessIdentifiers: [100, 200]
+        )
+
+        XCTAssertEqual(decision, .activateExisting(100))
+    }
+
+    func testOnlyRunningInstanceLaunchesNormally() {
+        let decision = SingleInstanceLaunchPolicy.evaluate(
+            currentProcessIdentifier: 200,
+            isManagedLaunch: true,
+            runningProcessIdentifiers: [200]
+        )
+
+        XCTAssertEqual(decision, .launch)
+    }
+
+    func testLaunchAgentEnvironmentDisablesConflictingLoginItem() {
+        let environment = ["CICADA_SENTINEL_SOCKET": "/tmp/cicada-sentinel.sock"]
+        var loginItemQueryCount = 0
+        let isLoginItemEnabled = {
+            loginItemQueryCount += 1
+            return true
+        }
+
+        XCTAssertEqual(
+            StartupRegistrationPolicy.action(
+                isRunningTests: false,
+                environment: environment,
+                isLoginItemEnabled: isLoginItemEnabled
+            ),
+            .disableLoginItem
+        )
+        XCTAssertEqual(
+            StartupRegistrationPolicy.action(
+                isRunningTests: false,
+                environment: [:],
+                isLoginItemEnabled: isLoginItemEnabled
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            StartupRegistrationPolicy.action(
+                isRunningTests: true,
+                environment: environment,
+                isLoginItemEnabled: isLoginItemEnabled
+            ),
+            .none
+        )
+        XCTAssertEqual(loginItemQueryCount, 1)
+    }
+
     func testDebugLaunchWithoutSandboxAllowsAppAndProducesDiagnostic() {
         let decision = StartupLaunchPolicy.evaluate(
             isRunningTests: false,

@@ -41,6 +41,14 @@ final class AppDelegate: NSObject, ObservableObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        let registrationAction = StartupRegistrationPolicy.action(
+            isRunningTests: isRunningTests,
+            environment: ProcessInfo.processInfo.environment,
+            isLoginItemEnabled: { LaunchAtLogin.isEnabled }
+        )
+        if registrationAction == .disableLoginItem {
+            LaunchAtLogin.isEnabled = false
+        }
         startupDiagnostics = PendingStartupDiagnostics.consume()
         // ⭐ P4 新增：启动 AppModel 3s 轮询（sentinels / sleepHold）
         AppModel.shared.startPolling()
