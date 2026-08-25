@@ -81,7 +81,7 @@ struct RecordingCard: View {
         case .status(.restricted), .status(.denied):
             CameraPreviewPlaceholder()
         case .status(.authorized):
-            // 实时预览是既定观察点（见 overview-P4.2 已知限制），授权后先给中性占位 +
+            // 实时预览是既定观察点（P4.2 评审确认的已知限制），授权后先给中性占位 +
             // 设备选择器：多摄像头 Mac 可切换 sentryRecordingDevice，否则静默回退内置/默认。
             CameraPreviewPlaceholder(
                 title: String(localized: "相机已授权", bundle: .module),

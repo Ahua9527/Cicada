@@ -42,3 +42,12 @@ pnpm-debug.log*
 
 # Local design previews
 design-previews/
+
+# 排期、任务规划与一次性过程产物（只留本地，不入库）
+plans/
+overview-*.md
+docs/Implementation-Plan*.md
+docs/Code-Review-*.md
+
+# 本机 Agent 状态
+.pi/
