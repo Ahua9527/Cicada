@@ -119,15 +119,25 @@ describe('验证性能测试', () => {
       const validRequest = createValidRequest('lock');
       const invalidRequest = createValidRequest('invalid_command');
 
+      // 共享 CI runner 抖动会让两条路径同比例变慢、比值随机越线（已两次误报）：
+      // 各测 3 轮取最小值逼近真实成本，阈值语义不变。
+      const measureBest = (fn: () => void): number => {
+        let best = Number.POSITIVE_INFINITY;
+        for (let round = 0; round < 3; round++) {
+          best = Math.min(best, measureTime(fn, 1000));
+        }
+        return best;
+      };
+
       // 测量成功验证
-      const validTime = measureTime(() => {
+      const validTime = measureBest(() => {
         validateCommandRequest(validRequest);
-      }, 1000);
+      });
 
       // 测量失败验证
-      const invalidTime = measureTime(() => {
+      const invalidTime = measureBest(() => {
         validateCommandRequest(invalidRequest);
-      }, 1000);
+      });
 
       console.log(`成功验证 1000 次: ${validTime.toFixed(2)}ms`);
       console.log(`失败验证 1000 次: ${invalidTime.toFixed(2)}ms`);
