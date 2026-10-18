@@ -25,7 +25,7 @@ bun run clean
 ## Change Flow
 
 1. Update the relevant type or validator under `src/`.
-2. Update `COMMANDS.md`.
+2. Run `bun run protocol:generate` from the monorepo root to regenerate the contract JSON and the command table in `COMMANDS.md`.
 3. Update Swift mirrors when command or Shortcuts payload shape changes.
 4. Run Relay and Agent validation from the monorepo root.
 
