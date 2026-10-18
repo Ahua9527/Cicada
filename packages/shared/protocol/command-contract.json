@@ -35,5 +35,15 @@
     "app_switch",
     "app_list",
     "daemon_exit"
+  ],
+  "high_risk_commands": [
+    "sleep",
+    "sentry_stop",
+    "sentry_unlock",
+    "restart",
+    "shutdown",
+    "screenshot",
+    "app_close",
+    "daemon_exit"
   ]
 }

@@ -339,7 +339,10 @@ final class CicadaCLITests: XCTestCase {
 
         let allResult = fixture.cli.run(arguments: ["shortcut", "create", "--commands", "all"])
         XCTAssertEqual(allResult.exitCode, 0)
-        XCTAssertEqual(Set(fixture.daemonControl.createCommands), Set(RemoteCommand.allCases.map(\.rawValue)))
+        XCTAssertEqual(
+            Set(fixture.daemonControl.createCommands),
+            Set(RemoteCommand.allCases.filter { !$0.isHighRisk }.map(\.rawValue))
+        )
     }
 
     func testRunPingExecutesLocalCommand() {
