@@ -169,7 +169,10 @@ public final class ShortcutGrantStore {
     public static func normalizeCommands(_ commands: [String]) -> [String] {
         let trimmed = commands.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         if trimmed.contains("all") {
-            return RemoteCommand.allCases.map(\.rawValue)
+            let named = Set(trimmed)
+            return RemoteCommand.allCases
+                .filter { !$0.isHighRisk || named.contains($0.rawValue) }
+                .map(\.rawValue)
         }
         let valid = Set(RemoteCommand.allCases.map(\.rawValue))
         let normalized = trimmed.filter { valid.contains($0) }

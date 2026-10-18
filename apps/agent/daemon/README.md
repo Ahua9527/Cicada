@@ -48,7 +48,7 @@ cicada run ping
 | `cicada start` | 安装缺失的 daemon/Sentinel 并启动本机 agent 服务；daemon 自动连接 Relay。 |
 | `cicada stop` / `cicada restart` | 停止或重启 daemon/Sentinel。 |
 | `cicada status [--json]` | 合并 config、daemon、Sentinel、runtime snapshot 和原生权限/能力摘要；不是完整端到端网络 smoke。 |
-| `cicada shortcut create [--name <name>] [--commands <csv|all>] [--ttl <duration>]` | 创建 iOS Shortcuts token，默认授权 `ping,status`、30 天；完整 token 只显示一次。 |
+| `cicada shortcut create [--name <name>] [--commands <csv|all>] [--ttl <duration>]` | 创建 iOS Shortcuts token，默认授权 `ping,status`、30 天；`all` 不含高风险命令；完整 token 只显示一次。 |
 | `cicada shortcut list` / `cicada shortcut revoke <id>` | 查看或撤销 Shortcuts token；通过 `~/.cicada/run/daemon.sock` 请求 daemon，daemon 不运行时失败。 |
 | `cicada run <command>` | 本机直接执行 9 个 Mac 命令，用于测试和手动操作；绕过 Relay 与 Shortcuts token。 |
 
@@ -143,11 +143,12 @@ cicada shortcut revoke <grantId>
 ```
 
 默认命令范围是 `ping,status`。`--commands all` 会授权
-[命令表](../../../packages/shared/COMMANDS.md#current-commands)中的全部命令，包括
-`shutdown`（关机）、`restart`（重启）、`sleep`（休眠，远程控制随之中断）、
+[命令表](../../../packages/shared/COMMANDS.md#current-commands)中除高风险命令外的全部命令。
+高风险命令包括 `shutdown`（关机）、`restart`（重启）、`sleep`（休眠，远程控制随之中断）、
 `daemon_exit`（退出远程控制服务）、`app_close`（关闭应用，可能丢失未保存的内容）、
 `screenshot`（截屏，图片经 Relay 传回）、`sentry_stop`（停止哨兵）和
-`sentry_unlock`（解除哨兵告警）。只有快捷指令确实需要这些全部权限时才使用。
+`sentry_unlock`（解除哨兵告警），必须逐个点名才会授权，例如 `--commands all,shutdown`。
+这一规则只影响新建的授权，已有授权的命令范围不变。
 
 ## iOS Shortcuts
 

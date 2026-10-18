@@ -36,3 +36,17 @@ export const COMMANDS = [
   'app_list',
   'daemon_exit',
 ] as const;
+
+/**
+ * 高风险命令：`--commands all` 不包含这些命令，必须逐个点名才授权。
+ */
+export const HIGH_RISK_COMMANDS = [
+  'sleep',
+  'sentry_stop',
+  'sentry_unlock',
+  'restart',
+  'shutdown',
+  'screenshot',
+  'app_close',
+  'daemon_exit',
+] as const satisfies readonly (typeof COMMANDS)[number][];

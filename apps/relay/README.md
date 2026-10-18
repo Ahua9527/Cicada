@@ -160,12 +160,13 @@ cicada shortcut revoke <grantId>
 ```
 
 Default grant scope is `ping,status`. `--commands all` grants every command in the
-[command table](../../packages/shared/COMMANDS.md#current-commands), including
-`shutdown` (shut down), `restart` (restart), `sleep` (sleep, interrupting remote control),
-`daemon_exit` (exit the remote control service), `app_close` (close an app, potentially
-losing unsaved work), `screenshot` (capture the screen and return the image through Relay),
-`sentry_stop` (stop Sentinel), and `sentry_unlock` (clear the Sentinel alarm).
-Use it only when the Shortcut needs all of these permissions.
+[command table](../../packages/shared/COMMANDS.md#current-commands) except the ones marked
+high risk: `shutdown` (shut down), `restart` (restart), `sleep` (sleep, interrupting remote
+control), `daemon_exit` (exit the remote control service), `app_close` (close an app,
+potentially losing unsaved work), `screenshot` (capture the screen and return the image
+through Relay), `sentry_stop` (stop Sentinel), and `sentry_unlock` (clear the Sentinel alarm).
+Name a high-risk command explicitly to grant it, for example `--commands all,shutdown`.
+Grants created before this change keep their existing command list.
 
 ## Local Validation
 

@@ -23,7 +23,7 @@ final class ShortcutGrantTests: XCTestCase {
         XCTAssertEqual(try store.list().count, 1)
     }
 
-    func testAllCommandsExpandsToCurrentCommandSet() throws {
+    func testAllCommandsExpandsToNonHighRiskCommandSet() throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("cicada-shortcut-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tempDir) }
         let store = ShortcutGrantStore(path: tempDir.appendingPathComponent("shortcut-grants.json").path)
@@ -37,8 +37,22 @@ final class ShortcutGrantTests: XCTestCase {
 
         XCTAssertEqual(
             Set(result.grant.allowedCommands),
-            Set(RemoteCommand.allCases.map(\.rawValue))
+            Set(RemoteCommand.allCases.filter { !$0.isHighRisk }.map(\.rawValue))
         )
+        XCTAssertFalse(result.grant.allowedCommands.contains("shutdown"))
+    }
+
+    func testAllWithNamedHighRiskCommandIncludesIt() {
+        let commands = ShortcutGrantStore.normalizeCommands(["all", "shutdown"])
+
+        XCTAssertTrue(commands.contains("shutdown"))
+        XCTAssertTrue(commands.contains("ping"))
+        XCTAssertFalse(commands.contains("restart"))
+    }
+
+    func testUnknownCommandsAreFiltered() {
+        XCTAssertEqual(ShortcutGrantStore.normalizeCommands(["ping", "format_disk"]), ["ping"])
+        XCTAssertFalse(ShortcutGrantStore.normalizeCommands(["all", "format_disk"]).contains("format_disk"))
     }
 
     func testRevokeMarksGrantAndAuthorizationFails() throws {
