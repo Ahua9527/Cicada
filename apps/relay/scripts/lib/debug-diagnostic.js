@@ -928,7 +928,7 @@ async function main() {
     colorLog('\n[查询] CicadaRelay诊断工具', 'bright');
     colorLog('=' .repeat(50), 'bright');
     colorLog('\n使用方法:', 'yellow');
-    colorLog('  node debug-diagnostic.js [命令]', 'white');
+    colorLog('  bun debug-diagnostic.js [命令]', 'white');
     colorLog('\n可用命令:', 'yellow');
     colorLog('  all                 - 运行完整诊断', 'white');
     colorLog('  environment         - 环境诊断', 'white');
@@ -945,10 +945,10 @@ async function main() {
     colorLog('  CICADA_RELAY_URL       - 服务器URL', 'white');
     colorLog('  HMAC_SECRET        - 签名密钥', 'white');
     colorLog('\n示例:', 'cyan');
-    colorLog('  node debug-diagnostic.js all', 'white');
-    colorLog('  node debug-diagnostic.js performance', 'white');
-    colorLog('  node debug-diagnostic.js security', 'white');
-    colorLog('  node debug-diagnostic.js report > diagnostic-report.json', 'white');
+    colorLog('  bun debug-diagnostic.js all', 'white');
+    colorLog('  bun debug-diagnostic.js performance', 'white');
+    colorLog('  bun debug-diagnostic.js security', 'white');
+    colorLog('  bun debug-diagnostic.js report > diagnostic-report.json', 'white');
 
     process.exit(0);
   }
@@ -1014,7 +1014,7 @@ async function main() {
 
       default:
         colorLog(`[错误] 未知命令: ${command}`, 'red');
-        colorLog('运行 "node debug-diagnostic.js" 查看帮助', 'yellow');
+        colorLog('运行 "bun debug-diagnostic.js" 查看帮助', 'yellow');
         process.exit(1);
     }
   } catch (error) {

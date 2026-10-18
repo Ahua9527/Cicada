@@ -322,7 +322,7 @@ async function main() {
     colorLog('\n[工具] CicadaRelay API调试工具', 'bright');
     colorLog('=' .repeat(50), 'bright');
     colorLog('\n使用方法:', 'yellow');
-    colorLog('  node debug-api.js [命令] [参数]', 'white');
+    colorLog('  bun debug-api.js [命令] [参数]', 'white');
     colorLog('\n可用命令:', 'yellow');
     colorLog('  health              - 健康检查', 'white');
     colorLog('  status [device_id]  - 设备状态查询', 'white');
@@ -333,11 +333,11 @@ async function main() {
     colorLog('\n支持命令:', 'white');
     colorLog('  ping, status, lock, bt_on, bt_off, sleep_hold, sleep_release', 'cyan');
     colorLog('\n示例:', 'yellow');
-    colorLog('  node debug-api.js health', 'white');
-    colorLog('  node debug-api.js send ping', 'white');
-    colorLog('  node debug-api.js send lock device-123', 'white');
-    colorLog('  node debug-api.js ws debug-device-001', 'white');
-    colorLog('  node debug-api.js full', 'white');
+    colorLog('  bun debug-api.js health', 'white');
+    colorLog('  bun debug-api.js send ping', 'white');
+    colorLog('  bun debug-api.js send lock device-123', 'white');
+    colorLog('  bun debug-api.js ws debug-device-001', 'white');
+    colorLog('  bun debug-api.js full', 'white');
 
     process.exit(0);
   }
@@ -380,7 +380,7 @@ async function main() {
 
     default:
       colorLog(`[错误] 未知命令: ${command}`, 'red');
-      colorLog('运行 "node debug-api.js" 查看帮助', 'yellow');
+      colorLog('运行 "bun debug-api.js" 查看帮助', 'yellow');
       process.exit(1);
   }
 }
