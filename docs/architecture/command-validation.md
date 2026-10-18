@@ -25,7 +25,7 @@ Swift agent owns:
 ## Source Of Truth
 
 - TypeScript transport contract: `packages/shared/src/types/relay-transport.types.ts`
-- Command list: `packages/shared/src/types/command.types.ts`
+- Command list: `packages/shared/src/protocol/commands.ts`
 - Swift command list: `apps/agent/swift/Sources/CicadaCore/Models.swift`
 - Swift grant model: `apps/agent/swift/Sources/CicadaCore/ShortcutGrant.swift`
 

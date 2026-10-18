@@ -454,17 +454,17 @@ async function main() {
     colorLog('\n[工具] CicadaRelay日志调试工具', 'bright');
     colorLog('=' .repeat(50), 'bright');
     colorLog('\n使用方法:', 'yellow');
-    colorLog('  node debug-logs.js [命令] [参数]', 'white');
+    colorLog('  bun debug-logs.js [命令] [参数]', 'white');
     colorLog('\n可用命令:', 'yellow');
     colorLog('  monitor             - 启动实时日志监控', 'white');
     colorLog('  analyze <file>      - 分析日志文件', 'white');
     colorLog('  filter <type> <value> - 设置过滤器 (level/requestId/deviceId/tag)', 'white');
     colorLog('  stats               - 显示当前统计信息', 'white');
     colorLog('\n示例:', 'cyan');
-    colorLog('  node debug-logs.js monitor', 'white');
-    colorLog('  node debug-logs.js analyze logs.txt', 'white');
-    colorLog('  node debug-logs.js filter level ERROR', 'white');
-    colorLog('  node debug-logs.js filter requestId req-123', 'white');
+    colorLog('  bun debug-logs.js monitor', 'white');
+    colorLog('  bun debug-logs.js analyze logs.txt', 'white');
+    colorLog('  bun debug-logs.js filter level ERROR', 'white');
+    colorLog('  bun debug-logs.js filter requestId req-123', 'white');
 
     process.exit(0);
   }
@@ -503,7 +503,7 @@ async function main() {
 
     default:
       colorLog(`[错误] 未知命令: ${command}`, 'red');
-      colorLog('运行 "node debug-logs.js" 查看帮助', 'yellow');
+      colorLog('运行 "bun debug-logs.js" 查看帮助', 'yellow');
       process.exit(1);
   }
 }

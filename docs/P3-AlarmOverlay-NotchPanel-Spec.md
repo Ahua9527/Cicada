@@ -1,7 +1,7 @@
 # Cicada P3 剩余部分实施 Spec：AlarmOverlay + NotchPanel 边界设计
 
 > 架构师：高见远（Gao）｜交付总监：齐活林
-> 基线文档：`docs/Design.md`（§5 警戒全屏、§6 NotchDrop）、`docs/Implementation-Plan-v2.md`（§4 简化后的步骤 9/10）
+> 基线文档：`docs/Design.md`（§5 警戒全屏、§6 NotchDrop）；原实施计划的简化步骤 9/10 为历史背景，已移出仓库
 > 产出日期：2026-07-17
 > 适用范围：P3 剩余部分——`AlarmOverlay`（警戒全屏）+ `NotchPanel`（刘海拖放面板）的**纯 SwiftUI 内容层**实施规格
 

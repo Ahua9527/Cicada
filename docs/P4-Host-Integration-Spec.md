@@ -1,7 +1,7 @@
 # Cicada P4 实施 Spec：Xcode 宿主接入 CicadaUI
 
 > 架构师：高见远（Gao）
-> 基线：`docs/P3-AlarmOverlay-NotchPanel-Spec.md` §5.2（留 Xcode 宿主动作清单）、`docs/Implementation-Plan-v2.md`、`.workbuddy/memory/MEMORY.md`
+> 基线：`docs/P3-AlarmOverlay-NotchPanel-Spec.md` §5.2（留 Xcode 宿主动作清单）；原实施计划及本地工作笔记为历史背景，均不在仓库中
 > 产出日期：2026-07-18
 > 适用范围：P4——把 CicadaUI（SwiftPM）已建好的 AlarmOverlay / NotchPanel / NotchMenu 接进 Xcode 宿主 `apps/agent/native/sentinel-app/`，替换旧 UI，让 app 带着新设计跑起来
 > 约束：本 spec 基于对宿主源码的实查（`project.pbxproj` / `Sentry.swift` / `SentryView.swift` / `SentinelController.swift` / `NotchViewModel*.swift` / `NotchContentView.swift` / `NotchView.swift` / `NotchHeaderView.swift` / `NotchMenuView.swift` / `AirDrop+View.swift` / `TrayDrop+View.swift` / `Ext+FileProvider.swift` / `AppModel.swift` / `AlarmModel.swift` / `Package.swift`），非照搬 P3-Spec 文字

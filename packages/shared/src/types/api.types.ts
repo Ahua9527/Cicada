@@ -15,16 +15,11 @@ export interface SystemStatusResponse extends ApiResponse {
   data?: {
     service: string;
     version: string;
-    uptime: number;
     totalDevices: number;
     activeDevices: number;
-    totalCommands: number;
-    commandsPerSecond: number;
-    memoryUsage: number;
     durableObjectStats: {
       totalSessions: number;
       activeConnections: number;
-      messagesQueued: number;
     };
   };
 }

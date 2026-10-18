@@ -747,7 +747,7 @@ async function main() {
     colorLog('\n[测试] CicadaRelay集成测试工具', 'bright');
     colorLog('=' .repeat(50), 'bright');
     colorLog('\n使用方法:', 'yellow');
-    colorLog('  node debug-integration.js [命令]', 'white');
+    colorLog('  bun debug-integration.js [命令]', 'white');
     colorLog('\n可用命令:', 'yellow');
     colorLog('  all                 - 运行所有集成测试', 'white');
     colorLog('  basic              - 基础连接和环境检查', 'white');
@@ -763,9 +763,9 @@ async function main() {
     colorLog('  CICADA_RELAY_URL       - 服务器URL (默认: http://localhost:8787)', 'white');
     colorLog('  HMAC_SECRET        - 签名密钥 (默认: test-signing-key)', 'white');
     colorLog('\n示例:', 'cyan');
-    colorLog('  CICADA_RELAY_URL=https://api.example.com node debug-integration.js all', 'white');
-    colorLog('  node debug-integration.js performance', 'white');
-    colorLog('  node debug-integration.js security', 'white');
+    colorLog('  CICADA_RELAY_URL=https://api.example.com bun debug-integration.js all', 'white');
+    colorLog('  bun debug-integration.js performance', 'white');
+    colorLog('  bun debug-integration.js security', 'white');
 
     process.exit(0);
   }
@@ -817,7 +817,7 @@ async function main() {
 
       default:
         colorLog(`[错误] 未知命令: ${command}`, 'red');
-        colorLog('运行 "node debug-integration.js" 查看帮助', 'yellow');
+        colorLog('运行 "bun debug-integration.js" 查看帮助', 'yellow');
         process.exit(1);
     }
   } catch (error) {
