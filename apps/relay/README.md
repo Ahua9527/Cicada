@@ -39,6 +39,53 @@ variables file.
 Do not commit `.env`, `.dev.vars`, secrets, Wrangler state, coverage output,
 build output, or local `.cicada` state.
 
+### Administrator secret
+
+`CICADA_ADMIN_TOKEN` is an optional **secret**, not an ordinary variable. It is used
+only by `POST /v1/admin/device-reset` to clear a device's trust-on-first-use (TOFU)
+identity binding. This is the only recovery path for registration after the
+agent's identity key is lost or rotated. Without the secret, the endpoint is
+unavailable and returns 404.
+
+From the monorepo root, set it interactively (enter the value at Wrangler's prompt):
+
+```bash
+bun run --cwd apps/relay wrangler secret put CICADA_ADMIN_TOKEN
+```
+
+Do not put the value in `wrangler.toml` or `.dev.vars.example`. To rotate it, run
+the same `secret put` command and enter a new value; update the administrator's
+Bearer credential to match. To remove it and disable the endpoint:
+
+```bash
+bun run --cwd apps/relay wrangler secret delete CICADA_ADMIN_TOKEN
+```
+
+Only reset a verified legitimate device when its agent is about to reconnect:
+after reset, the next agent connecting with that `device_id` will bind its public
+key. An unintended agent could claim the identity first.
+
+Example with placeholder credentials and device ID (replace both before use):
+
+```bash
+curl -X POST 'https://relay.example.com/v1/admin/device-reset' \
+  -H 'Authorization: Bearer <ADMIN_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  --data '{"device_id":"MAC_0123456789ABCDEF0123456789ABCDEF"}'
+```
+
+Successful response:
+
+```json
+{"ok":true,"deviceId":"MAC_0123456789ABCDEF0123456789ABCDEF","existed":true}
+```
+
+`existed` is false if no registry entry existed. A missing or incorrect Bearer
+token returns 401 when the secret is configured; malformed JSON or an invalid
+`device_id` returns 400. Device IDs must be `MAC_` followed by 32 hexadecimal
+characters. See the [deployment runbook](../../docs/runbooks/relay-deploy.md#administrator-device-recovery)
+for the recovery procedure.
+
 Production logging, alert definitions, and request-ID diagnosis are documented in
 [`docs/runbooks/relay-observability.md`](../../docs/runbooks/relay-observability.md).
 

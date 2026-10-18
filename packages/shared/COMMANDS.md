@@ -153,5 +153,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 ```
 
-Do not use `bun run build:agent` as a routine check; it installs binaries into
-`~/.cicada/bin`.
+`bun run build:agent` builds the release CLI, daemon, and SleepHold helper, then
+builds `Cicada.app` and embeds those helpers under `Contents/Helpers`. The app
+artifact is in `apps/agent/native/sentinel-app/.build/DerivedData/Build/Products/Release/`
+with the default configuration. This command does not install into `~/.cicada/bin`
+or replace `/Applications/Cicada.app`.

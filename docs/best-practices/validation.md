@@ -13,7 +13,7 @@
 
 Never log:
 
-- API keys or future admin tokens
+- API keys and the `CICADA_ADMIN_TOKEN` administrator secret
 - Authorization headers
 - full `cicada_sc_...` tokens
 - shortcut token hashes
