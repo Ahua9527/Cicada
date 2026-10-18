@@ -95,6 +95,16 @@ public enum RemoteCommand: String, CaseIterable {
 }
 
 public extension RemoteCommand {
+    /// `--commands all` 不包含高风险命令，需要逐个点名授权；须与 shared 的 HIGH_RISK_COMMANDS 一致。
+    var isHighRisk: Bool {
+        switch self {
+        case .sleep, .sentryStop, .sentryUnlock, .restart, .shutdown, .screenshot, .appClose, .daemonExit:
+            return true
+        default:
+            return false
+        }
+    }
+
     var isSentryCommand: Bool {
         switch self {
         case .sentryStart, .sentryStop, .sentryStatus, .sentryUnlock, .sentryOpen:

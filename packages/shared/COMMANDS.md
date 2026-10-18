@@ -8,43 +8,48 @@ one WebSocket session open to Relay.
 
 <!-- commands:begin -->
 <!-- 自动生成，改命令后运行 bun run protocol:generate -->
-| Command | Description |
-|---|---|
-| `lock` | 锁定屏幕 |
-| `bt_toggle` | 切换蓝牙状态 |
-| `ping` | 连接测试 |
-| `volume_mute` | 静音/取消静音 |
-| `sleep` | 系统休眠 |
-| `sleep_displays` | 显示器休眠 |
-| `caffeinate` | 保持唤醒 |
-| `decaffeinate` | 允许休眠 |
-| `status` | 获取设备状态 |
-| `sentry_start` | 启动哨兵 |
-| `sentry_stop` | 停止哨兵 |
-| `sentry_status` | 获取哨兵状态 |
-| `sentry_unlock` | 解除哨兵告警 |
-| `sentry_open` | 打开哨兵窗口 |
-| `wake` | 唤醒显示器 |
-| `restart` | 重启系统 |
-| `shutdown` | 关机 |
-| `bt_on` | 开启蓝牙 |
-| `bt_off` | 关闭蓝牙 |
-| `bt_status` | 获取蓝牙状态 |
-| `brightness_up` | 调高亮度 |
-| `brightness_down` | 调低亮度 |
-| `brightness_set` | 设置亮度 |
-| `screenshot` | 截屏 |
-| `mute` | 静音 |
-| `unmute` | 取消静音 |
-| `volume_up` | 调高音量 |
-| `volume_down` | 调低音量 |
-| `volume_set` | 设置音量 |
-| `app_open` | 打开应用 |
-| `app_close` | 关闭应用 |
-| `app_switch` | 切换到应用 |
-| `app_list` | 列出运行中应用 |
-| `daemon_exit` | 退出远程控制服务 |
+| Command | Description | Risk |
+|---|---|---|
+| `lock` | 锁定屏幕 |  |
+| `bt_toggle` | 切换蓝牙状态 |  |
+| `ping` | 连接测试 |  |
+| `volume_mute` | 静音/取消静音 |  |
+| `sleep` | 系统休眠 | 高风险 |
+| `sleep_displays` | 显示器休眠 |  |
+| `caffeinate` | 保持唤醒 |  |
+| `decaffeinate` | 允许休眠 |  |
+| `status` | 获取设备状态 |  |
+| `sentry_start` | 启动哨兵 |  |
+| `sentry_stop` | 停止哨兵 | 高风险 |
+| `sentry_status` | 获取哨兵状态 |  |
+| `sentry_unlock` | 解除哨兵告警 | 高风险 |
+| `sentry_open` | 打开哨兵窗口 |  |
+| `wake` | 唤醒显示器 |  |
+| `restart` | 重启系统 | 高风险 |
+| `shutdown` | 关机 | 高风险 |
+| `bt_on` | 开启蓝牙 |  |
+| `bt_off` | 关闭蓝牙 |  |
+| `bt_status` | 获取蓝牙状态 |  |
+| `brightness_up` | 调高亮度 |  |
+| `brightness_down` | 调低亮度 |  |
+| `brightness_set` | 设置亮度 |  |
+| `screenshot` | 截屏 | 高风险 |
+| `mute` | 静音 |  |
+| `unmute` | 取消静音 |  |
+| `volume_up` | 调高音量 |  |
+| `volume_down` | 调低音量 |  |
+| `volume_set` | 设置音量 |  |
+| `app_open` | 打开应用 |  |
+| `app_close` | 关闭应用 | 高风险 |
+| `app_switch` | 切换到应用 |  |
+| `app_list` | 列出运行中应用 |  |
+| `daemon_exit` | 退出远程控制服务 | 高风险 |
 <!-- commands:end -->
+
+Commands marked 高风险 (high risk) are listed in `HIGH_RISK_COMMANDS` and in
+`high_risk_commands` of `protocol/command-contract.json`. `cicada shortcut create --commands all`
+grants every command except these; name a high-risk command explicitly to grant it, for
+example `--commands all,shutdown`. Existing grants keep their stored command list.
 
 Mac agent command execution is native Swift/macOS API code. The command path
 does not require installed shell utilities or third-party binaries. Bluetooth

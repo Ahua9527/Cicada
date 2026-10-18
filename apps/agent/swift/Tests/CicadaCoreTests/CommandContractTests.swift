@@ -6,10 +6,12 @@ final class CommandContractTests: XCTestCase {
     private struct CommandContract: Decodable {
         let protocolVersion: Int
         let commands: [String]
+        let highRiskCommands: [String]
 
         enum CodingKeys: String, CodingKey {
             case protocolVersion = "protocol_version"
             case commands
+            case highRiskCommands = "high_risk_commands"
         }
     }
 
@@ -18,6 +20,7 @@ final class CommandContractTests: XCTestCase {
 
         XCTAssertEqual(contract.protocolVersion, 2)
         XCTAssertEqual(contract.commands, RemoteCommand.allCases.map(\.rawValue))
+        XCTAssertEqual(contract.highRiskCommands, RemoteCommand.allCases.filter(\.isHighRisk).map(\.rawValue))
     }
 
     private func loadContract() throws -> CommandContract {
