@@ -115,7 +115,7 @@ daemon 收到的是 relay 转来的 `grantId` 而不是 token，所以 Mac 端�
 - **设备身份**：daemon 首次运行时生成 Ed25519 签名密钥对，保存在 `~/.cicada/agent.identity.json`（文件权限 0600，`IdentityStore.swift`）。
 - **首次登记（首见绑定）**：daemon 连接时带上设备 ID 和身份公钥。注册表第一次见到某个设备 ID 时直接记录它的公钥；
   之后同一设备 ID 只接受同一公钥，并要求带时间戳、nonce 和签名的登记请求，注册表校验签名、时间窗和 nonce 是否已用过
-  （`session-manager.do.ts` 的 `handleRegistryAgentOnline`）。也就是说，第一次连接本身不需要任何凭据。
+  （`session-manager.do.ts` 的 `handleRegistryAgentOnline`）。
 - **快捷指令 token 与授权（grant）**：由 Mac 本地签发。`cicada` 通过 daemon 创建授权，本地只存 token 的哈希、预览、允许的命令和过期时间
   （`~/.cicada/shortcut-grants.json`，`ShortcutGrant.swift`）；daemon 通过 `shortcut_grant_update` 把这些元数据同步给注册表，
   注册表只能在设备在线时接受更新（`handleRegistryShortcutGrantUpdate`）。relay 和 Mac 都只保存哈希和预览，不保存完整 token。
@@ -127,8 +127,8 @@ daemon 收到的是 relay 转来的 `grantId` 而不是 token，所以 Mac 端�
 ## 4. 已知结构问题与升级方向（计划中）
 
 当前一个全局注册表实例同时承担身份绑定、授权存储和命令路由，所有快捷指令请求都要经过它，职责集中、也是单点。
-首次登记只相信第一次见到的公钥，谁先用某个设备 ID 连上谁就占住它，只能靠管理员令牌解绑；
+首次登记只相信第一次见到的公钥，
 计划改为由管理员签发一次性注册码，设备凭码完成首次登记。中转协议目前没有运行时版本协商
 （`constants.ts` 里的 `VERSION`/`API_VERSION` 只是常量，传输消息里没有版本字段），两端靠同时升级和跨语言样例保持一致。
 长期目标是“一台设备一个 DeviceDO”：身份、授权和会话都归到按设备寻址的实例，去掉全局注册表。
-以上都是计划，没有排期；进展在 [GitHub Issues](https://github.com/Ahua9527/Cicada/issues) 跟踪。
+以上都是计划，没有排期。
