@@ -3,7 +3,24 @@ import type { Env } from '../../src/types';
 
 describe('Worker entry rate limiting', () => {
   it('should retain per-IP counts across fetch calls and reject the 101st request', async () => {
-    const env = {} as Env;
+    const env = {
+      CICADA_SESSIONS: {
+        idFromName: jest.fn(() => ({ name: 'registry' })),
+        get: jest.fn(() => ({
+          fetch: jest.fn(() =>
+            Promise.resolve(
+              Response.json({
+                success: true,
+                totalDevices: 0,
+                activeDevices: 0,
+                totalSessions: 0,
+                activeConnections: 0,
+              })
+            )
+          ),
+        })),
+      },
+    } as unknown as Env;
     const ctx = {
       waitUntil: jest.fn(),
       passThroughOnException: jest.fn(),
