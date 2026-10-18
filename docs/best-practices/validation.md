@@ -26,7 +26,7 @@ redacted device/session summaries.
 
 ## Commands
 
-- Keep the command set at the current 9 commands unless a separate protocol change is approved.
+- Adding or removing commands requires a protocol change: update `packages/shared/src/protocol/commands.ts` and `COMMAND_DESCRIPTIONS` in `packages/shared/src/constants/commands.ts`, synchronize Swift's `RemoteCommand`, then run `bun run protocol:generate` to regenerate the contract JSON and [command table](../../packages/shared/COMMANDS.md#current-commands).
 - Relay validates Shortcuts command scope from grants.
 - Swift agent performs a final grant/scope check before execution.
 - Agent ignores `pong`, grant ACK, and other control messages for command logs.

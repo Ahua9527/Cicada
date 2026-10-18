@@ -112,8 +112,13 @@ cicada shortcut list
 cicada shortcut revoke <grantId>
 ```
 
-Default grant scope is `ping,status`. Use `--commands all` only when the
-Shortcut should be allowed to run all current 14 commands.
+Default grant scope is `ping,status`. `--commands all` grants every command in the
+[command table](../../packages/shared/COMMANDS.md#current-commands), including
+`shutdown` (shut down), `restart` (restart), `sleep` (sleep, interrupting remote control),
+`daemon_exit` (exit the remote control service), `app_close` (close an app, potentially
+losing unsaved work), `screenshot` (capture the screen and return the image through Relay),
+`sentry_stop` (stop Sentinel), and `sentry_unlock` (clear the Sentinel alarm).
+Use it only when the Shortcut needs all of these permissions.
 
 ## Local Validation
 
