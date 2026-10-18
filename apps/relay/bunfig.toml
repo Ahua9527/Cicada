@@ -1,0 +1,27 @@
+[test]
+preload = ["./test/setup.ts"]
+coverageSkipTestFiles = true
+# bun test 只统计行和函数覆盖率，不统计分支；它的 coverageThreshold 按单个文件判定，
+# 所以 70% 门槛由 scripts/check-coverage.mjs 按合计判定（见 package.json 的 test:coverage）
+coverageReporter = ["text", "lcov"]
+# 统计范围与原 Jest 的 collectCoverageFrom 一致：relay 的 src 加 shared 的 validators；
+# test/unit/coverage-scope.test.ts 会加载范围内的全部源码，没有被测试用到的文件也计入
+coveragePathIgnorePatterns = [
+  "test/**",
+  "src/types/**",
+  "src/domain/**/index.ts",
+  "src/infrastructure/**/index.ts",
+  "src/presentation/**/index.ts",
+  "src/infrastructure/crypto/**",
+  "src/infrastructure/logger/filters.ts",
+  "src/infrastructure/logger/formatters.ts",
+  "src/infrastructure/persistence/repositories/**",
+  "src/utils/debug-formatters.ts",
+  "src/utils/logger.ts",
+  "**/packages/shared/src/*.ts",
+  "**/packages/shared/src/constants/**",
+  "**/packages/shared/src/errors/**",
+  "**/packages/shared/src/logger/**",
+  "**/packages/shared/src/protocol/**",
+  "**/packages/shared/src/types/**",
+]

@@ -8,7 +8,7 @@ From the monorepo root:
 bun run build:relay
 bun run lint:relay
 bun run test:relay
-bun run --cwd apps/relay jest --coverage --silent
+bun run --cwd apps/relay test:coverage
 bun run deploy:relay:dry-run
 ```
 
@@ -24,6 +24,9 @@ them in the release `Cicada.app` under `Contents/Helpers`. It does not install i
 `~/.cicada/bin` or replace `/Applications/Cicada.app`.
 
 ## Deploy
+
+Cloudflare supports Wrangler on Node only. Confirm Node 24 is installed (`node --version`) before
+running the commands below; without Node, `bun run` silently runs Wrangler on Bun instead.
 
 Upload a version without moving production traffic:
 

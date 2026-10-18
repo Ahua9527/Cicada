@@ -1,9 +1,16 @@
 /**
- * Jest 测试设置文件
+ * 测试设置文件（bun test 通过 apps/relay/bunfig.toml 预加载）
  */
 
 // 设置测试环境变量
 process.env.NODE_ENV = 'test';
+
+// 等同原 Jest 配置的 clearMocks/restoreMocks：每个测试前清空调用记录并还原 spyOn。
+// bun test 的所有测试文件共用一个进程，不还原会串到别的文件。
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
+});
 
 // 模拟 Web Crypto API
 Object.defineProperty(global, 'crypto', {

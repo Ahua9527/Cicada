@@ -123,6 +123,6 @@ From the monorepo root:
 bun run build:relay
 bun run lint:relay
 bun run test:relay
-bun run --cwd apps/relay jest --coverage --silent
+bun run --cwd apps/relay test:coverage
 bun run deploy:relay:dry-run
 ```

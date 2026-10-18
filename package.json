@@ -11,7 +11,7 @@
     "build:relay": "bun run --cwd apps/relay build",
     "lint:relay": "bun run --cwd apps/relay lint",
     "test:relay": "bun run --cwd apps/relay test",
-    "protocol:generate": "bun run --cwd packages/shared build && node tools/generate-command-contract.mjs",
+    "protocol:generate": "bun run --cwd packages/shared build && bun tools/generate-command-contract.mjs",
     "protocol:check": "bun run protocol:generate && git diff --exit-code -- packages/shared/protocol/command-contract.json",
     "vendor:audit": "bash apps/agent/scripts/audit-vendored.sh",
     "deploy:relay:dry-run": "bun run --cwd apps/relay wrangler deploy --dry-run",
