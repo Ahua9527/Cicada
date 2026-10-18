@@ -1,0 +1,7 @@
+{
+  "type": "shortcut_grant_update_ack",
+  "ok": true,
+  "grantId": "fixture-grant-1",
+  "state": "active",
+  "sent_at": 1704067200000
+}

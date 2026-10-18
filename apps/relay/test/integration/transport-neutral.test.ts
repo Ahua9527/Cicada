@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { CicadaRelayApp } from '../../src/presentation/app';
 import { SessionManagerDO } from '../../src/infrastructure/persistence';
 import { SESSION_CONSTANTS } from '../../src/config/constants';
@@ -84,6 +85,162 @@ describe('Shortcuts-only relay transport', () => {
 
   beforeEach(() => {
     (global.crypto.subtle.digest as jest.Mock).mockResolvedValue(digestBytes('token-hash'));
+  });
+
+  const loadTransportFixture = (name: string): any =>
+    JSON.parse(
+      readFileSync(
+        new URL(`../../../../packages/shared/protocol/fixtures/${name}.json`, import.meta.url),
+        'utf8'
+      )
+    );
+
+  const expectKeys = (value: Record<string, unknown>, keys: string[]) => {
+    expect(Object.keys(value).sort()).toEqual([...keys].sort());
+  };
+
+  const executeFixtureResult = async (result: any) => {
+    const session = new SessionManagerDO(createMockState('fixture-session'), {} as Env);
+    const agent = createMockSocket();
+    await session.addRelaySocket('fixture-session', agent as unknown as WebSocket, {
+      deviceId,
+      agentIdentityPublicKey: 'fixture-public-key',
+    });
+    const responsePromise = session.fetch(
+      new Request('http://session/shortcut/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: 'fixture-request-1',
+          grantId: 'fixture-grant-1',
+          command: 'ping',
+          params: { value: 'fixture-input' },
+        }),
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const command = agent.send.mock.calls
+      .map(([raw]) => JSON.parse(raw as string))
+      .find((message) => message.type === 'shortcut_command');
+    agent.emit('message', {
+      data: JSON.stringify({
+        ...result,
+        id: command.id,
+        data: { ...result.data, requestId: command.data.requestId },
+      }),
+    });
+    return { command, response: await responsePromise };
+  };
+
+  it('emits the shared shortcut_command wire shape', async () => {
+    const fixture = loadTransportFixture('shortcut_command');
+    const { command, response } = await executeFixtureResult(
+      loadTransportFixture('shortcut_result_success')
+    );
+    expect(response.status).toBe(200);
+    expect(command.id).toEqual(expect.any(String));
+    expect(command.id).not.toBe('fixture-request-1');
+    expect(command.data.requestId).toBe(command.id);
+    expect(command.sent_at).toEqual(expect.any(Number));
+    expect({
+      ...command,
+      id: 'fixture-request-1',
+      sent_at: 1704067200000,
+      data: { ...command.data, requestId: 'fixture-request-1' },
+    }).toEqual(fixture);
+  });
+
+  for (const [name, status] of [
+    ['success', 200],
+    ['failure', 403],
+  ] as const) {
+    it(`maps the shared shortcut_result ${name} to HTTP`, async () => {
+      const fixture = loadTransportFixture(`shortcut_result_${name}`);
+      expectKeys(fixture, ['type', 'id', 'from', 'sent_at', 'data']);
+      expect(fixture.type).toBe('shortcut_result');
+      expect(fixture.id).toBe(fixture.data.requestId);
+      expect(fixture.from).toBe('agent');
+      expect(fixture.sent_at).toEqual(expect.any(Number));
+      expectKeys(fixture.data, [
+        'requestId',
+        'command',
+        'ok',
+        'success',
+        'message',
+        'data',
+        ...(name === 'failure' ? ['code', 'error'] : []),
+      ]);
+      expectKeys(fixture.data.data, [name === 'success' ? 'value' : 'reason']);
+      const { response } = await executeFixtureResult(fixture);
+      expect(response.status).toBe(status);
+      const body = (await response.json()) as any;
+      expect(body).toEqual({
+        ok: fixture.data.ok,
+        success: fixture.data.success,
+        request_id: fixture.data.requestId,
+        command: fixture.data.command,
+        message: fixture.data.message,
+        data: { ...fixture.data.data, latency_ms: expect.any(Number) },
+        latency_ms: expect.any(Number),
+        timestamp: expect.any(Number),
+        ...(name === 'failure' ? { code: fixture.data.code, error: fixture.data.error } : {}),
+      });
+      expect(body.data.latency_ms).toBe(body.latency_ms);
+    });
+  }
+
+  it('fails a shortcut_result without an explicit ok field', async () => {
+    const fixture = loadTransportFixture('shortcut_result_success');
+    delete fixture.data.ok;
+    const { response } = await executeFixtureResult(fixture);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, success: true, message: 'pong' });
+  });
+
+  it('accepts the shared shortcut_grant_update and emits the shared ack', async () => {
+    const fixture = loadTransportFixture('shortcut_grant_update');
+    const ackFixture = loadTransportFixture('shortcut_grant_update_ack');
+    expectKeys(fixture, ['type', 'from', 'sent_at', 'data']);
+    expect(fixture.type).toBe('shortcut_grant_update');
+    expect(fixture.from).toBe('agent');
+    expect(fixture.sent_at).toEqual(expect.any(Number));
+    expectKeys(fixture.data, ['state', 'grant']);
+    expectKeys(fixture.data.grant, [
+      'grantId',
+      'deviceId',
+      'name',
+      'tokenHash',
+      'tokenPreview',
+      'allowedCommands',
+      'expiresAt',
+      'createdAt',
+      'updatedAt',
+    ]);
+    const storedValues: Record<string, any> = {};
+    const registryRef: { current?: SessionManagerDO } = {};
+    const env = createEnv(() => registryRef.current);
+    const registry = new SessionManagerDO(
+      createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, storedValues),
+      env
+    );
+    registryRef.current = registry;
+    const session = new SessionManagerDO(createMockState('fixture-session'), env);
+    const agent = createMockSocket();
+    await session.addRelaySocket('fixture-session', agent as unknown as WebSocket, {
+      deviceId,
+      agentIdentityPublicKey: 'fixture-public-key',
+    });
+    agent.emit('message', { data: JSON.stringify(fixture) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const ack = agent.send.mock.calls
+      .map(([raw]) => JSON.parse(raw as string))
+      .find((message) => message.type === 'shortcut_grant_update_ack');
+    expect(ack.sent_at).toEqual(expect.any(Number));
+    expect({ ...ack, sent_at: 1704067200000 }).toEqual(ackFixture);
+    const records = storedValues[SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY];
+    expect(records.find((record: any) => record.deviceId === deviceId).shortcutGrants).toEqual([
+      fixture.data.grant,
+    ]);
   });
 
   it('does not register removed legacy public routes', async () => {

@@ -91,6 +91,13 @@ cicada advanced sleep uninstall
 
 ## Agent WebSocket Messages
 
+Shared wire examples live in `packages/shared/protocol/fixtures/`: `shortcut_command.json`,
+`shortcut_result_success.json`, `shortcut_result_failure.json`, `shortcut_grant_update.json`,
+and `shortcut_grant_update_ack.json`. Relay integration tests and Swift `RelayMessageCodec`
+tests both read these files and check field names and values against the actual messages.
+Missing fixtures fail the tests; field renames must be coordinated across both languages.
+Request IDs and timestamps are normalized where generated dynamically. All token values are fake.
+
 Visible Relay envelopes:
 
 ```json

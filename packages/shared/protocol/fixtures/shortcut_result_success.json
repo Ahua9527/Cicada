@@ -1,0 +1,14 @@
+{
+  "type": "shortcut_result",
+  "id": "fixture-request-1",
+  "from": "agent",
+  "sent_at": 1704067200000,
+  "data": {
+    "requestId": "fixture-request-1",
+    "command": "ping",
+    "ok": true,
+    "success": true,
+    "message": "pong",
+    "data": { "value": "ready" }
+  }
+}
