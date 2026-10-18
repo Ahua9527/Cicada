@@ -8,7 +8,8 @@ middleware, routes, controllers, and `bun test` suites. `apps/agent` contains th
 CLI, LaunchAgent daemon, notifier, assets, and shell scripts. `packages/shared`
 is the single source of truth for TypeScript command types, validators, errors,
 and shared utilities. Keep protocol changes centralized there, then check the
-Swift model and command gateway for compatibility.
+Swift model and command gateway for compatibility. See `docs/architecture.md`
+for component responsibilities, IPC, and the current trust model.
 
 ## Build, Test, and Development Commands
 
@@ -53,8 +54,8 @@ Relay tests live under `apps/relay/test` with `unit`, `integration`,
 `security`, and `performance` areas and run on Bun's Jest-compatible test
 runner (setup in `apps/relay/bunfig.toml`). Run `bun run test:relay`; use
 `bun run --cwd apps/relay test:coverage` when checking coverage. The coverage
-gate is 70% of lines and functions across all covered files; Bun does not
-measure branch coverage.
+gate is 70% of lines and functions across all covered files, checked by
+`apps/relay/scripts/check-coverage.mjs`; Bun does not measure branch coverage.
 Swift tests live under `apps/agent/swift/Tests` and run through
 `bun run test:agent`.
 
