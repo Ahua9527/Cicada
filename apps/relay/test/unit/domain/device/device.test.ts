@@ -1,4 +1,4 @@
-import { Device, DeviceCapability, DeviceConnectionStatus } from '@/domain/device';
+import { Device, DeviceCapability, DeviceConnectionStatus } from '@/domain/device/device.entity';
 
 describe('Device Aggregate', () => {
   const DEVICE_ID = 'MAC_0123456789abcdef0123456789abcdef';

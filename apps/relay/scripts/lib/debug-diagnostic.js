@@ -6,11 +6,11 @@
  * 提供系统诊断、性能分析、问题排查等功能
  */
 
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -435,12 +435,10 @@ class SystemDiagnostic {
       !permissionCheck.valid ? ['修复文件权限'] : undefined
     );
 
-    // 依赖版本检查
-    const dependencyCheck = await this.checkDependencyVersions();
-    this.addResult('config', 'dependencies', dependencyCheck.valid ? 'healthy' : 'warning',
-      `依赖版本: ${dependencyCheck.valid ? '兼容' : '存在不兼容'}`,
-      dependencyCheck,
-      !dependencyCheck.valid ? ['更新依赖版本'] : undefined
+    // 依赖版本检查：需要查询包仓库，诊断工具不做，如实标为未测
+    this.addResult('config', 'dependencies', 'not_checked',
+      '依赖版本: 未测（not checked），可手动运行 bun outdated',
+      {}
     );
   }
 
@@ -451,29 +449,37 @@ class SystemDiagnostic {
     colorLog('\n📦 依赖诊断', 'green');
     colorLog('-'.repeat(30), 'green');
 
-    // Node.js依赖检查
+    // 包依赖检查
     const nodeDepsCheck = await this.checkNodeDependencies();
     this.addResult('dependencies', 'node_modules', nodeDepsCheck.valid ? 'healthy' : 'warning',
-      `Node.js依赖: ${nodeDepsCheck.valid ? '完整' : '缺失'}`,
+      `包依赖: ${nodeDepsCheck.valid ? '完整' : `缺失 ${nodeDepsCheck.missingDeps?.join(', ') || nodeDepsCheck.error}`}`,
       nodeDepsCheck,
-      !nodeDepsCheck.valid ? ['安装缺失依赖'] : undefined
+      !nodeDepsCheck.valid ? ['在仓库根目录运行 bun install'] : undefined
     );
 
     // 系统依赖检查
     const systemDepsCheck = await this.checkSystemDependencies();
     this.addResult('dependencies', 'system', systemDepsCheck.valid ? 'healthy' : 'warning',
-      `系统依赖: ${systemDepsCheck.valid ? '满足' : '缺失'}`,
+      `系统依赖: ${systemDepsCheck.valid ? '满足' : `缺失 ${systemDepsCheck.missingDeps.join(', ')}`}`,
       systemDepsCheck,
-      !systemDepsCheck.valid ? ['安装系统依赖'] : undefined
+      !systemDepsCheck.valid ? ['安装缺失的系统依赖'] : undefined
     );
 
     // 外部服务依赖检查
-    const externalDepsCheck = await this.checkExternalDependencies();
-    this.addResult('dependencies', 'external', externalDepsCheck.available ? 'healthy' : 'error',
-      `外部服务: ${externalDepsCheck.available ? '可用' : '不可用'}`,
-      externalDepsCheck,
-      !externalDepsCheck.available ? ['检查外部服务状态'] : undefined
-    );
+    for (const service of await this.checkExternalDependencies()) {
+      if (service.available === undefined) {
+        this.addResult('dependencies', service.name, 'not_checked',
+          `外部服务 ${service.name}: 未测（not checked），${service.reason}`,
+          service
+        );
+        continue;
+      }
+      this.addResult('dependencies', service.name, service.available ? 'healthy' : 'error',
+        `外部服务 ${service.name}: ${service.available ? '可达' : '不可达'}`,
+        service,
+        !service.available ? ['检查网络连接和外部服务状态'] : undefined
+      );
+    }
   }
 
   // 辅助方法实现（简化版本，实际应该实现真实的检查逻辑）
@@ -752,24 +758,16 @@ class SystemDiagnostic {
     };
   }
 
-  async checkDependencyVersions() {
-    // 模拟依赖版本检查
-    return {
-      valid: Math.random() > 0.2,
-      outdatedCount: Math.floor(Math.random() * 5),
-      incompatibleCount: Math.floor(Math.random() * 2)
-    };
-  }
-
   async checkNodeDependencies() {
+    const relayDir = join(__dirname, '../..');
     try {
-      // 尝试读取package.json
-      const packageJsonPath = join(__dirname, '../package.json');
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      const packageJson = JSON.parse(readFileSync(join(relayDir, 'package.json'), 'utf8'));
+      const deps = Object.keys({ ...packageJson.dependencies, ...packageJson.devDependencies });
+      const missingDeps = deps.filter(name => !this.isPackageInstalled(relayDir, name));
       return {
-        valid: true,
-        dependencies: Object.keys(packageJson.dependencies || {}),
-        devDependencies: Object.keys(packageJson.devDependencies || {})
+        valid: missingDeps.length === 0,
+        checkedCount: deps.length,
+        missingDeps
       };
     } catch (error) {
       return {
@@ -779,24 +777,60 @@ class SystemDiagnostic {
     }
   }
 
+  // 从 relay 目录逐级向上查找 node_modules（bun 工作区会把依赖装在仓库根目录）
+  isPackageInstalled(fromDir, name) {
+    let dir = fromDir;
+    while (true) {
+      if (existsSync(join(dir, 'node_modules', name, 'package.json'))) {
+        return true;
+      }
+      const parent = dirname(dir);
+      if (parent === dir) {
+        return false;
+      }
+      dir = parent;
+    }
+  }
+
   async checkSystemDependencies() {
-    // 模拟系统依赖检查
+    const versions = {};
+    const missingDeps = [];
+    for (const cmd of ['bun', 'node']) {
+      const result = spawnSync(cmd, ['--version'], { encoding: 'utf8' });
+      if (result.status === 0) {
+        versions[cmd] = result.stdout.trim();
+      } else {
+        missingDeps.push(cmd);
+      }
+    }
     return {
-      valid: Math.random() > 0.1,
-      systemDeps: ['node', 'npm', 'wrangler'],
-      missingDeps: []
+      valid: missingDeps.length === 0,
+      versions,
+      missingDeps
     };
   }
 
   async checkExternalDependencies() {
-    // 模拟外部服务依赖检查
-    return {
-      available: Math.random() > 0.2,
-      services: [
-        { name: 'Cloudflare API', available: Math.random() > 0.1 },
-        { name: 'WebSocket Server', available: Math.random() > 0.2 }
-      ]
-    };
+    const startTime = Date.now();
+    let cloudflare;
+    try {
+      // 收到任何 HTTP 响应都说明 API 可达；未带凭据时返回 4xx 属于正常
+      const response = await fetch('https://api.cloudflare.com/client/v4/', {
+        signal: AbortSignal.timeout(10000)
+      });
+      cloudflare = { name: 'Cloudflare API', available: true, status: response.status };
+    } catch (error) {
+      cloudflare = { name: 'Cloudflare API', available: false, error: error.message };
+    }
+    cloudflare.responseTime = Date.now() - startTime;
+
+    return [
+      cloudflare,
+      {
+        name: 'WebSocket Server',
+        reason: '建立 WebSocket 连接需要设备凭据，诊断工具不做'
+      }
+    ];
   }
 
   /**
@@ -825,31 +859,34 @@ class SystemDiagnostic {
     const healthy = this.results.filter(r => r.status === 'healthy').length;
     const warning = this.results.filter(r => r.status === 'warning').length;
     const error = this.results.filter(r => r.status === 'error').length;
+    const notChecked = this.results.filter(r => r.status === 'not_checked').length;
+    const checked = total - notChecked;
 
     colorLog(`总检查项: ${total}`, 'white');
     colorLog(`[成功] 健康: ${healthy}`, 'green');
     colorLog(`[警告] 警告: ${warning}`, 'yellow');
     colorLog(`[错误] 错误: ${error}`, 'red');
+    colorLog(`[未测] 未测（not checked）: ${notChecked}`, 'gray');
 
-    const healthRate = (healthy / total * 100).toFixed(1);
+    const healthRate = checked > 0 ? (healthy / checked * 100).toFixed(1) : '0.0';
     colorLog(`健康率: ${healthRate}%`, healthRate >= 80 ? 'green' : healthRate >= 60 ? 'yellow' : 'red');
 
     // 按类别统计
     const byCategory = {};
     this.results.forEach(result => {
       if (!byCategory[result.category]) {
-        byCategory[result.category] = { healthy: 0, warning: 0, error: 0 };
+        byCategory[result.category] = { healthy: 0, warning: 0, error: 0, not_checked: 0 };
       }
       byCategory[result.category][result.status]++;
     });
 
     colorLog('\n[列表] 分类统计:', 'cyan');
     Object.entries(byCategory).forEach(([category, counts]) => {
-      colorLog(`  ${category}: [成功]${counts.healthy} [警告]${counts.warning} [错误]${counts.error}`, 'white');
+      colorLog(`  ${category}: [成功]${counts.healthy} [警告]${counts.warning} [错误]${counts.error} [未测]${counts.not_checked}`, 'white');
     });
 
     // 显示需要处理的问题
-    const issues = this.results.filter(r => r.status !== 'healthy');
+    const issues = this.results.filter(r => r.status === 'warning' || r.status === 'error');
     if (issues.length > 0) {
       colorLog('\n[紧急] 需要处理的问题:', 'red');
       issues.forEach(issue => {
@@ -892,6 +929,8 @@ class SystemDiagnostic {
     const healthy = this.results.filter(r => r.status === 'healthy').length;
     const warning = this.results.filter(r => r.status === 'warning').length;
     const error = this.results.filter(r => r.status === 'error').length;
+    const notChecked = this.results.filter(r => r.status === 'not_checked').length;
+    const checked = total - notChecked;
 
     return {
       timestamp: new Date().toISOString(),
@@ -901,7 +940,8 @@ class SystemDiagnostic {
         healthy,
         warning,
         error,
-        healthRate: (healthy / total * 100).toFixed(1)
+        notChecked,
+        healthRate: checked > 0 ? (healthy / checked * 100).toFixed(1) : '0.0'
       },
       results: this.results,
       recommendations: this.results
