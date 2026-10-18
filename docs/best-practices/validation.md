@@ -3,7 +3,10 @@
 ## Authentication
 
 - Shortcuts requests authenticate only with `Authorization: Bearer cicada_sc_<token>`.
-- Agent identity is Ed25519 and first-seen bound by `deviceId`.
+- Agent identity is Ed25519 and bound to `deviceId` at its first registration. That registration
+  needs a one-time enrollment code from `POST /v1/admin/enrollment-codes`, signed in the v2
+  transcript ([Agent Registration](../../packages/shared/COMMANDS.md#agent-registration)).
+- Enrollment codes are valid for 10 minutes, work once, and are stored only as SHA-256 hashes.
 - Re-registering an already-bound agent identity requires signature, timestamp, and nonce.
 - Shortcuts use `Authorization: Bearer cicada_sc_<token>`.
 - Relay and agent store only shortcut token hashes and previews.
@@ -16,6 +19,7 @@ Never log:
 - API keys and the `CICADA_ADMIN_TOKEN` administrator secret
 - Authorization headers
 - full `cicada_sc_...` tokens
+- `cicada_enroll_...` enrollment codes
 - shortcut token hashes
 - nonces or signatures
 - shortcut command payloads when they include user parameters
@@ -41,6 +45,10 @@ redacted device/session summaries.
 
 - `POST /v1/shortcuts/command` is the only user-facing control endpoint.
 - `GET /devices`, `GET /status`, and `GET /health` are the read-only operational endpoints.
+- `GET /devices` and `GET /status?device_id=...` require `Authorization: Bearer <CICADA_ADMIN_TOKEN>`,
+  like the admin endpoints `POST /v1/admin/enrollment-codes` and `POST /v1/admin/device-reset`. They
+  return 404 when the secret is not configured and 401 for a missing or wrong token. `GET /status`
+  without `device_id` and `GET /health` are public.
 
 ## Rate Limits And CORS
 

@@ -10,7 +10,7 @@ Relay owns:
 
 - online agent session rooms
 - global device registry
-- first-seen agent identity binding
+- agent identity binding at first registration, gated by a one-time enrollment code
 - shortcut grant registry and capability-token validation
 - command scope, TTL, revocation, online-state, and timeout checks
 - Shortcuts HTTP request/response bridging to the live agent WebSocket
@@ -31,8 +31,8 @@ Swift agent owns:
 
 ## Flow
 
-1. Agent opens `GET /relay/:liveSession` with `x-device-id` and `x-agent-identity-public-key`.
-2. Registry first-seen binds `deviceId -> agentIdentityPublicKey`.
+1. Agent opens `GET /relay/:liveSession` with `x-device-id`, `x-agent-identity-public-key`, and a signed registration ([Agent Registration](../../packages/shared/COMMANDS.md#agent-registration)).
+2. On the first registration of a `deviceId` the agent also sends a one-time enrollment code issued by the administrator; the registry consumes it and binds `deviceId -> agentIdentityPublicKey`. Later registrations are verified against the bound key.
 3. User creates a Shortcuts token on the Mac with `cicada shortcut create`.
 4. Agent stores only token hash/preview/scope/expiry locally and publishes `shortcut_grant_update` to Relay.
 5. iOS Shortcut calls `POST /v1/shortcuts/command` with `Authorization: Bearer cicada_sc_<token>`.

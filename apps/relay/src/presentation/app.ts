@@ -88,6 +88,7 @@ export class CicadaRelayApp {
             'X-Agent-Registration-Timestamp',
             'X-Agent-Registration-Nonce',
             'X-Agent-Registration-Signature',
+            'X-Agent-Enrollment-Code',
           ],
           enabled: true,
         })

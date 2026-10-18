@@ -10,6 +10,7 @@ Shared TypeScript contracts for Cicada Relay transport, Shortcuts gateway, comma
 2. Command names and command request types: `src/types/command.types.ts`
 3. Command validation: `src/validators/command.validator.ts`
 4. Shared API envelopes and errors.
+5. Agent registration headers and signed transcript (v1/v2): [`COMMANDS.md`](./COMMANDS.md#agent-registration) and `protocol/fixtures/agent_enrollment.json`.
 
 Swift mirrors the command and Shortcuts grant contract in `apps/agent/swift/Sources/CicadaCore` and `apps/agent/swift/Sources/CicadaRelayClient`.
 

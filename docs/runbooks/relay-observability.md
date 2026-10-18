@@ -13,11 +13,12 @@ Relay emits JSON logs to the Cloudflare Workers runtime. Request events use thes
 | `duration_ms` | Worker-side request duration in milliseconds. |
 | `do_operation` | Durable Object operation reached by the public route. |
 | `websocket_outcome` | `upgraded` or `upgrade_failed`. |
-| `security_event` | Stable security decision name; currently `agent_registration_replayed`. |
+| `security_event` | Stable security decision name: `agent_registration_replayed`, `agent_enrollment_rejected`, or `agent_enrolled`. |
+| `reason` | For `agent_enrollment_rejected`: `agent_enrollment_code_invalid`, `agent_enrollment_code_expired`, or `agent_enrollment_code_used`. A missing code is not logged, because an unenrolled Mac keeps retrying. |
 
 The logger filters credential-like keys recursively. Do not add raw request bodies, Authorization
-headers, session secrets, nonces, signatures, token hashes, or complete Shortcuts payloads to log
-contexts. An error stack is retained after credential text is redacted.
+headers, session secrets, enrollment codes, nonces, signatures, token hashes, or complete Shortcuts
+payloads to log contexts. An error stack is retained after credential text is redacted.
 
 ## Live diagnosis
 
@@ -43,6 +44,7 @@ Logpush destination. Use five-minute rolling windows:
 | WebSocket upgrade failures | At least 20 events with `websocket_outcome=upgrade_failed`, and more than 5% of WebSocket upgrade attempts. |
 | Durable Object exceptions | More than 5 error events with `do_operation` present. |
 | Replay rejection spike | `security_event=agent_registration_replayed` count is at least 3 times the same weekday/time baseline. |
+| Enrollment rejections | Any `security_event=agent_enrollment_rejected`; repeated `reason=agent_enrollment_code_invalid` suggests code guessing. |
 | Rate-limit spike | `status=429` count is at least 3 times the same weekday/time baseline. Relay rate-limit 429s come from each Worker instance's (isolate's) independent, best-effort counter: 100 requests per minute per client IP, not a global limit. |
 
 Route alerts to the normal on-call destination. Keep event definitions fixed for the first seven

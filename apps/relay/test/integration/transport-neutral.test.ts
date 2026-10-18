@@ -87,6 +87,29 @@ describe('Shortcuts-only relay transport', () => {
     (global.crypto.subtle.digest as jest.Mock).mockResolvedValue(digestBytes('token-hash'));
   });
 
+  /** 一台已登记且在线的设备：登记流程由 session-manager-do 测试覆盖，这里只测快捷指令转发。 */
+  const createOnlineRegistry = async (
+    env: Env,
+    liveSessionId: string,
+    storedValues: Record<string, unknown> = {}
+  ) => {
+    storedValues[SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY] = [
+      {
+        deviceId,
+        connected: true,
+        liveSessionId,
+        agentIdentityPublicKey: 'agent-public-key',
+        lastSeen: Date.now(),
+      },
+    ];
+    const registry = new SessionManagerDO(
+      createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, storedValues),
+      env
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return registry;
+  };
+
   const loadTransportFixture = (name: string): any =>
     JSON.parse(
       readFileSync(
@@ -219,17 +242,10 @@ describe('Shortcuts-only relay transport', () => {
     const storedValues: Record<string, any> = {};
     const registryRef: { current?: SessionManagerDO } = {};
     const env = createEnv(() => registryRef.current);
-    const registry = new SessionManagerDO(
-      createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, storedValues),
-      env
-    );
-    registryRef.current = registry;
+    registryRef.current = await createOnlineRegistry(env, 'fixture-session', storedValues);
     const session = new SessionManagerDO(createMockState('fixture-session'), env);
     const agent = createMockSocket();
-    await session.addRelaySocket('fixture-session', agent as unknown as WebSocket, {
-      deviceId,
-      agentIdentityPublicKey: 'fixture-public-key',
-    });
+    await session.addRelaySocket('fixture-session', agent as unknown as WebSocket, { deviceId });
     agent.emit('message', { data: JSON.stringify(fixture) });
     await new Promise((resolve) => setTimeout(resolve, 0));
     const ack = agent.send.mock.calls
@@ -306,16 +322,12 @@ describe('Shortcuts-only relay transport', () => {
     const rooms = new Map<string, SessionManagerDO>();
     const registryRef: { current?: SessionManagerDO } = {};
     const env = createEnv(() => registryRef.current!, rooms);
-    const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), env);
-    registryRef.current = registry;
+    registryRef.current = await createOnlineRegistry(env, 'session-live-1');
     const session = new SessionManagerDO(createMockState('session-live-1'), env);
     rooms.set('session-live-1', session);
     const agent = createMockSocket();
 
-    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, {
-      deviceId,
-      agentIdentityPublicKey: 'agent-public-key',
-    });
+    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, { deviceId });
 
     agent.emit('message', {
       data: JSON.stringify({
@@ -392,16 +404,12 @@ describe('Shortcuts-only relay transport', () => {
     const rooms = new Map<string, SessionManagerDO>();
     const registryRef: { current?: SessionManagerDO } = {};
     const env = createEnv(() => registryRef.current!, rooms);
-    const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), env);
-    registryRef.current = registry;
+    registryRef.current = await createOnlineRegistry(env, 'session-live-1');
     const session = new SessionManagerDO(createMockState('session-live-1'), env);
     rooms.set('session-live-1', session);
     const agent = createMockSocket();
 
-    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, {
-      deviceId,
-      agentIdentityPublicKey: 'agent-public-key',
-    });
+    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, { deviceId });
 
     agent.emit('message', {
       data: JSON.stringify({
@@ -547,17 +555,13 @@ describe('Shortcuts-only relay transport', () => {
     const rooms = new Map<string, SessionManagerDO>();
     const registryRef: { current?: SessionManagerDO } = {};
     const env = createEnv(() => registryRef.current!, rooms);
-    const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), env);
-    registryRef.current = registry;
+    registryRef.current = await createOnlineRegistry(env, 'session-live-1');
     const session = new SessionManagerDO(createMockState('session-live-1'), env, {
       shortcutCommandTimeoutMs: 1,
     });
     rooms.set('session-live-1', session);
     const agent = createMockSocket();
-    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, {
-      deviceId,
-      agentIdentityPublicKey: 'agent-public-key',
-    });
+    await session.addRelaySocket('session-live-1', agent as unknown as WebSocket, { deviceId });
     agent.emit('message', {
       data: JSON.stringify({
         type: 'shortcut_grant_update',

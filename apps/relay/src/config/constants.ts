@@ -98,6 +98,10 @@ export const SESSION_CONSTANTS = {
   AGENT_REGISTRATION_SKEW: 90 * 1000,
   AGENT_ABSENCE_GRACE_MS: 45 * 1000,
   SHORTCUT_COMMAND_TIMEOUT_MS: 20 * 1000,
+  // 一次性注册码：有效 10 分钟；过期或用过的记录再保留 1 天，登记失败时能说清是"已过期"还是"已使用"
+  ENROLLMENT_CODE_TTL_MS: 10 * 60 * 1000,
+  ENROLLMENT_CODE_RETENTION_MS: 24 * 60 * 60 * 1000,
+  MAX_ENROLLMENT_CODES: 100,
 
   // 消息配置
   MESSAGE_HISTORY_SIZE: 100,
@@ -111,6 +115,7 @@ export const SESSION_CONSTANTS = {
     METADATA: 'metadata',
     NONCES: 'nonces',
     DEVICE_REGISTRY: 'device_registry',
+    ENROLLMENT_CODES: 'enrollment_codes',
     SHORTCUT_GRANTS: 'shortcut_grants',
     MESSAGES: 'messages',
     STATS: 'stats',

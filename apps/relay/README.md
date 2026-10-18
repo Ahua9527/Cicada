@@ -13,7 +13,10 @@ results; this path is intentionally not E2EE.
 - Worker entry: `src/index.ts`
 - Agent WebSocket route: `GET /relay/:liveSession`
 - Shortcuts command route: `POST /v1/shortcuts/command`
-- Status routes: `GET /status`, `GET /status?device_id=...`, `GET /devices`
+- Status routes: `GET /status` and `GET /health` (public); `GET /status?device_id=...` and
+  `GET /devices` (administrator token)
+- Admin routes: `POST /v1/admin/enrollment-codes`, `POST /v1/admin/device-reset`
+  (administrator token)
 - Durable Object binding: `CICADA_SESSIONS`
 - Registry DO name: `__cicada_device_registry__`
 
@@ -41,11 +44,17 @@ build output, or local `.cicada` state.
 
 ### Administrator secret
 
-`CICADA_ADMIN_TOKEN` is an optional **secret**, not an ordinary variable. It is used
-only by `POST /v1/admin/device-reset` to clear a device's trust-on-first-use (TOFU)
-identity binding. This is the only recovery path for registration after the
-agent's identity key is lost or rotated. Without the secret, the endpoint is
-unavailable and returns 404.
+`CICADA_ADMIN_TOKEN` is an optional **secret**, not an ordinary variable. Requests send it as
+`Authorization: Bearer <token>`. It is required by:
+
+- `POST /v1/admin/enrollment-codes`: issue a one-time enrollment code. A device ID that has no
+  bound identity key can only register for the first time with such a code.
+- `POST /v1/admin/device-reset`: clear a device's identity binding, so a replaced or reinstalled
+  Mac can enroll again with a new code.
+- `GET /devices` and `GET /status?device_id=...`: read device state.
+
+Without the secret these endpoints return 404 as if they did not exist, so no new device can
+enroll. `GET /status` without `device_id` and `GET /health` stay public.
 
 From the monorepo root, set it interactively (enter the value at Wrangler's prompt):
 
@@ -61,9 +70,42 @@ Bearer credential to match. To remove it and disable the endpoint:
 bun run --cwd apps/relay wrangler secret delete CICADA_ADMIN_TOKEN
 ```
 
-Only reset a verified legitimate device when its agent is about to reconnect:
-after reset, the next agent connecting with that `device_id` will bind its public
-key. An unintended agent could claim the identity first.
+#### Enrollment codes
+
+Issue a code right before setting up a Mac that has never registered (placeholder token; replace
+it before use):
+
+```bash
+curl -X POST 'https://relay.example.com/v1/admin/enrollment-codes' \
+  -H 'Authorization: Bearer <ADMIN_TOKEN>'
+```
+
+```json
+{"ok":true,"enrollmentCode":"cicada_enroll_<random>","expiresAt":1704067800000}
+```
+
+The code appears only in this response, which is sent with `Cache-Control: no-store`; Relay stores
+only its SHA-256 hash and never logs it. It is valid for 10 minutes (`expiresAt` is Unix
+milliseconds), works once, and is not tied to a device ID in advance. The Mac sends it in the
+`x-agent-enrollment-code` header and signs it in the v2 registration transcript (see
+[Agent Registration](../../packages/shared/COMMANDS.md#agent-registration)). After the first
+successful registration the code is void and the device ID stays bound to that identity key; later
+connections need no code. Devices bound before enrollment codes existed are not affected.
+
+The Mac agent does not send enrollment codes yet; that support ships separately. Until then, only
+devices that are already bound can connect, and a device that is reset cannot register again.
+
+A rejected first registration fails the WebSocket upgrade with 429 and a `code` such as
+`agent_enrollment_code_required`, `agent_enrollment_code_invalid`, `agent_enrollment_code_expired`,
+`agent_enrollment_code_used`, or `invalid_agent_registration_signature`. Guessing codes is not
+practical: each code has 128 random bits, every attempt is a WebSocket upgrade under the per-IP
+rate limit, and invalid, expired, or used codes are logged as
+`security_event=agent_enrollment_rejected` (without the code).
+
+#### Device reset
+
+After a reset the device ID is unbound: its old key no longer connects, and the Mac must enroll
+again with a new enrollment code. Without a valid code no other agent can claim the device ID.
 
 Example with placeholder credentials and device ID (replace both before use):
 
@@ -94,8 +136,14 @@ Production logging, alert definitions, and request-ID diagnosis are documented i
 ```bash
 wscat -c "wss://relay.example.com/relay/live-random-session" \
   -H "x-device-id: MAC_1234567890ABCDEF1234567890ABCDEF" \
-  -H "x-agent-identity-public-key: <ed25519-public-key-base64>"
+  -H "x-agent-identity-public-key: <ed25519-public-key-base64>" \
+  -H "x-agent-registration-timestamp: <unix-ms>" \
+  -H "x-agent-registration-nonce: <random>" \
+  -H "x-agent-registration-signature: <ed25519-signature-base64>"
 ```
+
+A device ID that is not bound yet also sends `x-agent-enrollment-code` and signs the v2
+transcript; see [Agent Registration](../../packages/shared/COMMANDS.md#agent-registration).
 
 Visible control messages:
 
@@ -127,7 +175,13 @@ cicada start
 cicada status
 ```
 
-Confirm `/devices` shows it online.
+A Mac whose device ID is not bound yet needs a one-time enrollment code for its first connection
+(see [Enrollment codes](#enrollment-codes)). Confirm the Mac is online (administrator token
+required):
+
+```bash
+curl 'https://relay.example.com/devices' -H 'Authorization: Bearer <ADMIN_TOKEN>'
+```
 
 2. On the Mac, create a Shortcuts grant:
 

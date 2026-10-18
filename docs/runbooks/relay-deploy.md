@@ -48,12 +48,35 @@ bun run --cwd apps/relay wrangler deployments list
 Never deploy from a dirty worktree. Production deployment requires an explicit operator decision;
 the validation commands in this runbook do not authorize one.
 
+## Enrolling a new Mac
+
+A device ID that has no bound identity key can only register for the first time with a one-time
+enrollment code. Issuing codes needs `CICADA_ADMIN_TOKEN` (set it as described below); without the
+secret no new device can enroll. Issue a code right before setting up the Mac, using placeholder
+values only in saved examples:
+
+```bash
+curl -X POST 'https://relay.example.com/v1/admin/enrollment-codes' \
+  -H 'Authorization: Bearer <ADMIN_TOKEN>'
+```
+
+The response `{"ok":true,"enrollmentCode":"cicada_enroll_...","expiresAt":...}` is the only place
+the code appears. It is valid for 10 minutes, works once, and Relay stores only its hash. Give it to
+the Mac agent for its first connection; afterwards the device ID stays bound to that agent's key and
+later connections need no code. Devices bound before this release are not affected. Failure codes
+and the wire format are in [Agent Registration](../../packages/shared/COMMANDS.md#agent-registration).
+
+The Mac agent does not send enrollment codes yet; that support ships separately. Until it does, only
+devices bound before this release can connect, and a device that is reset cannot register again, so
+do not reset devices in the meantime.
+
 ## Administrator device recovery
 
-`CICADA_ADMIN_TOKEN` is an optional administrator **secret**, used only for
-`POST /v1/admin/device-reset`. This endpoint clears the first-seen (TOFU) identity
-binding and is the only registration recovery path after an agent identity key
-is lost or rotated. Without the secret, the endpoint returns 404.
+`CICADA_ADMIN_TOKEN` is an optional administrator **secret**. It is required by
+`POST /v1/admin/enrollment-codes`, `POST /v1/admin/device-reset`, `GET /devices`, and
+`GET /status?device_id=...`; without it these endpoints return 404. `POST /v1/admin/device-reset`
+clears a device's identity binding and is the only recovery path when a Mac is replaced or
+reinstalled, or its identity key is lost or rotated.
 
 Run from the monorepo root and enter the secret at Wrangler's interactive prompt;
 never put it in `wrangler.toml` or `.dev.vars.example`:
@@ -63,15 +86,15 @@ bun run --cwd apps/relay wrangler secret put CICADA_ADMIN_TOKEN
 ```
 
 To rotate the token, run the same command with a new value and update the
-administrator's Bearer credential. To delete the secret and disable the endpoint:
+administrator's Bearer credential. To delete the secret and disable these endpoints:
 
 ```bash
 bun run --cwd apps/relay wrangler secret delete CICADA_ADMIN_TOKEN
 ```
 
-Before resetting, verify the device and arrange for its legitimate agent to
-reconnect immediately afterward. The next agent connecting with that `device_id`
-will bind its public key; another agent could claim the identity first.
+After a reset the device ID is unbound: its old key no longer connects, and the
+Mac must enroll again with a new enrollment code. Without a valid code no other
+agent can claim the device ID.
 
 Use placeholder values only in saved examples; replace the token and device ID
 for the actual request:
@@ -92,14 +115,24 @@ Expected success response:
 `existed` indicates whether a registry entry was removed (false means none
 existed). With the secret configured, a missing or incorrect Bearer token returns
 401; malformed JSON or an invalid `device_id` returns 400. A valid device ID is
-`MAC_` followed by 32 hexadecimal characters. After success, reconnect the agent
-and confirm registration and `/status?device_id=...` for that device.
+`MAC_` followed by 32 hexadecimal characters. After success, issue a new
+enrollment code, enroll the Mac again, and confirm `/status?device_id=...` for that
+device with the administrator token.
 
 ## Smoke
 
 1. Start `wrangler dev` or a preview deployment.
-2. Start a Swift agent; it should connect to `GET /relay/:liveSession`.
-3. Confirm `/devices` shows one online device and `/status?device_id=MAC_...` matches it.
+2. Start a Swift agent; it should connect to `GET /relay/:liveSession`. On a fresh registry the
+   agent first needs an enrollment code (see [Enrolling a new Mac](#enrolling-a-new-mac)).
+3. Confirm `/devices` shows one online device and `/status?device_id=MAC_...` matches it. Both
+   need the administrator token:
+
+```bash
+curl 'https://relay.example.com/devices' -H 'Authorization: Bearer <ADMIN_TOKEN>'
+curl 'https://relay.example.com/status?device_id=MAC_...' -H 'Authorization: Bearer <ADMIN_TOKEN>'
+```
+
+   Without the header they return 401; when `CICADA_ADMIN_TOKEN` is not set they return 404.
 4. On the agent machine, create a Shortcuts grant:
 
 ```bash
@@ -145,6 +178,10 @@ binding, storage keys, and serialized schema, so they require no reverse data mi
 release changes Durable Object storage, stop here and follow its dedicated migration and dual-read
 rollback plan instead of using an unconditional Worker rollback.
 
+The enrollment-code release only adds the registry key `enrollment_codes`; earlier versions ignore
+it and keep every existing binding, so rolling back needs no migration. A rolled-back Relay accepts
+first registration without a code again, so roll forward as soon as possible.
+
 ## Agent and DMG rollback
 
 Relay-only changes do not require a DMG rebuild. For a Native change, rebuild the app, verify bundled
@@ -160,6 +197,6 @@ written command is not evidence that a production rollback exercise occurred.
 
 ## Protocol Checks
 
-- Agent registrations fail closed when the registry rejects identity binding, signature, timestamp, or nonce.
+- Agent registrations fail closed when the registry rejects the enrollment code, identity binding, signature, timestamp, or nonce.
 - `shortcut_grant_update` publishes only token hash/preview, never the full token.
-- Logs must not contain Authorization, `cicada_sc_` tokens, token hashes, nonces, signatures, or shortcut payloads.
+- Logs must not contain Authorization, `cicada_sc_` tokens, enrollment codes, token hashes, nonces, signatures, or shortcut payloads.

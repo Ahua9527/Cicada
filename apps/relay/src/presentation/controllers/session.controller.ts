@@ -119,6 +119,7 @@ export class SessionController {
         ['x-agent-registration-timestamp', 'X-Agent-Registration-Timestamp'],
         ['x-agent-registration-nonce', 'X-Agent-Registration-Nonce'],
         ['x-agent-registration-signature', 'X-Agent-Registration-Signature'],
+        ['x-agent-enrollment-code', 'X-Agent-Enrollment-Code'],
       ]) {
         const value = request.headers.get(source);
         if (value) {

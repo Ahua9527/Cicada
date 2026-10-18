@@ -1,0 +1,24 @@
+{
+  "description": "First registration of an unbound device with a one-time enrollment code (transcript v2). Test-only values: the key pair was generated for this file and the private key was discarded; no Relay ever issued this code.",
+  "path": "/relay/live-a2af44034816169031d39dbb45f20e8d",
+  "headers": {
+    "x-device-id": "MAC_1234567890ABCDEF1234567890ABCDEF",
+    "x-agent-identity-public-key": "gzV3mQgk0QxCKSge6xOwsxyBi+8+W+IkDdMTKbaGuqM=",
+    "x-agent-enrollment-code": "cicada_enroll_e0hn2ieCrTWsz_SQ1Wdtdw",
+    "x-agent-registration-timestamp": "1704067200000",
+    "x-agent-registration-nonce": "ffc95bda846f55524d50b57c1c1d71ea",
+    "x-agent-registration-signature": "cg8vMbDG1bc5eXLaHkKKqIKvEW0UDlDKqicZpt0o3UCuuYr38yYxV73gQvFHDfQ1S4iEhQxqjhNLjiOuGtxeBw=="
+  },
+  "transcript": {
+    "fields": [
+      "cicada-agent-registration-v2",
+      "MAC_1234567890ABCDEF1234567890ABCDEF",
+      "live-a2af44034816169031d39dbb45f20e8d",
+      "gzV3mQgk0QxCKSge6xOwsxyBi+8+W+IkDdMTKbaGuqM=",
+      "1704067200000",
+      "ffc95bda846f55524d50b57c1c1d71ea",
+      "cicada_enroll_e0hn2ieCrTWsz_SQ1Wdtdw"
+    ],
+    "base64": "AAAAHGNpY2FkYS1hZ2VudC1yZWdpc3RyYXRpb24tdjIAAAAkTUFDXzEyMzQ1Njc4OTBBQkNERUYxMjM0NTY3ODkwQUJDREVGAAAAJWxpdmUtYTJhZjQ0MDM0ODE2MTY5MDMxZDM5ZGJiNDVmMjBlOGQAAAAsZ3pWM21RZ2swUXhDS1NnZTZ4T3dzeHlCaSs4K1crSWtEZE1US2JhR3VxTT0AAAANMTcwNDA2NzIwMDAwMAAAACBmZmM5NWJkYTg0NmY1NTUyNGQ1MGI1N2MxYzFkNzFlYQAAACRjaWNhZGFfZW5yb2xsX2UwaG4yaWVDclRXc3pfU1ExV2R0ZHc="
+  }
+}
