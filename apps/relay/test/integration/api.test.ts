@@ -42,6 +42,21 @@ describe('API Integration Tests', () => {
       passThroughOnException: jest.fn(),
     } as any;
 
+    mockEnv = withRegistry(url => {
+      if (url.pathname === '/registry/status') {
+        return Response.json({
+          success: true,
+          totalDevices: 0,
+          activeDevices: 0,
+          totalSessions: 0,
+          activeConnections: 0,
+        });
+      }
+      if (url.pathname === '/registry/devices') {
+        return Response.json({ success: true, devices: [], total: 0, active: 0 });
+      }
+      return Response.json({ success: false }, { status: 404 });
+    });
     app = new CicadaRelayApp(mockEnv);
   });
 
@@ -59,7 +74,19 @@ describe('API Integration Tests', () => {
   });
 
   describe('GET /health', () => {
-    it('should return health status', async () => {
+    it('should return health status after probing the registry once', async () => {
+      const paths: string[] = [];
+      mockEnv = withRegistry(url => {
+        paths.push(url.pathname);
+        return Response.json({
+          success: true,
+          totalDevices: 0,
+          activeDevices: 0,
+          totalSessions: 0,
+          activeConnections: 0,
+        });
+      });
+      app = new CicadaRelayApp(mockEnv);
       const request = new Request('http://localhost/health', { method: 'GET' });
       const response = await app.handle(request, mockEnv, mockCtx);
       const data = (await response.json()) as any;
@@ -67,6 +94,8 @@ describe('API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(data.ok).toBe(true);
       expect(data.status).toBe('healthy');
+      expect(paths).toEqual(['/registry/status']);
+      expect(data.checks).toEqual({ api: 'ok', durableObjects: 'ok' });
     });
   });
 
@@ -79,7 +108,10 @@ describe('API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(data.ok).toBe(true);
       expect(data.data).toBeDefined();
-      expect(data.data).toHaveProperty('uptime');
+      for (const field of ['uptime', 'totalCommands', 'commandsPerSecond', 'memoryUsage']) {
+        expect(data.data).not.toHaveProperty(field);
+      }
+      expect(data.data.durableObjectStats).not.toHaveProperty('messagesQueued');
       expect(data.data).toHaveProperty('service');
       expect(data.data.service).toBe('CicadaRelay');
     });
@@ -159,6 +191,61 @@ describe('API Integration Tests', () => {
             connected: true,
           },
         ],
+      });
+    });
+  });
+
+  describe('Registry availability', () => {
+    for (const path of [
+      '/health',
+      '/devices',
+      '/status',
+      '/status?device_id=MAC_1234567890ABCDEF1234567890ABCDEF',
+    ]) {
+      for (const failure of ['missing binding', 'fetch throws', 'non-2xx response']) {
+        it(`returns 503 for ${path} when the registry has ${failure}`, async () => {
+          if (failure === 'missing binding') {
+            mockEnv = { ...mockEnv, CICADA_SESSIONS: undefined } as unknown as Env;
+          } else {
+            mockEnv = withRegistry(() => {
+              if (failure === 'fetch throws') {
+                throw new Error('private registry failure');
+              }
+              return new Response('private registry failure', { status: 502 });
+            });
+          }
+          app = new CicadaRelayApp(mockEnv);
+
+          const response = await app.handle(
+            new Request(`http://localhost${path}`),
+            mockEnv,
+            mockCtx
+          );
+          const data = (await response.json()) as any;
+
+          expect(response.status).toBe(503);
+          expect(data).toEqual({
+            ok: false,
+            error: 'Internal server error',
+            request_id: expect.any(String),
+          });
+          expect(response.headers.get('X-Request-ID')).toBe(data.request_id);
+        });
+      }
+    }
+
+    it('reports an unknown device as offline only after a successful registry read', async () => {
+      const deviceId = 'MAC_1234567890ABCDEF1234567890ABCDEF';
+      const response = await app.handle(
+        new Request(`http://localhost/status?device_id=${deviceId}`),
+        mockEnv,
+        mockCtx
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        ok: true,
+        data: { deviceId, connected: false },
       });
     });
   });
