@@ -4,7 +4,6 @@
  */
 
 import {
-  WSMessage,
   SessionInfo,
   Timer,
   RelayTransportMessage,
@@ -13,7 +12,7 @@ import {
   Env,
 } from '../../../types';
 import { ErrorCode, constantTimeStringEqual, isValidDeviceId } from '@cicada/shared';
-import { SESSION_CONSTANTS, SECURITY_CONSTANTS } from '../../../config/constants';
+import { SESSION_CONSTANTS } from '../../../config/constants';
 import {
   createPublicServerErrorResponse,
   enforcePublicServerErrorResponse,
@@ -33,12 +32,6 @@ import {
   shortcutErrorResponse,
   shortcutFailureStatus,
 } from './session-manager.logic';
-
-type PendingConnection = {
-  timestamp: number;
-  userAgent?: string;
-  ip?: string;
-};
 
 type DeviceRegistryRecord = {
   deviceId: string;
@@ -72,15 +65,11 @@ type PendingShortcutCommand = {
 export interface SessionManagerOptions {
   sessionTimeout?: number;
   cleanupInterval?: number;
-  maxConcurrentSessions?: number;
-  nonceCacheSize?: number;
-  nonceRetentionSize?: number;
   agentAbsenceGraceMs?: number;
   shortcutCommandTimeoutMs?: number;
 }
 
 export class SessionManagerDO {
-  private sessions: Map<string, WebSocket> = new Map();
   private sessionInfo: Map<string, SessionInfo> = new Map();
   private registryDevices: Map<string, DeviceRegistryRecord> = new Map();
   private relaySockets: Map<'agent', WebSocket> = new Map();
@@ -89,24 +78,10 @@ export class SessionManagerDO {
   private agentAbsentSince: number | null = null;
   private pendingShortcutCommands: Map<string, PendingShortcutCommand> = new Map();
   private usedRegistrationNonces: Map<string, number> = new Map();
-  private nonces: Set<string> = new Set();
-  private pendingConnections: Map<string, PendingConnection> = new Map();
   private options: Required<SessionManagerOptions>;
   private cleanupTimer: Timer | null = null;
-  private readonly startTime = Date.now();
-
-  /**
-   * H9: 节流 saveSessions 的状态。
-   * handleIncomingMessage 每条 ping/pong 都会更新 sessionInfo，但无需每次
-   * 都落盘——累积变更 ≥ SAVE_THROTTLE_MS 或 ≥ SAVE_THROTTLE_COUNT 才真正
-   * 调一次 saveSessions()，减少 DO storage 写入。
-   */
-  private lastSessionSaveAt = 0;
-  private pendingSaveCount = 0;
   private saveInFlight = false;
   private saveDirty = false;
-  private static readonly SAVE_THROTTLE_MS = 30_000;
-  private static readonly SAVE_THROTTLE_COUNT = 20;
 
   constructor(
     private state: DurableObjectState,
@@ -116,10 +91,6 @@ export class SessionManagerDO {
     this.options = {
       sessionTimeout: options.sessionTimeout ?? SESSION_CONSTANTS.TIMEOUT,
       cleanupInterval: options.cleanupInterval ?? SESSION_CONSTANTS.CLEANUP_INTERVAL,
-      maxConcurrentSessions:
-        options.maxConcurrentSessions ?? SESSION_CONSTANTS.MAX_CONCURRENT_SESSIONS,
-      nonceCacheSize: options.nonceCacheSize ?? SECURITY_CONSTANTS.NONCE.CACHE_SIZE,
-      nonceRetentionSize: options.nonceRetentionSize ?? SECURITY_CONSTANTS.NONCE.RETENTION_SIZE,
       agentAbsenceGraceMs: options.agentAbsenceGraceMs ?? SESSION_CONSTANTS.AGENT_ABSENCE_GRACE_MS,
       shortcutCommandTimeoutMs:
         options.shortcutCommandTimeoutMs ?? SESSION_CONSTANTS.SHORTCUT_COMMAND_TIMEOUT_MS,
@@ -150,13 +121,6 @@ export class SessionManagerDO {
         });
       }
 
-      const noncesData = await this.state.storage.get<string[]>(
-        SESSION_CONSTANTS.STORAGE_KEYS.NONCES
-      );
-      if (noncesData) {
-        noncesData.forEach(nonce => this.nonces.add(nonce));
-      }
-
       const registryData = await this.state.storage.get<DeviceRegistryRecord[]>(
         SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY
       );
@@ -176,10 +140,8 @@ export class SessionManagerDO {
   /**
    * Save sessions to persistent storage
    *
-   * H9: 节流 + 单写合并。一次 storage.put 进行期间，新到达的消息只标记 saveDirty，
-   * 不再各自触发一次完整 put——否则突发流量在 put 未返回期间会因陈旧的
-   * lastSessionSaveAt 退化为每条一写，耗尽 DO 写预算。计数在落盘前同步重置，
-   * 避免陈旧时间戳在 put 期间再次触发；落盘完成后若 dirty 则尾随一次补写。
+   * H9: 单写合并。一次 storage.put 进行期间，新的落盘请求只标记 saveDirty，
+   * 不再各自触发一次完整 put；落盘完成后若 dirty 则尾随一次补写。
    */
   private async saveSessions(): Promise<void> {
     if (this.saveInFlight) {
@@ -187,16 +149,12 @@ export class SessionManagerDO {
       return;
     }
     this.saveInFlight = true;
-    // 同步重置节流计数：避免 put 期间用陈旧 lastSessionSaveAt 再触发落盘。
-    this.lastSessionSaveAt = Date.now();
-    this.pendingSaveCount = 0;
     try {
       const sessions = Array.from(this.sessionInfo.values()).map(info =>
         this.normalizeSessionInfo(info.deviceId ?? this.state.id.toString(), info)
       );
       await this.state.storage.put({
         [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: sessions,
-        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: Array.from(this.nonces),
       });
     } catch (error) {
       this.logStructured('error', 'Failed to save session data', { error });
@@ -232,16 +190,6 @@ export class SessionManagerDO {
     (this.cleanupTimer as { unref?: () => void }).unref?.();
   }
 
-  /**
-   * Stop cleanup timer
-   */
-  private stopCleanupTimer(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
-  }
-
   private clearAgentAbsenceTimer(): void {
     if (this.agentAbsenceTimer) {
       clearTimeout(this.agentAbsenceTimer);
@@ -265,84 +213,6 @@ export class SessionManagerDO {
     }, this.options.agentAbsenceGraceMs);
     // 同上：可选调用 unref，避免 Node 测试进程被挂起。
     (this.agentAbsenceTimer as { unref?: () => void }).unref?.();
-  }
-
-  /**
-   * Add WebSocket session
-   */
-  async addSession(deviceId: string, ws: WebSocket): Promise<{ success: boolean; error?: string }> {
-    // Check concurrent session limit
-    if (this.sessions.size >= this.options.maxConcurrentSessions && !this.sessions.has(deviceId)) {
-      return { success: false, error: 'Maximum concurrent sessions reached' };
-    }
-
-    // Cleanup old connection for this device
-    const oldWs = this.sessions.get(deviceId);
-    if (oldWs) {
-      oldWs.close();
-    }
-
-    this.sessions.set(deviceId, ws);
-
-    const now = Date.now();
-    const existingInfo = this.sessionInfo.get(deviceId);
-    const normalized = existingInfo
-      ? this.normalizeSessionInfo(deviceId, existingInfo)
-      : this.createSessionInfo(deviceId);
-
-    const pending = this.pendingConnections.get(deviceId);
-    const metadata = {
-      ...(normalized.metadata ?? {}),
-      ...(pending?.userAgent ? { userAgent: pending.userAgent } : {}),
-      ...(pending?.ip ? { ipAddress: pending.ip } : {}),
-    };
-
-    this.sessionInfo.set(deviceId, {
-      ...normalized,
-      deviceId,
-      isActive: true,
-      connectedAt: normalized.connectedAt ?? now,
-      createdAt: normalized.createdAt ?? now,
-      lastActivity: now,
-      lastPing: now,
-      metadata: Object.keys(metadata).length > 0 ? metadata : normalized.metadata,
-    });
-
-    this.pendingConnections.delete(deviceId);
-
-    await this.saveSessions();
-
-    // Setup WebSocket event handlers
-    ws.addEventListener('message', event => {
-      this.handleIncomingMessage(deviceId, event);
-    });
-
-    ws.addEventListener('close', () => {
-      if (this.sessions.get(deviceId) !== ws) {
-        return;
-      }
-
-      this.sessions.delete(deviceId);
-      const info = this.sessionInfo.get(deviceId);
-      let updatedInfo = info;
-      if (info) {
-        const nowTimestamp = Date.now();
-        updatedInfo = {
-          ...info,
-          isActive: false,
-          lastActivity: nowTimestamp,
-        };
-        this.sessionInfo.set(deviceId, updatedInfo);
-      }
-      this.pendingConnections.delete(deviceId);
-      void this.saveSessions();
-    });
-
-    ws.addEventListener('error', error => {
-      this.logStructured('error', `Device ${deviceId} WebSocket error`, { error });
-    });
-
-    return { success: true };
   }
 
   async addRelaySocket(
@@ -415,115 +285,6 @@ export class SessionManagerDO {
   }
 
   /**
-   * Send message to device
-   */
-  async sendMessage(
-    deviceId: string,
-    message: WSMessage
-  ): Promise<{ success: boolean; error?: string }> {
-    const ws = this.sessions.get(deviceId);
-    if (!ws) {
-      return { success: false, error: 'Device not connected' };
-    }
-
-    try {
-      ws.send(JSON.stringify(message));
-      return { success: true };
-    } catch (error) {
-      this.logStructured('error', `Failed to send message to device ${deviceId}`, { error });
-      return { success: false, error: 'Failed to send message' };
-    }
-  }
-
-  /**
-   * Broadcast message to all devices
-   */
-  async broadcastMessage(
-    message: WSMessage
-  ): Promise<{ success: number; failed: number; errors: string[] }> {
-    const results = { success: 0, failed: 0, errors: [] as string[] };
-
-    for (const [deviceId, ws] of this.sessions) {
-      try {
-        ws.send(JSON.stringify(message));
-        results.success++;
-      } catch (error) {
-        results.failed++;
-        results.errors.push(
-          `Device ${deviceId}: ${error instanceof Error ? error.message : 'Send failed'}`
-        );
-      }
-    }
-
-    if (results.failed > 0) {
-      this.logStructured('warn', 'Broadcast had partial failures', {
-        success: results.success,
-        failed: results.failed,
-      });
-    }
-    return results;
-  }
-
-  /**
-   * Check whether the local nonce cache has seen this value.
-   * Command auth does not currently call this cache.
-   */
-  isNonceUsed(nonce: string): boolean {
-    return this.nonces.has(nonce);
-  }
-
-  /**
-   * Mark nonce as used
-   */
-  async markNonceUsed(nonce: string): Promise<void> {
-    this.nonces.add(nonce);
-
-    // Manage nonce cache
-    if (this.nonces.size > this.options.nonceCacheSize) {
-      const nonceArray = Array.from(this.nonces);
-      const toKeep = nonceArray.slice(-this.options.nonceRetentionSize);
-      this.nonces = new Set(toKeep);
-    }
-
-    await this.saveSessions();
-  }
-
-  /**
-   * Get connected devices
-   */
-  getConnectedDevices(): string[] {
-    return Array.from(this.sessions.keys());
-  }
-
-  /**
-   * Get session info
-   */
-  getSessionInfo(deviceId: string): SessionInfo | undefined {
-    return this.sessionInfo.get(deviceId);
-  }
-
-  /**
-   * Get all session info
-   */
-  getAllSessionInfo(): SessionInfo[] {
-    return Array.from(this.sessionInfo.values());
-  }
-
-  /**
-   * Update last ping time
-   */
-  async updateLastPing(deviceId: string): Promise<void> {
-    const info = this.sessionInfo.get(deviceId);
-    if (info) {
-      const now = Date.now();
-      info.lastPing = now;
-      info.lastActivity = now;
-      this.sessionInfo.set(deviceId, info);
-      await this.saveSessions();
-    }
-  }
-
-  /**
    * Cleanup inactive sessions
    */
   async cleanupInactiveSessions(): Promise<{ cleaned: number; remaining: number }> {
@@ -534,11 +295,6 @@ export class SessionManagerDO {
     for (const [deviceId, info] of this.sessionInfo) {
       const lastPing = info.lastPing ?? info.lastActivity ?? info.connectedAt ?? now;
       if (now - lastPing > timeout) {
-        const ws = this.sessions.get(deviceId);
-        if (ws) {
-          ws.close();
-        }
-        this.sessions.delete(deviceId);
         this.sessionInfo.delete(deviceId);
         cleanedCount++;
       }
@@ -547,78 +303,7 @@ export class SessionManagerDO {
     await this.saveSessions();
     return {
       cleaned: cleanedCount,
-      remaining: this.sessions.size,
-    };
-  }
-
-  /**
-   * Disconnect device
-   */
-  async disconnectDevice(deviceId: string): Promise<boolean> {
-    const ws = this.sessions.get(deviceId);
-    if (ws) {
-      ws.close();
-      this.sessions.delete(deviceId);
-      this.sessionInfo.delete(deviceId);
-      await this.saveSessions();
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Disconnect all devices
-   */
-  async disconnectAllDevices(): Promise<number> {
-    const count = this.sessions.size;
-    for (const [_, ws] of this.sessions) {
-      ws.close();
-    }
-    this.sessions.clear();
-    this.sessionInfo.clear();
-    await this.saveSessions();
-    return count;
-  }
-
-  /**
-   * Get session statistics
-   */
-  getSessionStats() {
-    const now = Date.now();
-    const sessions = Array.from(this.sessionInfo.values());
-    const activeSessions = sessions.filter(
-      info =>
-        now - (info.lastPing ?? info.lastActivity ?? info.connectedAt ?? now) <=
-        this.options.sessionTimeout
-    );
-
-    const averageDuration =
-      sessions.length > 0
-        ? sessions.reduce((sum, info) => {
-            const connectedAt = info.connectedAt ?? info.createdAt ?? now;
-            return sum + (now - connectedAt);
-          }, 0) / sessions.length
-        : 0;
-
-    return {
-      totalSessions: sessions.length,
-      activeSessions: activeSessions.length,
-      noncesCached: this.nonces.size,
-      uptime: now - this.startTime,
-      averageSessionDuration: averageDuration,
-    };
-  }
-
-  private createSessionInfo(deviceId: string): SessionInfo {
-    const now = Date.now();
-    return {
-      sessionId: `${deviceId}-${now}`,
-      deviceId,
-      isActive: true,
-      createdAt: now,
-      lastActivity: now,
-      connectedAt: now,
-      lastPing: now,
+      remaining: this.sessionInfo.size,
     };
   }
 
@@ -931,77 +616,6 @@ export class SessionManagerDO {
         body: JSON.stringify({ deviceId, sessionId }),
       }))
     );
-  }
-
-  private handleIncomingMessage(deviceId: string, event: MessageEvent): void {
-    const info = this.sessionInfo.get(deviceId);
-    if (!info) {
-      return;
-    }
-
-    const now = Date.now();
-    let lastPing = info.lastPing ?? now;
-    let shouldReplyPong = false;
-    let replyId: string | undefined;
-    let receivedTimestamp: number | undefined;
-
-    if (typeof event.data === 'string') {
-      try {
-        const payload = JSON.parse(event.data) as Partial<WSMessage> & {
-          id?: string;
-          timestamp?: number;
-          ts?: number;
-        };
-        if (payload.type === 'pong' || payload.type === 'ping') {
-          lastPing = now;
-        }
-        if (payload.type === 'ping') {
-          shouldReplyPong = true;
-          replyId = payload.id;
-          receivedTimestamp = payload.timestamp ?? payload.ts;
-        }
-      } catch {
-        lastPing = now;
-      }
-    } else {
-      lastPing = now;
-    }
-
-    const updatedInfo = {
-      ...info,
-      lastActivity: now,
-      lastPing,
-    };
-
-    this.sessionInfo.set(deviceId, updatedInfo);
-
-    // H9: 节流落盘——累积变更 ≥ SAVE_THROTTLE_COUNT 或距上次落盘 ≥
-    // SAVE_THROTTLE_MS 才真正调 saveSessions()，避免每条 ping/pong 都写 DO storage。
-    this.pendingSaveCount++;
-    if (
-      this.pendingSaveCount >= SessionManagerDO.SAVE_THROTTLE_COUNT ||
-      now - this.lastSessionSaveAt >= SessionManagerDO.SAVE_THROTTLE_MS
-    ) {
-      this.state.waitUntil(this.saveSessions());
-    }
-
-    if (shouldReplyPong) {
-      const ws = this.sessions.get(deviceId);
-      if (!ws) {
-        return;
-      }
-
-      const pong: WSMessage = {
-        type: 'pong',
-        id: replyId,
-        timestamp: now,
-        data: {
-          deviceId,
-          receivedTimestamp,
-        },
-      };
-      ws.send(JSON.stringify(pong));
-    }
   }
 
   private jsonResponse<T>(body: T, init?: ResponseInit): Response {
@@ -1870,24 +1484,5 @@ export class SessionManagerDO {
     } else {
       console.info(text);
     }
-  }
-
-  /**
-   * Update options
-   */
-  updateOptions(newOptions: Partial<SessionManagerOptions>): void {
-    this.options = { ...this.options, ...newOptions };
-
-    if (newOptions.cleanupInterval) {
-      this.startCleanupTimer();
-    }
-  }
-
-  /**
-   * Destroy session manager
-   */
-  async destroy(): Promise<void> {
-    this.stopCleanupTimer();
-    await this.disconnectAllDevices();
   }
 }
