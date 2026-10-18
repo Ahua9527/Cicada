@@ -44,7 +44,7 @@ redacted device/session summaries.
 
 ## Rate Limits And CORS
 
-- Rate limiting is enabled unless `RATE_LIMIT_ENABLED=false`.
+- Rate limiting is enabled unless `RATE_LIMIT_ENABLED=false`: best-effort, 100 requests per minute per client IP, counted independently by each Worker instance (isolate), not globally.
 - Keep `RATE_LIMIT_ENABLED=false` limited to local/integration fixtures.
 - CORS is disabled unless `ENABLE_CORS=true`.
 - When CORS is enabled, set `ALLOWED_ORIGINS` explicitly for deployed environments.

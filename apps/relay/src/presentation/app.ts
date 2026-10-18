@@ -38,6 +38,8 @@ export class CicadaRelayApp {
       minLevel: 'info',
       enableConsole: true,
       enableStructured: true,
+      // The app lives for the isolate's lifetime; keep its in-memory log buffer small.
+      maxLogs: 100,
       env: env,
     });
 
