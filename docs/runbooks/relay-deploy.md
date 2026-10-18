@@ -5,21 +5,21 @@
 From the monorepo root:
 
 ```bash
-pnpm run build:relay
-pnpm run lint:relay
-pnpm run test:relay
-pnpm --filter @cicada/relay exec jest --coverage --silent
-pnpm run deploy:relay:dry-run
+bun run build:relay
+bun run lint:relay
+bun run test:relay
+bun run --cwd apps/relay jest --coverage --silent
+bun run deploy:relay:dry-run
 ```
 
 Agent validation:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 ```
 
-`pnpm run build:agent` produces the release CLI, daemon, and SleepHold artifacts, then embeds
+`bun run build:agent` produces the release CLI, daemon, and SleepHold artifacts, then embeds
 them in the release `Cicada.app` under `Contents/Helpers`. It does not install into
 `~/.cicada/bin` or replace `/Applications/Cicada.app`.
 
@@ -28,8 +28,8 @@ them in the release `Cicada.app` under `Contents/Helpers`. It does not install i
 Upload a version without moving production traffic:
 
 ```bash
-pnpm --filter @cicada/relay exec wrangler versions upload
-pnpm --filter @cicada/relay exec wrangler versions list
+bun run --cwd apps/relay wrangler versions upload
+bun run --cwd apps/relay wrangler versions list
 ```
 
 Record the new version ID and the currently active version ID. Where gradual deployments are
@@ -38,8 +38,8 @@ smoke checks and observability checks pass. Otherwise, use `wrangler deploy` and
 version ID ready for immediate rollback.
 
 ```bash
-pnpm --filter @cicada/relay exec wrangler deploy
-pnpm --filter @cicada/relay exec wrangler deployments list
+bun run --cwd apps/relay wrangler deploy
+bun run --cwd apps/relay wrangler deployments list
 ```
 
 Never deploy from a dirty worktree. Production deployment requires an explicit operator decision;
@@ -85,9 +85,9 @@ Rollback is a production action and requires operator approval. Identify the las
 version before running:
 
 ```bash
-pnpm --filter @cicada/relay exec wrangler deployments list
-pnpm --filter @cicada/relay exec wrangler versions list
-pnpm --filter @cicada/relay exec wrangler rollback <LAST_KNOWN_GOOD_VERSION_ID>
+bun run --cwd apps/relay wrangler deployments list
+bun run --cwd apps/relay wrangler versions list
+bun run --cwd apps/relay wrangler rollback <LAST_KNOWN_GOOD_VERSION_ID>
 ```
 
 Repeat the smoke and log checks after rollback. Stages 1–6 preserve the Durable Object class name,

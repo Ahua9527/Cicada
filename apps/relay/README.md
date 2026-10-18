@@ -120,9 +120,9 @@ Shortcut should be allowed to run all current 14 commands.
 From the monorepo root:
 
 ```bash
-pnpm run build:relay
-pnpm run lint:relay
-pnpm run test:relay
-pnpm --filter @cicada/relay exec jest --coverage --silent
-pnpm run deploy:relay:dry-run
+bun run build:relay
+bun run lint:relay
+bun run test:relay
+bun run --cwd apps/relay jest --coverage --silent
+bun run deploy:relay:dry-run
 ```

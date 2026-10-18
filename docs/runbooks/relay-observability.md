@@ -24,7 +24,7 @@ contexts. An error stack is retained after credential text is redacted.
 Use a narrow time window and filter by the request ID supplied by the caller:
 
 ```bash
-pnpm --filter @cicada/relay exec wrangler tail --format json
+bun run --cwd apps/relay wrangler tail --format json
 ```
 
 In Workers Observability or the Logpush destination, filter `request_id` first, then inspect

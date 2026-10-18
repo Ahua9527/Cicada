@@ -2,22 +2,26 @@
   "name": "cicada-workspace",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@9.12.2",
+  "packageManager": "bun@1.4.2",
   "scripts": {
-    "build": "pnpm run build:relay && pnpm run build:agent",
-    "test": "pnpm run test:relay && pnpm run test:agent",
-    "lint": "pnpm run lint:relay && pnpm run lint:agent",
-    "clean": "pnpm --filter @cicada/relay run clean && rm -rf packages/shared/dist packages/shared/*.tsbuildinfo apps/relay/*.tsbuildinfo apps/relay/.wrangler apps/agent/swift/.build apps/agent/native/sentinel-app/.build",
-    "build:relay": "pnpm --filter @cicada/relay run build",
-    "lint:relay": "pnpm --filter @cicada/relay run lint",
-    "test:relay": "pnpm --filter @cicada/relay run test",
-    "protocol:generate": "pnpm --filter @cicada/shared run build && node tools/generate-command-contract.mjs",
-    "protocol:check": "pnpm run protocol:generate && git diff --exit-code -- packages/shared/protocol/command-contract.json",
+    "build": "bun run build:relay && bun run build:agent",
+    "test": "bun run test:relay && bun run test:agent",
+    "lint": "bun run lint:relay && bun run lint:agent",
+    "clean": "bun run --cwd apps/relay clean && rm -rf packages/shared/dist packages/shared/*.tsbuildinfo apps/relay/*.tsbuildinfo apps/relay/.wrangler apps/agent/swift/.build apps/agent/native/sentinel-app/.build",
+    "build:relay": "bun run --cwd apps/relay build",
+    "lint:relay": "bun run --cwd apps/relay lint",
+    "test:relay": "bun run --cwd apps/relay test",
+    "protocol:generate": "bun run --cwd packages/shared build && node tools/generate-command-contract.mjs",
+    "protocol:check": "bun run protocol:generate && git diff --exit-code -- packages/shared/protocol/command-contract.json",
     "vendor:audit": "bash apps/agent/scripts/audit-vendored.sh",
-    "deploy:relay:dry-run": "pnpm --filter @cicada/relay exec wrangler deploy --dry-run",
+    "deploy:relay:dry-run": "bun run --cwd apps/relay wrangler deploy --dry-run",
     "build:agent": "bash apps/agent/scripts/build.sh",
     "lint:agent": "bash apps/agent/scripts/lint.sh",
     "test:agent": "bash apps/agent/scripts/test.sh",
     "sign:agent": "bash apps/agent/native/sentinel-app/scripts/sign.sh"
-  }
+  },
+  "workspaces": [
+    "apps/relay",
+    "packages/shared"
+  ]
 }

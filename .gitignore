@@ -8,7 +8,6 @@
 
 # Dependencies
 node_modules/
-.pnpm-store/
 
 # Build and coverage
 dist/
@@ -37,7 +36,6 @@ xcuserdata/
 # Logs
 *.log
 npm-debug.log*
-pnpm-debug.log*
 .workbuddy/
 
 # Local design previews

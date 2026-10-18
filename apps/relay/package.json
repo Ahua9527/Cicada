@@ -3,12 +3,11 @@
   "version": "1.0.0",
   "description": "Cicada Relay - 远程 Mac 控制系统中间服务",
   "main": "src/index.ts",
-  "packageManager": "pnpm@9.12.2",
   "scripts": {
     "deploy": "wrangler deploy",
     "deploy:preview": "wrangler deploy",
     "deploy:production": "wrangler deploy",
-    "build": "pnpm --filter @cicada/shared run build && tsc --noEmit",
+    "build": "bun run --cwd ../../packages/shared build && tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -18,7 +17,7 @@
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\" \"*.json\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\" \"*.json\"",
-    "type-check": "pnpm --filter @cicada/shared run build && tsc --noEmit",
+    "type-check": "bun run --cwd ../../packages/shared build && tsc --noEmit",
     "clean": "rm -rf coverage dist",
     "test:integration": "node scripts/debug-integration.js",
     "diagnostic": "node scripts/debug-diagnostic.js"

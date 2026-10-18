@@ -12,40 +12,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 9.12.2
+          bun-version-file: package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - name: Protocol Contract Drift
-        run: pnpm run protocol:check
-      - run: pnpm run build:relay
-      - run: pnpm run lint:relay
-      - run: pnpm run test:relay
-      - run: pnpm --filter @cicada/relay exec jest --coverage --silent
-      - run: pnpm run deploy:relay:dry-run
+        run: bun run protocol:check
+      - run: bun run build:relay
+      - run: bun run lint:relay
+      - run: bun run test:relay
+      - run: bun run --cwd apps/relay jest --coverage --silent
+      - run: bun run deploy:relay:dry-run
 
   agent:
     name: Agent
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 9.12.2
+          bun-version-file: package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-      - run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
+      - run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
       - name: SwiftPM Tests
         run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash apps/agent/scripts/test.sh swiftpm
       - name: Native Xcode Tests
         run: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash apps/agent/scripts/test.sh native
-      - run: pnpm run build:agent
+      - run: bun run build:agent

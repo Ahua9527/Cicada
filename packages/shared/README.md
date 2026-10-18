@@ -17,9 +17,9 @@ Swift mirrors the command and Shortcuts grant contract in `apps/agent/swift/Sour
 
 ```bash
 cd /path/to/Cicada/packages/shared
-pnpm run build
-pnpm run dev
-pnpm run clean
+bun run build
+bun run dev
+bun run clean
 ```
 
 ## Change Flow
@@ -30,11 +30,11 @@ pnpm run clean
 4. Run Relay and Agent validation from the monorepo root.
 
 ```bash
-pnpm run build:relay
-pnpm run lint:relay
-pnpm run test:relay
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
+bun run build:relay
+bun run lint:relay
+bun run test:relay
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 ```
 
 ## Related Docs

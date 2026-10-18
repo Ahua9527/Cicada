@@ -18,7 +18,7 @@ DMG_PATH="${DIST_DIR}/${APP_NAME}-${TIMESTAMP}.dmg"
 
 if [ ! -d "$APP_PATH" ]; then
   echo "❌ 未找到构建产物：$APP_PATH"
-  echo "   先运行 pnpm run build:agent"
+  echo "   先运行 bun run build:agent"
   exit 1
 fi
 
