@@ -141,7 +141,8 @@ describe('Shortcuts-only relay transport', () => {
       ctx
     );
 
-    expect(wsResponse.status).toBe(200);
+    // 与 Workers 一致返回 101；只有 Node 拒绝 101 时 createWebSocketResponse 才退回 200
+    expect(wsResponse.status).toBe(101);
   });
 
   it('executes a valid Shortcuts token through the online agent session', async () => {

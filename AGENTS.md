@@ -4,7 +4,7 @@
 
 Cicada is a monorepo for a Cloudflare Relay, a macOS Swift agent, and shared
 protocol contracts. `apps/relay` contains the TypeScript Worker, Durable Object,
-middleware, routes, controllers, and Jest tests. `apps/agent` contains the Swift
+middleware, routes, controllers, and `bun test` suites. `apps/agent` contains the Swift
 CLI, LaunchAgent daemon, notifier, assets, and shell scripts. `packages/shared`
 is the single source of truth for TypeScript command types, validators, errors,
 and shared utilities. Keep protocol changes centralized there, then check the
@@ -13,21 +13,22 @@ Swift model and command gateway for compatibility.
 ## Build, Test, and Development Commands
 
 Install dependencies from the repository root with Bun (version pinned by
-`packageManager` in `package.json`). Jest, Wrangler, and the repository tools
-still run on Node 24, so keep Node installed:
+`packageManager` in `package.json`). Everything except Wrangler works without
+Node; keep Node 24 installed for Wrangler deploys, because Cloudflare supports
+Wrangler on Node only:
 
 ```bash
 bun install
 ```
 
 Use root scripts for normal validation. Always call them as `bun run <script>`:
-`bun test` and `bun build` are Bun's own test runner and bundler, not these
-scripts.
+a bare `bun test` or `bun build` invokes Bun's built-in test runner or bundler
+and skips these scripts and their configuration.
 
 ```bash
 bun run build              # build shared + relay, then Swift agent binaries
 bun run lint               # ESLint relay + Swift compile lint
-bun run test               # Jest relay tests + SwiftPM tests
+bun run test               # relay tests (bun test) + SwiftPM tests
 bun run deploy:relay:dry-run
 ```
 
@@ -49,9 +50,11 @@ uses module names such as `CicadaCore`, `CicadaSystem`, and `CicadaRelayClient`.
 ## Testing Guidelines
 
 Relay tests live under `apps/relay/test` with `unit`, `integration`,
-`security`, and `performance` areas. Run `bun run test:relay`; use
-`bun run --cwd apps/relay test:coverage` when checking coverage. Jest
-coverage thresholds are 70% for branches, functions, lines, and statements.
+`security`, and `performance` areas and run on Bun's Jest-compatible test
+runner (setup in `apps/relay/bunfig.toml`). Run `bun run test:relay`; use
+`bun run --cwd apps/relay test:coverage` when checking coverage. The coverage
+gate is 70% of lines and functions across all covered files; Bun does not
+measure branch coverage.
 Swift tests live under `apps/agent/swift/Tests` and run through
 `bun run test:agent`.
 

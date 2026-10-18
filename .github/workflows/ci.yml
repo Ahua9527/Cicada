@@ -15,6 +15,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
+      # 只有 Wrangler（部署预演）还要 Node：Cloudflare 官方只支持用 Node 运行 Wrangler
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -24,7 +25,7 @@ jobs:
       - run: bun run build:relay
       - run: bun run lint:relay
       - run: bun run test:relay
-      - run: bun run --cwd apps/relay jest --coverage --silent
+      - run: bun run --cwd apps/relay test:coverage
       - run: bun run deploy:relay:dry-run
 
   agent:
@@ -35,9 +36,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
       - run: bun install --frozen-lockfile
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer

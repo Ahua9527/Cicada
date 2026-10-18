@@ -17,8 +17,8 @@ Cicada/
 
 ## 开发命令
 
-需要 Bun（版本见 `package.json` 的 `packageManager`）和 Node 24（Jest、Wrangler 仍运行在 Node 上）。
-脚本一律用 `bun run <脚本名>`：`bun test`、`bun build` 是 Bun 自带的测试器和打包器，不是这里的脚本。
+需要 Bun（版本见 `package.json` 的 `packageManager`）。除部署工具 Wrangler 外都不需要 Node；真部署前请装好 Node 24（Cloudflare 官方只支持在 Node 上运行 Wrangler）。
+脚本一律用 `bun run <脚本名>`：直接敲 `bun test`、`bun build` 会调用 Bun 自带的测试器和打包器，绕过这里的脚本和配置。
 
 ```bash
 bun install

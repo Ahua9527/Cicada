@@ -12,10 +12,10 @@ bun outdated -r
 
 Use these batches in order, but do not combine them:
 
-1. Patch/minor releases within the currently selected major versions, including Prettier, `ts-jest`, `ws`, and Wrangler 4.
+1. Patch/minor releases within the currently selected major versions, including Prettier, `ws`, and Wrangler 4.
 2. Wrangler and `@cloudflare/workers-types`. Treat a Workers types major change as a separate compatibility review even when Wrangler remains on major 4.
 3. TypeScript, ESLint, and typescript-eslint majors. Confirm their supported-version matrix before changing manifests.
-4. Jest, `ts-jest`, and `@types/jest` majors. Upgrade the test ecosystem as a unit only after compatibility is confirmed.
+4. `@types/jest` majors. Relay tests run on `bun test`; `@types/jest` only type-checks the Jest-compatible test API, so confirm every API the tests use still type-checks and still exists in Bun.
 
 Do not remove `ws`: Relay diagnostic scripts use it. Do not cross multiple major-version boundaries merely to make `bun outdated` empty.
 
@@ -31,6 +31,9 @@ rather than a patch update.
 | TypeScript / lint | TypeScript 5.9.3, ESLint 8.57, typescript-eslint 6.21 | TypeScript 6.0.3, ESLint 10.7, `@eslint/js` 10.0.1, typescript-eslint 8.63 | Node 24 satisfies all engine ranges. typescript-eslint 8.63 supports ESLint 10 and TypeScript `<6.1`, so TypeScript 6 is the highest compatible target. TypeScript 7.0.2 is not yet supported. | Upgrade all lint packages together, review flat-config rule and default changes, run TypeScript 6 migration checks, and resolve new diagnostics without weakening rules. Keep TypeScript 7 deferred until the parser explicitly supports it. |
 | Jest | Jest 29.7, `ts-jest` 29.4.11, `@types/jest` 29.5 | Jest 30.4.2, `ts-jest` 29.4.11, `@types/jest` 30.0.0 | Node 24 is supported and `ts-jest` 29.4.11 declares Jest 30 peers, but Jest 30 and its type package are still a major runtime, transform, and typing change. | Upgrade Jest and its types together, verify ESM and `ts-jest` transform behavior, review changed matcher/type semantics, and compare all 22 suites, 356 tests, and coverage thresholds before and after. |
 
+Superseded (2026-10): Relay tests moved from Jest to `bun test`, so the Jest row no longer applies;
+only `@types/jest` remains.
+
 These major migrations are deliberately deferred from routine dependency maintenance.
 Each requires its own pull request and can proceed only after the peer matrix above is
 still current and the complete validation matrix passes.
@@ -41,7 +44,7 @@ For every batch, run and record:
 bun run lint
 bun run build
 bun run test
-bun run --cwd apps/relay jest --coverage --runInBand --silent
+bun run --cwd apps/relay test:coverage
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 bun run deploy:relay:dry-run
 bun run protocol:check

@@ -1,3 +1,3 @@
 [install]
-# 沿用原 pnpm 的 shamefully-hoist=true：依赖平铺到根 node_modules（Jest 以仓库根为 rootDir，从根目录解析 ts-jest 预设）
+# 沿用原 pnpm 的 shamefully-hoist=true：依赖平铺到根 node_modules
 linker = "hoisted"

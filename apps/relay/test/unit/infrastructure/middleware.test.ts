@@ -507,12 +507,11 @@ describe('Middleware', () => {
     });
 
     it('resets an expired key and preserves upgrade responses', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(1_000);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
       const middleware = rateLimitMiddleware({ windowMs: 100, maxRequests: 1 });
       const context = createContext({ headers: { 'cf-connecting-ip': '192.0.2.12' } });
       await middleware(context, async () => new Response('ok'));
-      jest.setSystemTime(1_101);
+      now.mockReturnValue(1_101);
 
       await expect(middleware(context, async () => new Response('fresh'))).resolves.toBeInstanceOf(
         Response
@@ -525,8 +524,7 @@ describe('Middleware', () => {
     });
 
     it('waits for the cleanup interval when the store remains small', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(1_000);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
 
       const entriesSpy = jest.spyOn(Map.prototype, 'entries');
       const middleware = rateLimitMiddleware({
@@ -536,19 +534,18 @@ describe('Middleware', () => {
       });
 
       await middleware(createContext({ headers: { 'x-device-id': 'one' } }), async () => new Response('ok'));
-      jest.setSystemTime(60_999);
+      now.mockReturnValue(60_999);
       await middleware(createContext({ headers: { 'x-device-id': 'two' } }), async () => new Response('ok'));
 
       expect(entriesSpy).not.toHaveBeenCalled();
 
-      jest.setSystemTime(61_000);
+      now.mockReturnValue(61_000);
       await middleware(createContext({ headers: { 'x-device-id': 'three' } }), async () => new Response('ok'));
       expect(entriesSpy).toHaveBeenCalledTimes(1);
     });
 
     it('scans at most 100 stored keys per request under high cardinality', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(1_000);
+      jest.spyOn(Date, 'now').mockReturnValue(1_000);
 
       const middleware = rateLimitMiddleware({
         windowMs: 120_000,
@@ -583,8 +580,7 @@ describe('Middleware', () => {
     });
 
     it('eventually reclaims expired high-cardinality entries in bounded batches', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(1_000);
+      const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
 
       const middleware = rateLimitMiddleware({
         windowMs: 100,
@@ -598,7 +594,7 @@ describe('Middleware', () => {
         );
       }
 
-      jest.setSystemTime(1_101);
+      now.mockReturnValue(1_101);
       const originalEntries = Map.prototype.entries;
       let scanned = 0;
       jest.spyOn(Map.prototype, 'entries').mockImplementation(function <K, V>(this: Map<K, V>) {
