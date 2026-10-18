@@ -10,7 +10,7 @@ import { COMMANDS } from '../protocol/commands.js';
  * 添加新命令时，只修改 protocol/commands.ts 中的命令列表，再同步 Swift 执行层。
  *
  * @see packages/shared/src/validators/command.validator.ts
- * @see Cicada/src/command-executor.ts
+ * @see apps/agent/swift/Sources/CicadaSystem/MacOSCommandGateway.swift
  */
 export type CommandType = (typeof COMMANDS)[number];
 
