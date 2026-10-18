@@ -12,7 +12,6 @@ coveragePathIgnorePatterns = [
   "src/domain/**/index.ts",
   "src/infrastructure/**/index.ts",
   "src/presentation/**/index.ts",
-  "src/infrastructure/crypto/**",
   "src/infrastructure/logger/filters.ts",
   "src/infrastructure/logger/formatters.ts",
   "src/infrastructure/persistence/repositories/**",
