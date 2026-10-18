@@ -27,7 +27,7 @@ Optional:
 
 | Name | Default | Purpose |
 |---|---|---|
-| `RATE_LIMIT_ENABLED` | enabled | Set to `false` only for local tests. |
+| `RATE_LIMIT_ENABLED` | enabled | Best-effort limit of 100 requests per minute per client IP, counted independently by each Worker instance (isolate), not globally. Set to `false` only for local tests. |
 | `ENABLE_CORS` | `false` | Enables configured CORS headers. |
 | `ALLOWED_ORIGINS` | local dev origins | Comma-separated allow list when CORS is enabled. |
 | `DEBUG_MODE` | `false` | Enables debug-level structured logs. |

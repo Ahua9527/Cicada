@@ -43,7 +43,7 @@ Logpush destination. Use five-minute rolling windows:
 | WebSocket upgrade failures | At least 20 events with `websocket_outcome=upgrade_failed`, and more than 5% of WebSocket upgrade attempts. |
 | Durable Object exceptions | More than 5 error events with `do_operation` present. |
 | Replay rejection spike | `security_event=agent_registration_replayed` count is at least 3 times the same weekday/time baseline. |
-| Rate-limit spike | `status=429` count is at least 3 times the same weekday/time baseline. |
+| Rate-limit spike | `status=429` count is at least 3 times the same weekday/time baseline. Relay rate-limit 429s come from each Worker instance's (isolate's) independent, best-effort counter: 100 requests per minute per client IP, not a global limit. |
 
 Route alerts to the normal on-call destination. Keep event definitions fixed for the first seven
 days; after collecting a production baseline, adjust only thresholds. Record the alert policy ID,
