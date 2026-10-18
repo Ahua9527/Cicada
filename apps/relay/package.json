@@ -19,8 +19,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\" \"*.json\"",
     "type-check": "bun run --cwd ../../packages/shared build && tsc --noEmit",
     "clean": "rm -rf coverage dist",
-    "test:integration": "node scripts/debug-integration.js",
-    "diagnostic": "node scripts/debug-diagnostic.js"
+    "debug:integration": "bun scripts/lib/debug-integration.js",
+    "diagnostic": "bun scripts/lib/debug-diagnostic.js"
   },
   "repository": {
     "type": "git",

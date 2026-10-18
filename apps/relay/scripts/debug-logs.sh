@@ -36,10 +36,10 @@ log_warning() {
     echo -e "${YELLOW}[警告]${NC} $1"
 }
 
-# 检查 Node.js 是否安装
-check_node() {
-    if ! command -v node &> /dev/null; then
-        log_error "Node.js 未安装，请先安装 Node.js"
+# 检查 Bun 是否安装
+check_bun() {
+    if ! command -v bun &> /dev/null; then
+        log_error "Bun 未安装，请先安装 Bun"
         exit 1
     fi
 }
@@ -55,12 +55,12 @@ check_dependencies() {
 
 # 主函数
 main() {
-    check_node
+    check_bun
     check_dependencies
     
-    # 执行 Node.js 脚本
+    # 用 Bun 执行脚本
     cd "$PROJECT_ROOT"
-    node "$SCRIPT_DIR/lib/debug-logs.js" "$@"
+    bun "$SCRIPT_DIR/lib/debug-logs.js" "$@"
 }
 
 # 运行主函数

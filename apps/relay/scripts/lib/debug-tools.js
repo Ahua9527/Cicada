@@ -672,7 +672,7 @@ async function main() {
     colorLog('\n[工具] CicadaRelay调试工具集', 'bright');
     colorLog('=' .repeat(50), 'bright');
     colorLog('\n使用方法:', 'yellow');
-    colorLog('  node debug-tools.js [工具] [参数]', 'white');
+    colorLog('  bun debug-tools.js [工具] [参数]', 'white');
     colorLog('\n可用工具:', 'yellow');
     colorLog('  signature          - 签名生成测试', 'white');
     colorLog('  websocket          - WebSocket连接测试', 'width: 16');
@@ -681,10 +681,10 @@ async function main() {
     colorLog('  data               - 生成测试数据', 'white');
     colorLog('  performance        - API性能测试', 'white');
     colorLog('\n示例:', 'cyan');
-    colorLog('  node debug-tools.js signature', 'white');
-    colorLog('  node debug-tools.js websocket ws-device-001', 'white');
-    colorLog('  node debug-tools.js data 5', 'white');
-    colorLog('  node debug-tools.js performance 100', 'white');
+    colorLog('  bun debug-tools.js signature', 'white');
+    colorLog('  bun debug-tools.js websocket ws-device-001', 'white');
+    colorLog('  bun debug-tools.js data 5', 'white');
+    colorLog('  bun debug-tools.js performance 100', 'white');
 
     process.exit(0);
   }
@@ -741,7 +741,7 @@ async function main() {
 
       default:
         colorLog(`[错误] 未知工具: ${tool}`, 'red');
-        colorLog('运行 "node debug-tools.js" 查看帮助', 'yellow');
+        colorLog('运行 "bun debug-tools.js" 查看帮助', 'yellow');
         process.exit(1);
     }
   } catch (error) {
