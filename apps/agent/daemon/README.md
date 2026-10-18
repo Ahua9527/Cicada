@@ -142,8 +142,12 @@ cicada shortcut list
 cicada shortcut revoke <grantId>
 ```
 
-默认命令范围是 `ping,status`。需要授权全部 9 个命令时显式使用
-`--commands all`。
+默认命令范围是 `ping,status`。`--commands all` 会授权
+[命令表](../../../packages/shared/COMMANDS.md#current-commands)中的全部命令，包括
+`shutdown`（关机）、`restart`（重启）、`sleep`（休眠，远程控制随之中断）、
+`daemon_exit`（退出远程控制服务）、`app_close`（关闭应用，可能丢失未保存的内容）、
+`screenshot`（截屏，图片经 Relay 传回）、`sentry_stop`（停止哨兵）和
+`sentry_unlock`（解除哨兵告警）。只有快捷指令确实需要这些全部权限时才使用。
 
 ## iOS Shortcuts
 

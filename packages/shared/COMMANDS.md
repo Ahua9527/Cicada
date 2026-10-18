@@ -6,22 +6,45 @@ one WebSocket session open to Relay.
 
 ## Current Commands
 
+<!-- commands:begin -->
+<!-- 自动生成，改命令后运行 bun run protocol:generate -->
 | Command | Description |
 |---|---|
-| `lock` | Lock screen |
-| `bt_toggle` | Toggle Bluetooth |
-| `ping` | Connectivity test |
-| `volume_mute` | Toggle mute |
-| `sleep` | Sleep system |
-| `sleep_displays` | Sleep displays |
-| `caffeinate` | Start no-sleep mode |
-| `decaffeinate` | Stop no-sleep mode |
-| `status` | Read device status |
-| `sentry_start` | Start Sentinel monitoring |
-| `sentry_stop` | Stop Sentinel monitoring |
-| `sentry_status` | Read Sentinel status |
-| `sentry_unlock` | Unlock Sentinel alarm |
-| `sentry_open` | Open Sentinel window |
+| `lock` | 锁定屏幕 |
+| `bt_toggle` | 切换蓝牙状态 |
+| `ping` | 连接测试 |
+| `volume_mute` | 静音/取消静音 |
+| `sleep` | 系统休眠 |
+| `sleep_displays` | 显示器休眠 |
+| `caffeinate` | 保持唤醒 |
+| `decaffeinate` | 允许休眠 |
+| `status` | 获取设备状态 |
+| `sentry_start` | 启动哨兵 |
+| `sentry_stop` | 停止哨兵 |
+| `sentry_status` | 获取哨兵状态 |
+| `sentry_unlock` | 解除哨兵告警 |
+| `sentry_open` | 打开哨兵窗口 |
+| `wake` | 唤醒显示器 |
+| `restart` | 重启系统 |
+| `shutdown` | 关机 |
+| `bt_on` | 开启蓝牙 |
+| `bt_off` | 关闭蓝牙 |
+| `bt_status` | 获取蓝牙状态 |
+| `brightness_up` | 调高亮度 |
+| `brightness_down` | 调低亮度 |
+| `brightness_set` | 设置亮度 |
+| `screenshot` | 截屏 |
+| `mute` | 静音 |
+| `unmute` | 取消静音 |
+| `volume_up` | 调高音量 |
+| `volume_down` | 调低音量 |
+| `volume_set` | 设置音量 |
+| `app_open` | 打开应用 |
+| `app_close` | 关闭应用 |
+| `app_switch` | 切换到应用 |
+| `app_list` | 列出运行中应用 |
+| `daemon_exit` | 退出远程控制服务 |
+<!-- commands:end -->
 
 Mac agent command execution is native Swift/macOS API code. The command path
 does not require installed shell utilities or third-party binaries. Bluetooth
@@ -114,10 +137,11 @@ Failure codes include `invalid_token`, `grant_expired`, `grant_revoked`,
 ## Authoritative Files
 
 1. `src/types/relay-transport.types.ts`
-2. `src/types/command.types.ts`
-3. `src/validators/command.validator.ts`
-4. `apps/agent/swift/Sources/CicadaCore/Models.swift`
-5. `apps/agent/swift/Sources/CicadaCore/ShortcutGrant.swift`
+2. `src/protocol/commands.ts`
+3. `src/types/command.types.ts`
+4. `src/validators/command.validator.ts`
+5. `apps/agent/swift/Sources/CicadaCore/Models.swift`
+6. `apps/agent/swift/Sources/CicadaCore/ShortcutGrant.swift`
 
 ## Validation
 
