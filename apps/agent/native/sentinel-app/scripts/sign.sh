@@ -1,7 +1,7 @@
 #!/bin/bash
 # 对 Release 构建产物 Cicada.app 整体代码签名（框架 → helpers → 主程序），并校验。
 # 用法：bash apps/agent/native/sentinel-app/scripts/sign.sh
-# 要求：先 pnpm run build:agent；钥匙串有签名身份（security find-identity -v -p codesigning）。
+# 要求：先 bun run build:agent；钥匙串有签名身份（security find-identity -v -p codesigning）。
 #   默认取第一个 "Apple Development" 身份，可用 CICADA_SIGN_IDENTITY 覆盖，
 #   如 CICADA_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)"。
 
@@ -25,7 +25,7 @@ fi
 
 if [ ! -d "$APP_PATH" ]; then
   echo "❌ 未找到构建产物：$APP_PATH"
-  echo "   先运行 pnpm run build:agent"
+  echo "   先运行 bun run build:agent"
   exit 1
 fi
 

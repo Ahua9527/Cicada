@@ -46,10 +46,10 @@ check_node() {
 
 # 检查依赖是否安装
 check_dependencies() {
-    if [ ! -d "$PROJECT_ROOT/node_modules" ]; then
+    if [ ! -d "$PROJECT_ROOT/../../node_modules" ]; then
         log_warning "依赖未安装，正在安装..."
         cd "$PROJECT_ROOT"
-        pnpm install
+        bun install
     fi
 }
 

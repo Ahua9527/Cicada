@@ -17,25 +17,28 @@ Cicada/
 
 ## 开发命令
 
+需要 Bun（版本见 `package.json` 的 `packageManager`）和 Node 24（Jest、Wrangler 仍运行在 Node 上）。
+脚本一律用 `bun run <脚本名>`：`bun test`、`bun build` 是 Bun 自带的测试器和打包器，不是这里的脚本。
+
 ```bash
-pnpm install
+bun install
 
-pnpm run build:relay
-pnpm run lint:relay
-pnpm run test:relay
-pnpm run deploy:relay:dry-run
+bun run build:relay
+bun run lint:relay
+bun run test:relay
+bun run deploy:relay:dry-run
 
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
-pnpm run build:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
+bun run build:agent
 ```
 
 统一命令：
 
 ```bash
-pnpm run build
-pnpm run lint
-pnpm run test
+bun run build
+bun run lint
+bun run test
 ```
 
 ## 包边界

@@ -122,12 +122,12 @@ Failure codes include `invalid_token`, `grant_expired`, `grant_revoked`,
 ## Validation
 
 ```bash
-pnpm run build:relay
-pnpm run lint:relay
-pnpm run test:relay
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run lint:agent
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
+bun run build:relay
+bun run lint:relay
+bun run test:relay
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run lint:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 ```
 
-Do not use `pnpm run build:agent` as a routine check; it installs binaries into
+Do not use `bun run build:agent` as a routine check; it installs binaries into
 `~/.cicada/bin`.

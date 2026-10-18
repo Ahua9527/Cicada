@@ -12,25 +12,29 @@ Swift model and command gateway for compatibility.
 
 ## Build, Test, and Development Commands
 
-Install dependencies from the repository root:
+Install dependencies from the repository root with Bun (version pinned by
+`packageManager` in `package.json`). Jest, Wrangler, and the repository tools
+still run on Node 24, so keep Node installed:
 
 ```bash
-pnpm install
+bun install
 ```
 
-Use root scripts for normal validation:
+Use root scripts for normal validation. Always call them as `bun run <script>`:
+`bun test` and `bun build` are Bun's own test runner and bundler, not these
+scripts.
 
 ```bash
-pnpm run build              # build shared + relay, then Swift agent binaries
-pnpm run lint               # ESLint relay + Swift compile lint
-pnpm run test               # Jest relay tests + SwiftPM tests
-pnpm run deploy:relay:dry-run
+bun run build              # build shared + relay, then Swift agent binaries
+bun run lint               # ESLint relay + Swift compile lint
+bun run test               # Jest relay tests + SwiftPM tests
+bun run deploy:relay:dry-run
 ```
 
 For macOS agent checks, prefer the same Xcode path used by CI:
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
 ```
 
 ## Coding Style & Naming Conventions
@@ -45,11 +49,11 @@ uses module names such as `CicadaCore`, `CicadaSystem`, and `CicadaRelayClient`.
 ## Testing Guidelines
 
 Relay tests live under `apps/relay/test` with `unit`, `integration`,
-`security`, and `performance` areas. Run `pnpm run test:relay`; use
-`pnpm --filter @cicada/relay run test:coverage` when checking coverage. Jest
+`security`, and `performance` areas. Run `bun run test:relay`; use
+`bun run --cwd apps/relay test:coverage` when checking coverage. Jest
 coverage thresholds are 70% for branches, functions, lines, and statements.
 Swift tests live under `apps/agent/swift/Tests` and run through
-`pnpm run test:agent`.
+`bun run test:agent`.
 
 ## Commit & Pull Request Guidelines
 

@@ -17,7 +17,7 @@ NotchDrop vendor notice
 The entries above are the maintained local-change inventory. Generate an exact source diff before an update with:
 
 ```bash
-pnpm run vendor:audit
+bun run vendor:audit
 bash apps/agent/scripts/audit-vendored.sh --diff notchdrop > /tmp/cicada-notchdrop-vendor.diff
 ```
 

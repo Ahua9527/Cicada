@@ -152,7 +152,5 @@ jest.config.json.bak
 # Cicada local state
 .cicada/
 
-# pnpm
-.pnpm-store/
 .DS_Store
 native/notification-agent/.build/*

@@ -7,7 +7,7 @@ Run this maintenance workflow quarterly. Keep each dependency ecosystem and each
 Start with a live inventory:
 
 ```bash
-pnpm outdated -r
+bun outdated -r
 ```
 
 Use these batches in order, but do not combine them:
@@ -17,7 +17,7 @@ Use these batches in order, but do not combine them:
 3. TypeScript, ESLint, and typescript-eslint majors. Confirm their supported-version matrix before changing manifests.
 4. Jest, `ts-jest`, and `@types/jest` majors. Upgrade the test ecosystem as a unit only after compatibility is confirmed.
 
-Do not remove `ws`: Relay diagnostic scripts use it. Do not cross multiple major-version boundaries merely to make `pnpm outdated` empty.
+Do not remove `ws`: Relay diagnostic scripts use it. Do not cross multiple major-version boundaries merely to make `bun outdated` empty.
 
 ### Compatibility snapshot (2026-07-12)
 
@@ -38,13 +38,13 @@ still current and the complete validation matrix passes.
 For every batch, run and record:
 
 ```bash
-pnpm run lint
-pnpm run build
-pnpm run test
-pnpm --filter @cicada/relay exec jest --coverage --runInBand --silent
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer pnpm run test:agent
-pnpm run deploy:relay:dry-run
-pnpm run protocol:check
+bun run lint
+bun run build
+bun run test
+bun run --cwd apps/relay jest --coverage --runInBand --silent
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bun run test:agent
+bun run deploy:relay:dry-run
+bun run protocol:check
 git diff --check
 ```
 
@@ -55,7 +55,7 @@ The production sources are integrated into the Xcode filesystem-synchronized `Se
 Validate the pinned source mapping locally:
 
 ```bash
-pnpm run vendor:audit
+bun run vendor:audit
 ```
 
 Generate exact diffs from the recorded upstream revisions before considering an update:
@@ -74,7 +74,7 @@ When accepting a new upstream baseline:
 3. Port selected upstream changes; never replace the integrated directory wholesale.
 4. Update the version or baseline commit and the local-change inventory in that vendor's `VENDOR.md`.
 5. Update the pinned revision in `audit-vendored.sh` so metadata and executable verification stay aligned.
-6. Run `pnpm run vendor:audit`, the complete validation matrix above, codesign verification, helper inspection, and DMG verification.
+6. Run `bun run vendor:audit`, the complete validation matrix above, codesign verification, helper inspection, and DMG verification.
 7. Commit the source update, provenance update, and its tests together so the batch is independently revertible.
 
 Do not switch Sentry or NotchDrop to SPM and do not split the Native app into another repository as part of routine upstream maintenance.
