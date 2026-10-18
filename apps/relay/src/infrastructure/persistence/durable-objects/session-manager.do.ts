@@ -740,7 +740,7 @@ export class SessionManagerDO {
     clearTimeout(pending.timer);
     this.pendingShortcutCommands.delete(dispatchId);
 
-    const ok = data?.ok !== false;
+    const ok = data?.ok === true;
     const latencyMs = Date.now() - pending.dispatchedAt;
     const rawResultData =
       typeof data?.resultData === 'object' && data.resultData !== null

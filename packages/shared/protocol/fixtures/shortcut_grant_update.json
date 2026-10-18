@@ -1,0 +1,19 @@
+{
+  "type": "shortcut_grant_update",
+  "from": "agent",
+  "sent_at": 1704067200000,
+  "data": {
+    "state": "active",
+    "grant": {
+      "grantId": "fixture-grant-1",
+      "deviceId": "MAC_1234567890ABCDEF1234567890ABCDEF",
+      "name": "Fixture Shortcut",
+      "tokenHash": "FAKE_TOKEN_HASH_FOR_TESTS_ONLY",
+      "tokenPreview": "FAKE_TOKEN_PREVIEW",
+      "allowedCommands": ["ping", "status"],
+      "expiresAt": 1706659200000,
+      "createdAt": 1704067200000,
+      "updatedAt": 1704067200000
+    }
+  }
+}

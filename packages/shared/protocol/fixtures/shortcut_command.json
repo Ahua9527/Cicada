@@ -1,0 +1,11 @@
+{
+  "type": "shortcut_command",
+  "id": "fixture-request-1",
+  "sent_at": 1704067200000,
+  "data": {
+    "requestId": "fixture-request-1",
+    "grantId": "fixture-grant-1",
+    "command": "ping",
+    "params": { "value": "fixture-input" }
+  }
+}

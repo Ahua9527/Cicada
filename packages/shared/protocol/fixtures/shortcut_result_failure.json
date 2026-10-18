@@ -1,0 +1,16 @@
+{
+  "type": "shortcut_result",
+  "id": "fixture-request-1",
+  "from": "agent",
+  "sent_at": 1704067200000,
+  "data": {
+    "requestId": "fixture-request-1",
+    "command": "ping",
+    "ok": false,
+    "success": false,
+    "message": "Command denied",
+    "data": { "reason": "not_allowed" },
+    "code": "command_not_allowed",
+    "error": "Shortcut grant does not allow this command."
+  }
+}
