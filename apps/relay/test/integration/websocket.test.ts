@@ -5,6 +5,7 @@
 
 import { SessionManagerDO } from '../../src/infrastructure/persistence';
 import { SESSION_CONSTANTS } from '../../src/config/constants';
+import { RELAY_CLOSE_CODES } from '../../src/types';
 import type { Env } from '../../src/types';
 
 describe('WebSocket Integration Tests', () => {
@@ -119,9 +120,6 @@ describe('WebSocket Integration Tests', () => {
 
     it('should not expose the old direct send endpoint', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
-      const socket = createMockSocket();
-
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
 
       const request = new Request('http://session/send', {
         method: 'POST',
@@ -183,7 +181,7 @@ describe('WebSocket Integration Tests', () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
       const socket = createMockSocket();
 
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
+      await sessionManager.addRelaySocket('test-session', socket as unknown as WebSocket);
       socket.emit('message', {
         data: JSON.stringify({
           type: 'ping',
@@ -193,22 +191,18 @@ describe('WebSocket Integration Tests', () => {
       });
 
       expect(socket.send).toHaveBeenCalledTimes(1);
-      const sentPayload = JSON.parse(socket.send.mock.calls[0][0]);
-      expect(sentPayload).toMatchObject({
+      expect(JSON.parse(socket.send.mock.calls[0][0])).toEqual({
         type: 'pong',
         id: 'ping-1',
-      });
-      expect(typeof sentPayload.timestamp).toBe('number');
-      expect(sentPayload.data).toMatchObject({
-        deviceId: 'test-device',
+        sent_at: expect.any(Number),
       });
     });
 
-    it('should update activity without replying when agent sends pong', async () => {
+    it('should not reply when agent sends pong or a binary frame', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
       const socket = createMockSocket();
 
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
+      await sessionManager.addRelaySocket('test-session', socket as unknown as WebSocket);
       socket.emit('message', {
         data: JSON.stringify({
           type: 'pong',
@@ -216,8 +210,24 @@ describe('WebSocket Integration Tests', () => {
           timestamp: 123,
         }),
       });
+      socket.emit('message', { data: new ArrayBuffer(4) });
 
       expect(socket.send).not.toHaveBeenCalled();
+    });
+
+    it('should report invalid JSON from the agent', async () => {
+      const sessionManager = new SessionManagerDO(mockState, mockEnv);
+      const socket = createMockSocket();
+
+      await sessionManager.addRelaySocket('test-session', socket as unknown as WebSocket);
+      socket.emit('message', { data: '{' });
+
+      expect(JSON.parse(socket.send.mock.calls[0][0])).toEqual({
+        type: 'error',
+        code: 'invalid_json',
+        error: 'Relay transport messages must be JSON.',
+        sent_at: expect.any(Number),
+      });
     });
 
     it('should handle command acknowledgment', async () => {
@@ -229,28 +239,46 @@ describe('WebSocket Integration Tests', () => {
   });
 
   describe('Session Management', () => {
-    it('should close the previous socket when the same device reconnects', async () => {
+    it('should close the previous socket when the agent reconnects', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
       const firstSocket = createMockSocket();
       const secondSocket = createMockSocket();
 
-      await sessionManager.addSession('test-device', firstSocket as unknown as WebSocket);
-      await sessionManager.addSession('test-device', secondSocket as unknown as WebSocket);
+      await sessionManager.addRelaySocket('test-session', firstSocket as unknown as WebSocket);
+      await sessionManager.addRelaySocket('test-session', secondSocket as unknown as WebSocket);
 
       expect(firstSocket.close).toHaveBeenCalledTimes(1);
+      expect(firstSocket.close).toHaveBeenCalledWith(
+        RELAY_CLOSE_CODES.AGENT_REPLACED,
+        'Previous agent connection replaced'
+      );
       expect(secondSocket.close).not.toHaveBeenCalled();
-      expect(sessionManager.getConnectedDevices()).toEqual(['test-device']);
 
+      // 旧连接的 close 事件不能把新连接从房间里摘掉：命令仍然发给新连接。
       firstSocket.emit('close');
-      expect(sessionManager.getConnectedDevices()).toEqual(['test-device']);
+      const response = sessionManager.fetch(
+        new Request('http://session/shortcut/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: 'req-1', grantId: 'grant-1', command: 'ping' }),
+        })
+      );
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const [dispatched] = secondSocket.send.mock.calls.map(([raw]) => JSON.parse(raw as string));
+      expect(dispatched).toMatchObject({ type: 'shortcut_command', data: { command: 'ping' } });
+      expect(firstSocket.send).not.toHaveBeenCalled();
+      secondSocket.emit('message', {
+        data: JSON.stringify({
+          type: 'shortcut_result',
+          id: dispatched.id,
+          data: { requestId: dispatched.id, ok: true, success: true },
+        }),
+      });
+      expect((await response).status).toBe(200);
     });
 
     it('should not expose local session status from the room object', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
-      const socket = createMockSocket();
-
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
-      socket.emit('close');
 
       const response = await sessionManager.fetch(
         new Request('http://session/status', {
@@ -353,134 +381,72 @@ describe('WebSocket Integration Tests', () => {
       });
     });
 
-    it('should reject new devices when max concurrent session limit is reached', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv, {
-        maxConcurrentSessions: 1,
-      });
-
-      const firstResult = await sessionManager.addSession(
-        'device-one',
-        createMockSocket() as unknown as WebSocket
-      );
-      const secondResult = await sessionManager.addSession(
-        'device-two',
-        createMockSocket() as unknown as WebSocket
-      );
-
-      expect(firstResult).toEqual({ success: true });
-      expect(secondResult).toEqual({
-        success: false,
-        error: 'Maximum concurrent sessions reached',
-      });
-    });
-
-    it('should report send failures from the socket', async () => {
+    it('should report agent send failures as agent unavailable', async () => {
       const sessionManager = new SessionManagerDO(mockState, mockEnv);
       const socket = createMockSocket();
       socket.send.mockImplementation(() => {
         throw new Error('broken socket');
       });
 
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
-      const result = await sessionManager.sendMessage('test-device', {
-        type: 'ping',
-        timestamp: Date.now(),
-      });
+      await sessionManager.addRelaySocket('test-session', socket as unknown as WebSocket);
+      const response = await sessionManager.fetch(
+        new Request('http://session/shortcut/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: 'req-1', grantId: 'grant-1', command: 'ping' }),
+        })
+      );
 
-      expect(result).toEqual({
-        success: false,
-        error: 'Failed to send message',
+      // 5xx 在 DO 出口统一脱敏，只保留状态码。
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ ok: false, error: 'Internal server error' });
+    });
+
+    it('should drop stale stored sessions on the cleanup timer', async () => {
+      const now = Date.now();
+      const state = createMockState('test-device', {
+        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [
+          { sessionId: 'stale', deviceId: 'stale-device', lastPing: now - 10 },
+          { sessionId: 'fresh', deviceId: 'fresh-device', lastPing: now },
+        ],
+      });
+      const sessionManager = new SessionManagerDO(state, mockEnv, {
+        sessionTimeout: 5,
+        cleanupInterval: 2,
+      });
+      expect(sessionManager).toBeDefined();
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const put = state.storage.put as jest.Mock;
+      expect(put).toHaveBeenCalled();
+      const [saved] = put.mock.calls[put.mock.calls.length - 1];
+      expect(saved).toEqual({
+        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [
+          expect.objectContaining({ sessionId: 'fresh', deviceId: 'fresh-device' }),
+        ],
       });
     });
 
-    it('should report broadcast successes and failures', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv);
-      const goodSocket = createMockSocket();
-      const badSocket = createMockSocket();
-      badSocket.send.mockImplementation(() => {
-        throw new Error('broadcast failed');
+    it('should report how many stale sessions cleanup removed', async () => {
+      const now = Date.now();
+      const sessionManager = new SessionManagerDO(
+        createMockState('test-device', {
+          [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [
+            { sessionId: 'stale', deviceId: 'stale-device', lastPing: now - 10 },
+            { sessionId: 'fresh', deviceId: 'fresh-device', lastPing: now },
+          ],
+        }),
+        mockEnv,
+        { sessionTimeout: 5 }
+      );
+      // 等 blockConcurrencyWhile 里的 loadSessions 读完存储。
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      await expect(sessionManager.cleanupInactiveSessions()).resolves.toEqual({
+        cleaned: 1,
+        remaining: 1,
       });
-
-      await sessionManager.addSession('device-one', goodSocket as unknown as WebSocket);
-      await sessionManager.addSession('device-two', badSocket as unknown as WebSocket);
-
-      const result = await sessionManager.broadcastMessage({
-        type: 'ping',
-        timestamp: Date.now(),
-      });
-
-      expect(result.success).toBe(1);
-      expect(result.failed).toBe(1);
-      expect(result.errors[0]).toContain('device-two');
-    });
-
-    it('should persist a nonce exactly once without trimming', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv, {
-        nonceCacheSize: 2,
-        nonceRetentionSize: 1,
-      });
-      const put = mockState.storage.put as jest.Mock;
-
-      await sessionManager.markNonceUsed('nonce-one');
-
-      expect(put).toHaveBeenCalledTimes(1);
-      expect(put).toHaveBeenCalledWith({
-        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [],
-        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: ['nonce-one'],
-      });
-    });
-
-    it('should trim and persist the nonce cache exactly once', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv, {
-        nonceCacheSize: 2,
-        nonceRetentionSize: 1,
-      });
-      const put = mockState.storage.put as jest.Mock;
-
-      await sessionManager.markNonceUsed('nonce-one');
-      await sessionManager.markNonceUsed('nonce-two');
-      put.mockClear();
-      await sessionManager.markNonceUsed('nonce-three');
-
-      expect(put).toHaveBeenCalledTimes(1);
-      expect(put).toHaveBeenCalledWith({
-        [SESSION_CONSTANTS.STORAGE_KEYS.SESSIONS]: [],
-        [SESSION_CONSTANTS.STORAGE_KEYS.NONCES]: ['nonce-three'],
-      });
-      expect(sessionManager.isNonceUsed('nonce-one')).toBe(false);
-      expect(sessionManager.isNonceUsed('nonce-three')).toBe(true);
-    });
-
-    it('should cleanup inactive sessions and close their sockets', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv, {
-        sessionTimeout: 1,
-      });
-      const socket = createMockSocket();
-
-      await sessionManager.addSession('test-device', socket as unknown as WebSocket);
-      const info = sessionManager.getSessionInfo('test-device');
-      if (info) {
-        info.lastPing = Date.now() - 10;
-        info.lastActivity = Date.now() - 10;
-      }
-
-      const result = await sessionManager.cleanupInactiveSessions();
-
-      expect(result.cleaned).toBe(1);
-      expect(result.remaining).toBe(0);
-      expect(socket.close).toHaveBeenCalled();
-    });
-
-    it('should disconnect a single device and all devices explicitly', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv);
-
-      await sessionManager.addSession('device-one', createMockSocket() as unknown as WebSocket);
-      await sessionManager.addSession('device-two', createMockSocket() as unknown as WebSocket);
-
-      await expect(sessionManager.disconnectDevice('device-one')).resolves.toBe(true);
-      await expect(sessionManager.disconnectDevice('missing-device')).resolves.toBe(false);
-      await expect(sessionManager.disconnectAllDevices()).resolves.toBe(1);
-      expect(sessionManager.getConnectedDevices()).toEqual([]);
     });
 
     it('should expose registry device summaries only', async () => {
@@ -680,16 +646,6 @@ describe('WebSocket Integration Tests', () => {
       );
 
       expect(response.status).toBe(404);
-    });
-
-    it('should update options and destroy all sessions', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv);
-      await sessionManager.addSession('test-device', createMockSocket() as unknown as WebSocket);
-
-      sessionManager.updateOptions({ cleanupInterval: 1000 });
-      await sessionManager.destroy();
-
-      expect(sessionManager.getConnectedDevices()).toEqual([]);
     });
   });
 });
