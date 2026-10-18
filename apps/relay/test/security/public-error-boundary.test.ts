@@ -46,9 +46,13 @@ const createMockState = (name = 'test-session'): DurableObjectState =>
     waitUntil: jest.fn(),
   }) as any;
 
-const expectPublicServerError = async (response: Response, expectedRequestId = requestId) => {
+const expectPublicServerError = async (
+  response: Response,
+  expectedRequestId = requestId,
+  expectedStatus = 500
+) => {
   const body = await response.json();
-  expect(response.status).toBe(500);
+  expect(response.status).toBe(expectedStatus);
   expect(body).toEqual({
     ok: false,
     error: 'Internal server error',
@@ -201,7 +205,7 @@ describe('public server error boundary', () => {
       } as any,
     });
 
-    await expectPublicServerError(await DeviceController.getDeviceList(context));
+    await expectPublicServerError(await DeviceController.getDeviceList(context), requestId, 503);
   });
 
   it('uses the final middleware request ID at the application boundary', async () => {

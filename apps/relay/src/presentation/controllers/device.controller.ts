@@ -22,12 +22,6 @@ type RegistryStatus = {
   activeConnections?: number;
 };
 
-const emptyDeviceList = (): NonNullable<DeviceListResponse['data']> => ({
-  devices: [],
-  total: 0,
-  active: 0,
-});
-
 /**
  * Device Controller
  */
@@ -64,7 +58,7 @@ export class DeviceController {
         tags: ['device', 'status', 'error'],
       });
 
-      return createPublicServerErrorResponse(requestId);
+      return createPublicServerErrorResponse(requestId, 503);
     }
   }
 
@@ -81,16 +75,11 @@ export class DeviceController {
         data: {
           service: 'CicadaRelay',
           version: API_CONSTANTS.VERSION,
-          uptime: Date.now(),
           totalDevices: registryStatus.totalDevices ?? 0,
           activeDevices: registryStatus.activeDevices ?? 0,
-          totalCommands: 0,
-          commandsPerSecond: 0,
-          memoryUsage: 0,
           durableObjectStats: {
             totalSessions: registryStatus.totalSessions ?? 0,
             activeConnections: registryStatus.activeConnections ?? 0,
-            messagesQueued: 0,
           },
         },
       };
@@ -108,7 +97,7 @@ export class DeviceController {
         tags: ['system', 'status', 'error'],
       });
 
-      return createPublicServerErrorResponse(requestId);
+      return createPublicServerErrorResponse(requestId, 503);
     }
   }
 
@@ -139,7 +128,7 @@ export class DeviceController {
         tags: ['device', 'list', 'error'],
       });
 
-      return createPublicServerErrorResponse(requestId);
+      return createPublicServerErrorResponse(requestId, 503);
     }
   }
 
@@ -147,9 +136,10 @@ export class DeviceController {
    * Health check
    */
   static async healthCheck(context: MiddlewareContext): Promise<Response> {
-    const { logger, requestId } = context;
+    const { env, logger, requestId } = context;
 
     try {
+      await this.getRegistryStatus(env);
       const health = {
         ok: true,
         status: 'healthy',
@@ -159,7 +149,6 @@ export class DeviceController {
         checks: {
           api: 'ok',
           durableObjects: 'ok',
-          memory: 'ok',
         },
       };
 
@@ -196,7 +185,7 @@ export class DeviceController {
     env: MiddlewareContext['env']
   ): Promise<NonNullable<DeviceListResponse['data']>> {
     if (!this.hasRegistryBinding(env)) {
-      return emptyDeviceList();
+      throw new Error('Registry binding unavailable');
     }
 
     const registry = this.getRegistryStub(env);
@@ -205,7 +194,7 @@ export class DeviceController {
     });
 
     if (!response.ok) {
-      return emptyDeviceList();
+      throw new Error(`Registry devices request failed: ${response.status}`);
     }
 
     const payload = (await response.json()) as RegistryDeviceList;
@@ -218,7 +207,7 @@ export class DeviceController {
 
   private static async getRegistryStatus(env: MiddlewareContext['env']): Promise<RegistryStatus> {
     if (!this.hasRegistryBinding(env)) {
-      return {};
+      throw new Error('Registry binding unavailable');
     }
 
     const registry = this.getRegistryStub(env);
@@ -227,7 +216,7 @@ export class DeviceController {
     });
 
     if (!response.ok) {
-      return {};
+      throw new Error(`Registry status request failed: ${response.status}`);
     }
 
     return (await response.json()) as RegistryStatus;
