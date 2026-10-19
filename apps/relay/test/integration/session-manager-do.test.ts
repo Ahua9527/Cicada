@@ -1,16 +1,20 @@
 /**
- * SessionManagerDO 真实入口测试：只走 fetch() 和 agent WebSocket 消息。
+ * SessionManagerDO 真实入口测试：只走 fetch()、agent WebSocket 消息和 worker 入口。
  */
 
 import {
   createHash,
   createPublicKey,
   generateKeyPairSync,
+  randomUUID,
   sign as signBytes,
   verify as verifyBytes,
+  type KeyObject,
 } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { SessionManagerDO } from '../../src/infrastructure/persistence';
 import { SESSION_CONSTANTS } from '../../src/config/constants';
+import { CicadaRelayApp } from '../../src/presentation/app';
 import type { Env } from '../../src/types';
 
 // Ed25519 公钥 raw 字节前面加上固定的 SPKI DER 头，才能交给 node:crypto 校验。
@@ -18,6 +22,20 @@ const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const deviceId = 'MAC_1234567890ABCDEF1234567890ABCDEF';
 const otherDeviceId = 'MAC_FEDCBA0987654321FEDCBA0987654321';
 const registryKey = SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY;
+const enrollmentCodesKey = SESSION_CONSTANTS.STORAGE_KEYS.ENROLLMENT_CODES;
+
+type Identity = { publicKey: string; privateKey: KeyObject };
+
+const createIdentity = (): Identity => {
+  const pair = generateKeyPairSync('ed25519');
+  return {
+    privateKey: pair.privateKey,
+    publicKey: pair.publicKey
+      .export({ format: 'der', type: 'spki' })
+      .subarray(ED25519_SPKI_PREFIX.byteLength)
+      .toString('base64'),
+  };
+};
 
 const createMockState = (
   name?: string,
@@ -120,11 +138,8 @@ const activeGrant = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('SessionManagerDO real entry points', () => {
-  const keyPair = generateKeyPairSync('ed25519');
-  const publicKey = keyPair.publicKey
-    .export({ format: 'der', type: 'spki' })
-    .subarray(ED25519_SPKI_PREFIX.byteLength)
-    .toString('base64');
+  const identity = createIdentity();
+  const publicKey = identity.publicKey;
 
   beforeEach(() => {
     // setup.ts 把 crypto.subtle 换成了空 mock；这里接到 node:crypto，签名校验和哈希都走真实算法。
@@ -154,23 +169,28 @@ describe('SessionManagerDO real entry points', () => {
     }) as any);
   });
 
-  const signRegistration = (fields: {
-    deviceId: string;
-    sessionId: string;
-    timestamp: number;
-    nonce: string;
-  }) =>
+  const signRegistration = (
+    fields: {
+      deviceId: string;
+      sessionId: string;
+      timestamp: number;
+      nonce: string;
+      enrollmentCode?: string;
+    },
+    signer: Identity = identity
+  ) =>
     signBytes(
       null,
       transcript([
-        'cicada-agent-registration-v1',
+        fields.enrollmentCode ? 'cicada-agent-registration-v2' : 'cicada-agent-registration-v1',
         fields.deviceId,
         fields.sessionId,
-        publicKey,
+        signer.publicKey,
         String(fields.timestamp),
         fields.nonce,
+        ...(fields.enrollmentCode ? [fields.enrollmentCode] : []),
       ]),
-      keyPair.privateKey
+      signer.privateKey
     ).toString('base64');
 
   const registerOnline = (registry: SessionManagerDO, body: Record<string, unknown>) =>
@@ -187,6 +207,42 @@ describe('SessionManagerDO real entry points', () => {
     registrationNonce: nonce,
     registrationSignature: signRegistration({ deviceId, sessionId, timestamp, nonce }),
   });
+
+  const issueEnrollmentCode = async (registry: SessionManagerDO) => {
+    const response = await post(registry, '/registry/admin-enrollment-code', {});
+    return ((await response.json()) as { enrollmentCode: string }).enrollmentCode;
+  };
+
+  /** 带注册码的首次登记（v2 签名）；换 signer 或 signedDeviceId 可以造出别的设备的签名。 */
+  const enrollmentRegistration = (
+    enrollmentCode: string,
+    {
+      sessionId = 'session-1',
+      nonce = randomUUID(),
+      signer = identity,
+      signedDeviceId = deviceId,
+    }: { sessionId?: string; nonce?: string; signer?: Identity; signedDeviceId?: string } = {}
+  ) => {
+    const timestamp = Date.now();
+    return {
+      sessionId,
+      agentIdentityPublicKey: signer.publicKey,
+      enrollmentCode,
+      registrationTimestamp: timestamp,
+      registrationNonce: nonce,
+      registrationSignature: signRegistration(
+        { deviceId: signedDeviceId, sessionId, timestamp, nonce, enrollmentCode },
+        signer
+      ),
+    };
+  };
+
+  /** 签发注册码并完成首次登记，得到一台已绑定且在线的设备。 */
+  const enroll = async (registry: SessionManagerDO, sessionId = 'session-1') => {
+    const code = await issueEnrollmentCode(registry);
+    const response = await registerOnline(registry, enrollmentRegistration(code, { sessionId }));
+    expect(response.status).toBe(200);
+  };
 
   describe('routing', () => {
     it('answers OPTIONS and unknown paths', async () => {
@@ -212,6 +268,7 @@ describe('SessionManagerDO real entry points', () => {
       ['/registry/agent-offline', 'GET', 'POST'],
       ['/registry/shortcut-grant-update', 'GET', 'POST'],
       ['/registry/admin-reset-device', 'GET', 'POST'],
+      ['/registry/admin-enrollment-code', 'GET', 'POST'],
       ['/v1/shortcuts/command', 'GET', 'POST'],
       ['/registry/devices', 'POST', 'GET'],
     ])('rejects %s with %s', async (path, method, allowed) => {
@@ -225,11 +282,12 @@ describe('SessionManagerDO real entry points', () => {
   });
 
   describe('registry agent-online', () => {
-    it('binds the identity key on first sight and persists the record', async () => {
+    it('binds the identity key with an enrollment code and consumes the code', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
+      const code = await issueEnrollmentCode(registry);
 
-      const response = await registerOnline(registry, {});
+      const response = await registerOnline(registry, enrollmentRegistration(code));
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
@@ -244,11 +302,134 @@ describe('SessionManagerDO real entry points', () => {
       expect(storedValues[registryKey]).toEqual([
         expect.objectContaining({ deviceId, connected: true, agentIdentityPublicKey: publicKey }),
       ]);
+      expect(storedValues[enrollmentCodesKey]).toEqual([
+        expect.objectContaining({ usedAt: Date.now() }),
+      ]);
+
+      // 码已作废：另一台未绑定的设备拿同一个码登记会被拒。
+      const reused = await registerOnline(registry, {
+        ...enrollmentRegistration(code, { signedDeviceId: otherDeviceId }),
+        deviceId: otherDeviceId,
+      });
+      expect(reused.status).toBe(409);
+      expect(await reused.json()).toMatchObject({ code: 'agent_enrollment_code_used' });
+    });
+
+    it('requires an enrollment code and a signature before binding an unbound device', async () => {
+      const storedValues: Record<string, any> = {};
+      const registry = createRegistry(storedValues);
+
+      const unsigned = await registerOnline(registry, {});
+      expect(unsigned.status).toBe(401);
+      expect(await unsigned.json()).toMatchObject({ code: 'agent_enrollment_code_required' });
+
+      // 只有 v1 签名、没有注册码，同样不能首次登记。
+      const signedV1 = await registerOnline(
+        registry,
+        await signedRegistration('session-1', 'nonce-v1')
+      );
+      expect(signedV1.status).toBe(401);
+      expect(await signedV1.json()).toMatchObject({ code: 'agent_enrollment_code_required' });
+
+      const codeOnly = await registerOnline(registry, {
+        enrollmentCode: await issueEnrollmentCode(registry),
+      });
+      expect(codeOnly.status).toBe(401);
+      expect(await codeOnly.json()).toMatchObject({
+        code: 'agent_registration_signature_required',
+      });
+      expect(storedValues[registryKey]).toBeUndefined();
+    });
+
+    it('rejects unknown and expired enrollment codes', async () => {
+      const registry = createRegistry();
+
+      const unknown = await registerOnline(
+        registry,
+        enrollmentRegistration('cicada_enroll_never-issued')
+      );
+      expect(unknown.status).toBe(403);
+      expect(await unknown.json()).toMatchObject({ code: 'agent_enrollment_code_invalid' });
+
+      const code = await issueEnrollmentCode(registry);
+      (Date.now as unknown as jest.Mock).mockReturnValue(
+        Date.now() + SESSION_CONSTANTS.ENROLLMENT_CODE_TTL_MS
+      );
+      const expired = await registerOnline(registry, enrollmentRegistration(code));
+      expect(expired.status).toBe(401);
+      expect(await expired.json()).toMatchObject({ code: 'agent_enrollment_code_expired' });
+    });
+
+    it('rejects enrollment signed by another key or for another device and keeps the code', async () => {
+      const registry = createRegistry();
+      const code = await issueEnrollmentCode(registry);
+
+      for (const forged of [
+        // 声明的是本机公钥，签名却出自另一把私钥。
+        {
+          ...enrollmentRegistration(code, { signer: createIdentity() }),
+          agentIdentityPublicKey: publicKey,
+        },
+        // 签名内容里写的是另一台设备。
+        enrollmentRegistration(code, { signedDeviceId: otherDeviceId }),
+      ]) {
+        const response = await registerOnline(registry, forged);
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({
+          code: 'invalid_agent_registration_signature',
+        });
+      }
+
+      const accepted = await registerOnline(registry, enrollmentRegistration(code));
+      expect(accepted.status).toBe(200);
+    });
+
+    it('accepts a retry with the used code once the device is bound to the same key', async () => {
+      const storedValues: Record<string, any> = {};
+      const registry = createRegistry(storedValues);
+      const code = await issueEnrollmentCode(registry);
+      await registerOnline(registry, enrollmentRegistration(code));
+
+      // Mac 没收到上次登记成功的响应：同一把钥匙带同一个码重连，不再核销注册码。
+      const retry = await registerOnline(
+        registry,
+        enrollmentRegistration(code, { sessionId: 'session-2' })
+      );
+
+      expect(retry.status).toBe(200);
+      expect(storedValues[registryKey][0]).toMatchObject({ liveSessionId: 'session-2' });
+    });
+
+    it('logs rejected enrollment codes without the code or the device id', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const guessedCode = 'cicada_enroll_guessed-code';
+
+      const response = await post(
+        createRegistry(),
+        '/registry/agent-online',
+        { deviceId, ...enrollmentRegistration(guessedCode) },
+        { 'X-Request-ID': 'req-enroll' }
+      );
+
+      expect(response.status).toBe(403);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const eventText = String(warn.mock.calls[0]?.[0]);
+      expect(JSON.parse(eventText)).toEqual({
+        level: 'warn',
+        message: 'Agent enrollment rejected',
+        request_id: 'req-enroll',
+        security_event: 'agent_enrollment_rejected',
+        reason: 'agent_enrollment_code_invalid',
+        status: 403,
+        do_operation: 'registry_agent_online',
+      });
+      expect(eventText).not.toContain(guessedCode);
+      expect(eventText).not.toContain(deviceId);
     });
 
     it('rejects a different identity key after the first-seen binding', async () => {
       const registry = createRegistry();
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       const response = await registerOnline(registry, { agentIdentityPublicKey: 'other-key' });
 
@@ -258,7 +439,7 @@ describe('SessionManagerDO real entry points', () => {
 
     it('requires a signature once the device is bound', async () => {
       const registry = createRegistry();
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       const response = await registerOnline(registry, { sessionId: 'session-2' });
 
@@ -270,7 +451,7 @@ describe('SessionManagerDO real entry points', () => {
 
     it('rejects registration timestamps outside the allowed skew', async () => {
       const registry = createRegistry();
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       const response = await registerOnline(
         registry,
@@ -287,7 +468,7 @@ describe('SessionManagerDO real entry points', () => {
 
     it('rejects a signature over a different transcript', async () => {
       const registry = createRegistry();
-      await registerOnline(registry, {});
+      await enroll(registry);
       const signed = await signedRegistration('session-signed', 'nonce-1');
 
       const response = await registerOnline(registry, { ...signed, sessionId: 'session-other' });
@@ -299,7 +480,7 @@ describe('SessionManagerDO real entry points', () => {
     it('accepts a valid signature once and rejects the replayed nonce', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
-      await registerOnline(registry, {});
+      await enroll(registry);
       const signed = await signedRegistration('session-2', 'nonce-1');
 
       const accepted = await registerOnline(registry, signed);
@@ -319,11 +500,42 @@ describe('SessionManagerDO real entry points', () => {
     });
   });
 
+  describe('registry admin-enrollment-code', () => {
+    it('returns the code once, stores only its hash and drops stale codes', async () => {
+      const stale = {
+        codeHash: 'stale-hash',
+        createdAt: 0,
+        expiresAt: Date.now() - SESSION_CONSTANTS.ENROLLMENT_CODE_RETENTION_MS - 1,
+      };
+      const storedValues: Record<string, any> = { [enrollmentCodesKey]: [stale] };
+      const registry = createRegistry(storedValues);
+      await tick();
+
+      const response = await post(registry, '/registry/admin-enrollment-code', {});
+
+      expect(response.status).toBe(201);
+      const body = (await response.json()) as { enrollmentCode: string; expiresAt: number };
+      expect(body).toEqual({
+        ok: true,
+        enrollmentCode: expect.stringMatching(/^cicada_enroll_[\w-]{22}$/),
+        expiresAt: Date.now() + SESSION_CONSTANTS.ENROLLMENT_CODE_TTL_MS,
+      });
+      expect(storedValues[enrollmentCodesKey]).toEqual([
+        {
+          codeHash: createHash('sha256').update(body.enrollmentCode).digest('base64url'),
+          createdAt: Date.now(),
+          expiresAt: body.expiresAt,
+        },
+      ]);
+      expect(JSON.stringify(storedValues)).not.toContain(body.enrollmentCode);
+    });
+  });
+
   describe('registry agent-offline', () => {
     it('validates the body and only marks the matching live session offline', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       const missing = await post(registry, '/registry/agent-offline', {});
       expect(missing.status).toBe(400);
@@ -361,7 +573,7 @@ describe('SessionManagerDO real entry points', () => {
       expect(offline.status).toBe(404);
       expect(await offline.json()).toMatchObject({ code: 'device_unavailable' });
 
-      await registerOnline(registry, {});
+      await enroll(registry);
       const staleSession = await update(registry, { sessionId: 'session-old' });
       expect(staleSession.status).toBe(404);
 
@@ -373,7 +585,7 @@ describe('SessionManagerDO real entry points', () => {
     it('replaces grants by id and records revocation', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       expect(await (await update(registry, {})).json()).toEqual({
         ok: true,
@@ -402,7 +614,7 @@ describe('SessionManagerDO real entry points', () => {
     it('validates the body and removes the first-seen binding', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
-      await registerOnline(registry, {});
+      await enroll(registry);
 
       const invalidJson = await post(registry, '/registry/admin-reset-device', '{');
       expect(invalidJson.status).toBe(400);
@@ -416,8 +628,11 @@ describe('SessionManagerDO real entry points', () => {
       expect(await reset.json()).toEqual({ ok: true, deviceId, existed: true });
       expect(storedValues[registryKey]).toEqual([]);
 
-      // 解绑后可以用新密钥重新首见绑定。
-      const rebound = await registerOnline(registry, { agentIdentityPublicKey: 'new-key' });
+      // 解绑后可以换一把新密钥、用新注册码重新登记。
+      const rebound = await registerOnline(
+        registry,
+        enrollmentRegistration(await issueEnrollmentCode(registry), { signer: createIdentity() })
+      );
       expect(rebound.status).toBe(200);
     });
 
@@ -641,7 +856,7 @@ describe('SessionManagerDO real entry points', () => {
     it('forwards signed registration headers to the registry', async () => {
       const storedValues: Record<string, any> = {};
       const registry = createRegistry(storedValues);
-      await registerOnline(registry, {});
+      await enroll(registry);
       const room = new SessionManagerDO(
         createMockState('session-2'),
         createNamespaceEnv(() => registry)
@@ -663,7 +878,7 @@ describe('SessionManagerDO real entry points', () => {
 
     it('closes the socket when the registry rejects the agent', async () => {
       const registry = createRegistry();
-      await registerOnline(registry, {});
+      await enroll(registry);
       const room = new SessionManagerDO(
         createMockState('session-2'),
         createNamespaceEnv(() => registry)
@@ -675,6 +890,7 @@ describe('SessionManagerDO real entry points', () => {
       expect(await response.json()).toEqual({
         success: false,
         error: 'Agent identity key does not match first-seen binding.',
+        code: 'agent_identity_mismatch',
       });
       expect(lastServerSocket().close).toHaveBeenCalledWith(
         1013,
@@ -709,7 +925,7 @@ describe('SessionManagerDO real entry points', () => {
       const first = createMockSocket();
       await room.addRelaySocket('session-1', first as unknown as WebSocket, {
         deviceId,
-        agentIdentityPublicKey: publicKey,
+        ...enrollmentRegistration(await issueEnrollmentCode(registry)),
       });
 
       first.emit('close');
@@ -717,6 +933,84 @@ describe('SessionManagerDO real entry points', () => {
       await tick(15);
 
       expect(storedValues[registryKey][0]).toMatchObject({ connected: true });
+    });
+
+    it('enrolls a new Mac with a code issued through the worker admin API', async () => {
+      const adminToken = 'test-admin-token';
+      const storedValues: Record<string, any> = {};
+      const registry = createRegistry(storedValues);
+      const rooms = new Map<string, SessionManagerDO>();
+      const env: Env = {
+        ...createNamespaceEnv(name => {
+          if (name === SESSION_CONSTANTS.REGISTRY_DO_NAME) {
+            return registry;
+          }
+          if (!rooms.has(name)) {
+            rooms.set(name, new SessionManagerDO(createMockState(name), env));
+          }
+          return rooms.get(name)!;
+        }),
+        RATE_LIMIT_ENABLED: 'false',
+        CICADA_ADMIN_TOKEN: adminToken,
+      };
+      const app = new CicadaRelayApp(env);
+      const ctx = { waitUntil: jest.fn(), passThroughOnException: jest.fn() } as any;
+      const upgradeThroughWorker = (
+        agentDeviceId: string,
+        enrollment: ReturnType<typeof enrollmentRegistration>
+      ) =>
+        app.handle(
+          new Request(`http://localhost/relay/${enrollment.sessionId}`, {
+            headers: {
+              Upgrade: 'websocket',
+              'x-device-id': agentDeviceId,
+              'x-agent-identity-public-key': enrollment.agentIdentityPublicKey,
+              'x-agent-enrollment-code': enrollment.enrollmentCode,
+              'x-agent-registration-timestamp': String(enrollment.registrationTimestamp),
+              'x-agent-registration-nonce': enrollment.registrationNonce,
+              'x-agent-registration-signature': enrollment.registrationSignature,
+            },
+          }),
+          env,
+          ctx
+        );
+
+      const issued = await app.handle(
+        new Request('http://localhost/v1/admin/enrollment-codes', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken}` },
+        }),
+        env,
+        ctx
+      );
+      expect(issued.status).toBe(201);
+      expect(issued.headers.get('Cache-Control')).toBe('no-store');
+      const { enrollmentCode } = (await issued.json()) as { enrollmentCode: string };
+
+      const enrolled = await upgradeThroughWorker(
+        deviceId,
+        enrollmentRegistration(enrollmentCode, { sessionId: 'live-enroll-1' })
+      );
+      expect(enrolled.status).toBe(101);
+      expect(storedValues[registryKey]).toEqual([
+        expect.objectContaining({
+          deviceId,
+          connected: true,
+          liveSessionId: 'live-enroll-1',
+          agentIdentityPublicKey: publicKey,
+        }),
+      ]);
+
+      // 同一个码不能再给别的设备用；失败的升级响应里带着具体错误码。
+      const reused = await upgradeThroughWorker(
+        otherDeviceId,
+        enrollmentRegistration(enrollmentCode, {
+          sessionId: 'live-enroll-2',
+          signedDeviceId: otherDeviceId,
+        })
+      );
+      expect(reused.status).toBe(429);
+      expect(await reused.json()).toMatchObject({ code: 'agent_enrollment_code_used' });
     });
 
     describe('shortcut_grant_update', () => {
@@ -762,7 +1056,7 @@ describe('SessionManagerDO real entry points', () => {
         const agent = createMockSocket();
         await room.addRelaySocket('session-1', agent as unknown as WebSocket, {
           deviceId,
-          agentIdentityPublicKey: publicKey,
+          ...enrollmentRegistration(await issueEnrollmentCode(registry)),
         });
         await post(registry, '/registry/agent-offline', { deviceId, sessionId: 'session-1' });
 
@@ -783,6 +1077,81 @@ describe('SessionManagerDO real entry points', () => {
           error: 'registry down',
         });
       });
+    });
+  });
+
+  describe('shared enrollment fixture', () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../../packages/shared/protocol/fixtures/agent_enrollment.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    );
+    const headers: Record<string, string> = fixture.headers;
+    const sessionId: string = fixture.path.slice('/relay/'.length);
+
+    it('lists the v2 transcript fields in order and signs exactly those bytes', () => {
+      expect(fixture.transcript.fields).toEqual([
+        'cicada-agent-registration-v2',
+        headers['x-device-id'],
+        sessionId,
+        headers['x-agent-identity-public-key'],
+        headers['x-agent-registration-timestamp'],
+        headers['x-agent-registration-nonce'],
+        headers['x-agent-enrollment-code'],
+      ]);
+      const bytes = transcript(fixture.transcript.fields);
+      expect(bytes.toString('base64')).toBe(fixture.transcript.base64);
+      const key = createPublicKey({
+        key: Buffer.concat([
+          ED25519_SPKI_PREFIX,
+          Buffer.from(headers['x-agent-identity-public-key'], 'base64'),
+        ]),
+        format: 'der',
+        type: 'spki',
+      });
+      const signature = Buffer.from(headers['x-agent-registration-signature'], 'base64');
+      expect(verifyBytes(null, bytes, key, signature)).toBe(true);
+    });
+
+    it('is accepted by the relay as a first registration', async () => {
+      const timestamp = Number(headers['x-agent-registration-timestamp']);
+      (Date.now as unknown as jest.Mock).mockReturnValue(timestamp);
+      const storedValues: Record<string, any> = {
+        [enrollmentCodesKey]: [
+          {
+            codeHash: createHash('sha256')
+              .update(headers['x-agent-enrollment-code'])
+              .digest('base64url'),
+            createdAt: timestamp,
+            expiresAt: timestamp + SESSION_CONSTANTS.ENROLLMENT_CODE_TTL_MS,
+          },
+        ],
+      };
+      const registry = createRegistry(storedValues);
+      await tick();
+      const room = new SessionManagerDO(
+        createMockState(sessionId),
+        createNamespaceEnv(() => registry)
+      );
+
+      const response = await room.fetch(
+        new Request(`http://session${fixture.path}`, {
+          headers: { Upgrade: 'websocket', 'X-Session-ID': sessionId, ...headers },
+        })
+      );
+
+      expect(response.status).toBe(101);
+      expect(storedValues[registryKey]).toEqual([
+        expect.objectContaining({
+          deviceId: headers['x-device-id'],
+          agentIdentityPublicKey: headers['x-agent-identity-public-key'],
+        }),
+      ]);
+      expect(storedValues[enrollmentCodesKey][0].usedAt).toBe(timestamp);
     });
   });
 });

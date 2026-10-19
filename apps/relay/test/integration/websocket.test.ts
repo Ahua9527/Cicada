@@ -321,10 +321,22 @@ describe('WebSocket Integration Tests', () => {
     });
 
     it('should update registry records across connect and close lifecycle', async () => {
+      const deviceId = 'MAC_1234567890ABCDEF1234567890ABCDEF';
+      // 这里只测连接生命周期：已绑定设备的签名校验由 session-manager-do 测试用真实 Ed25519 覆盖，
+      // 公钥和签名只需是合法 base64。crypto.subtle 是 setup.ts 的全局 mock，别的测试文件会改它的实现，
+      // 所以只给这一次登记各放一次结果。
+      const agentPublicKey = Buffer.from('agent-public-key').toString('base64');
+      (crypto.subtle.importKey as jest.Mock).mockResolvedValueOnce({});
+      (crypto.subtle.verify as jest.Mock).mockResolvedValueOnce(true);
       const registry = new SessionManagerDO(
-        createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME),
+        createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, {
+          [SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY]: [
+            { deviceId, connected: false, agentIdentityPublicKey: agentPublicKey, lastSeen: 0 },
+          ],
+        }),
         mockEnv
       );
+      await new Promise(resolve => setTimeout(resolve, 0));
       const namespace = {
         idFromName: jest.fn((name: string) => ({ name })),
         get: jest.fn(() => registry),
@@ -338,11 +350,13 @@ describe('WebSocket Integration Tests', () => {
         { agentAbsenceGraceMs: 1 }
       );
       const socket = createMockSocket();
-      const deviceId = 'MAC_1234567890ABCDEF1234567890ABCDEF';
 
       await sessionManager.addRelaySocket('session-live-1', socket as unknown as WebSocket, {
         deviceId,
-        agentIdentityPublicKey: 'agent-public-key',
+        agentIdentityPublicKey: agentPublicKey,
+        registrationTimestamp: Date.now(),
+        registrationNonce: 'nonce-lifecycle',
+        registrationSignature: Buffer.from('signature').toString('base64'),
       });
 
       const onlineResponse = await registry.fetch(
@@ -450,19 +464,22 @@ describe('WebSocket Integration Tests', () => {
     });
 
     it('should expose registry device summaries only', async () => {
-      const sessionManager = new SessionManagerDO(mockState, mockEnv);
-
-      await sessionManager.fetch(
-        new Request('http://session/registry/agent-online', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceId: 'MAC_1234567890ABCDEF1234567890ABCDEF',
-            sessionId: 'session-1',
-            agentIdentityPublicKey: 'agent-public-key',
-          }),
-        })
+      const sessionManager = new SessionManagerDO(
+        createMockState('test-device', {
+          [SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY]: [
+            {
+              deviceId: 'MAC_1234567890ABCDEF1234567890ABCDEF',
+              connected: true,
+              liveSessionId: 'session-1',
+              agentIdentityPublicKey: 'agent-public-key',
+              shortcutGrants: [],
+              lastSeen: Date.now(),
+            },
+          ],
+        }),
+        mockEnv
       );
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       const request = new Request('http://session/registry/devices', { method: 'GET' });
 
@@ -534,7 +551,20 @@ describe('WebSocket Integration Tests', () => {
     });
 
     it('should handle registry endpoint validation and status summaries', async () => {
-      const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), mockEnv);
+      const registry = new SessionManagerDO(
+        createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, {
+          [SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY]: [
+            {
+              deviceId: 'MAC_1234567890ABCDEF1234567890ABCDEF',
+              connected: true,
+              agentIdentityPublicKey: 'agent-public-key',
+              lastSeen: Date.now(),
+            },
+          ],
+        }),
+        mockEnv
+      );
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       const missing = await registry.fetch(
         new Request('http://session/registry/agent-online', {
@@ -545,18 +575,20 @@ describe('WebSocket Integration Tests', () => {
       );
       expect(missing.status).toBe(400);
 
-      const update = await registry.fetch(
+      // 没有注册码的新 deviceId 不能首次登记，也不会进入下面的统计。
+      const unenrolled = await registry.fetch(
         new Request('http://session/registry/agent-online', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            deviceId: 'MAC_1234567890ABCDEF1234567890ABCDEF',
+            deviceId: 'MAC_FEDCBA0987654321FEDCBA0987654321',
             sessionId: 'session-1',
             agentIdentityPublicKey: 'agent-public-key',
           }),
         })
       );
-      expect(update.status).toBe(200);
+      expect(unenrolled.status).toBe(401);
+      expect(await unenrolled.json()).toMatchObject({ code: 'agent_enrollment_code_required' });
 
       const status = await registry.fetch(
         new Request('http://session/registry/status', { method: 'GET' })
@@ -575,25 +607,21 @@ describe('WebSocket Integration Tests', () => {
     });
 
     it('should log replay rejection as a stable event without sensitive registration data', async () => {
-      const registry = new SessionManagerDO(createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME), mockEnv);
       const deviceId = 'MAC_REPLAY_SECRET_DEVICE';
+      // 已绑定的设备：重放检查发生在验签之前。
+      const registry = new SessionManagerDO(
+        createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME, {
+          [SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY]: [
+            { deviceId, connected: false, agentIdentityPublicKey: 'agent-public-key', lastSeen: 0 },
+          ],
+        }),
+        mockEnv
+      );
+      await new Promise(resolve => setTimeout(resolve, 0));
       const nonce = 'nonce-replay-secret';
       const signature = 'signature-replay-secret';
       const requestId = 'req-replay-test';
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-      const firstSeen = await registry.fetch(
-        new Request('http://session/registry/agent-online', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceId,
-            sessionId: 'session-first-seen',
-            agentIdentityPublicKey: 'agent-public-key',
-          }),
-        })
-      );
-      expect(firstSeen.status).toBe(200);
 
       const replayCache = (
         registry as unknown as { usedRegistrationNonces: Map<string, number> }

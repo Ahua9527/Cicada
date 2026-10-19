@@ -54,6 +54,26 @@ type RelayRoomInfo = {
   agentIdentityPublicKey?: string;
 };
 
+/** 一次性注册码只存 SHA-256 哈希，明文只在签发响应里出现一次。 */
+type EnrollmentCodeRecord = {
+  codeHash: string;
+  createdAt: number;
+  expiresAt: number;
+  usedAt?: number;
+};
+
+const ENROLLMENT_CODE_FAILURES = {
+  agent_enrollment_code_required: {
+    status: 401,
+    error: 'Agent enrollment code is required for an unbound device.',
+  },
+  agent_enrollment_code_invalid: { status: 403, error: 'Agent enrollment code is invalid.' },
+  agent_enrollment_code_expired: { status: 401, error: 'Agent enrollment code has expired.' },
+  agent_enrollment_code_used: { status: 409, error: 'Agent enrollment code was already used.' },
+} as const;
+
+type EnrollmentCodeFailure = keyof typeof ENROLLMENT_CODE_FAILURES;
+
 type PendingShortcutCommand = {
   resolve: (response: Response) => void;
   timer: Timer;
@@ -72,6 +92,7 @@ export interface SessionManagerOptions {
 export class SessionManagerDO {
   private sessionInfo: Map<string, SessionInfo> = new Map();
   private registryDevices: Map<string, DeviceRegistryRecord> = new Map();
+  private enrollmentCodes: EnrollmentCodeRecord[] = [];
   private relaySockets: Map<'agent', WebSocket> = new Map();
   private relayRoomInfo: RelayRoomInfo | null = null;
   private agentAbsenceTimer: Timer | null = null;
@@ -132,6 +153,13 @@ export class SessionManagerDO {
         });
       }
 
+      const enrollmentCodes = await this.state.storage.get<EnrollmentCodeRecord[]>(
+        SESSION_CONSTANTS.STORAGE_KEYS.ENROLLMENT_CODES
+      );
+      if (enrollmentCodes) {
+        this.enrollmentCodes = enrollmentCodes;
+      }
+
     } catch (error) {
       this.logStructured('error', 'Failed to load session data', { error });
     }
@@ -172,6 +200,13 @@ export class SessionManagerDO {
     await this.state.storage.put(
       SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY,
       Array.from(this.registryDevices.values())
+    );
+  }
+
+  private async saveEnrollmentCodes(): Promise<void> {
+    await this.state.storage.put(
+      SESSION_CONSTANTS.STORAGE_KEYS.ENROLLMENT_CODES,
+      this.enrollmentCodes
     );
   }
 
@@ -221,17 +256,19 @@ export class SessionManagerDO {
     metadata: {
       deviceId?: string;
       agentIdentityPublicKey?: string;
+      enrollmentCode?: string;
       registrationTimestamp?: number;
       registrationNonce?: string;
       registrationSignature?: string;
     } = {}
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; code?: string }> {
     const now = Date.now();
     if (metadata.deviceId && metadata.agentIdentityPublicKey) {
       const registration = await this.syncRelayRegistryAgentOnline({
         deviceId: metadata.deviceId,
         sessionId,
         agentIdentityPublicKey: metadata.agentIdentityPublicKey,
+        enrollmentCode: metadata.enrollmentCode,
         registrationTimestamp: metadata.registrationTimestamp,
         registrationNonce: metadata.registrationNonce,
         registrationSignature: metadata.registrationSignature,
@@ -241,6 +278,7 @@ export class SessionManagerDO {
         return {
           success: false,
           error: registration.error ?? registration.code ?? 'Agent registration rejected',
+          code: registration.code,
         };
       }
     }
@@ -494,6 +532,7 @@ export class SessionManagerDO {
     deviceId: string;
     sessionId: string;
     agentIdentityPublicKey: string;
+    enrollmentCode?: string;
     registrationTimestamp?: number;
     registrationNonce?: string;
     registrationSignature?: string;
@@ -752,6 +791,7 @@ export class SessionManagerDO {
       deviceId?: string;
       sessionId?: string;
       agentIdentityPublicKey?: string;
+      enrollmentCode?: string;
       registrationTimestamp?: number;
       registrationNonce?: string;
       registrationSignature?: string;
@@ -771,94 +811,114 @@ export class SessionManagerDO {
 
     const existing = this.registryDevices.get(payload.deviceId);
     if (existing?.agentIdentityPublicKey && existing.agentIdentityPublicKey !== payload.agentIdentityPublicKey) {
+      return this.agentIdentityMismatchResponse();
+    }
+    // 未绑定的 deviceId 只能凭有效的一次性注册码首次登记，不再“首次见到即信任”。
+    if (!existing?.agentIdentityPublicKey && !payload.enrollmentCode) {
+      return this.rejectEnrollment('agent_enrollment_code_required', requestId);
+    }
+
+    const now = Date.now();
+    if (
+      !payload.registrationTimestamp ||
+      !payload.registrationNonce ||
+      !payload.registrationSignature
+    ) {
       return this.jsonResponse(
         {
           ok: false,
-          error: 'Agent identity key does not match first-seen binding.',
-          code: 'agent_identity_mismatch',
+          error: 'Agent registration signature is required.',
+          code: 'agent_registration_signature_required',
+        },
+        { status: 401 }
+      );
+    }
+    if (
+      Math.abs(now - Number(payload.registrationTimestamp)) >
+      SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+    ) {
+      return this.jsonResponse(
+        {
+          ok: false,
+          error: 'Agent registration request expired.',
+          code: 'agent_registration_expired',
+        },
+        { status: 401 }
+      );
+    }
+    this.pruneUsedRegistrationNonces(now);
+    const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
+    if (this.usedRegistrationNonces.has(nonceKey)) {
+      this.logStructured('warn', 'Agent registration replay rejected', {
+        request_id: requestId,
+        security_event: 'agent_registration_replayed',
+        status: 409,
+        do_operation: 'registry_agent_online',
+      });
+      return this.jsonResponse(
+        {
+          ok: false,
+          error: 'Agent registration request was already used.',
+          code: 'agent_registration_replayed',
+        },
+        { status: 409 }
+      );
+    }
+    // 带注册码时签名内容是 v2（含注册码），否则是 v1；已绑定设备不带码时与原流程一致。
+    const transcript = this.buildAgentRegistrationTranscript({
+      deviceId: payload.deviceId,
+      sessionId: payload.sessionId,
+      agentIdentityPublicKey: payload.agentIdentityPublicKey,
+      timestamp: Number(payload.registrationTimestamp),
+      nonce: payload.registrationNonce,
+      enrollmentCode: payload.enrollmentCode,
+    });
+    // 已绑定时这就是绑定的那把公钥；未绑定时用它验签，证明登记方持有对应私钥。
+    const signatureValid = await this.verifyEd25519Signature(
+      payload.agentIdentityPublicKey,
+      transcript,
+      payload.registrationSignature
+    );
+    if (!signatureValid) {
+      return this.jsonResponse(
+        {
+          ok: false,
+          error: 'Agent registration signature is invalid.',
+          code: 'invalid_agent_registration_signature',
         },
         { status: 403 }
       );
     }
+    // 过期锚定到所声明时间戳的最晚可接受时间，防止未来时间戳在条目过期后重放。
+    this.usedRegistrationNonces.set(
+      nonceKey,
+      Number(payload.registrationTimestamp) + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
+    );
+    const codeHash = payload.enrollmentCode
+      ? await this.sha256Base64Url(payload.enrollmentCode)
+      : undefined;
 
-    const now = Date.now();
-    if (existing?.agentIdentityPublicKey) {
-      if (
-        !payload.registrationTimestamp ||
-        !payload.registrationNonce ||
-        !payload.registrationSignature
-      ) {
-        return this.jsonResponse(
-          {
-            ok: false,
-            error: 'Agent registration signature is required after first-seen binding.',
-            code: 'agent_registration_signature_required',
-          },
-          { status: 401 }
-        );
+    // 上面的 await 期间可能有并发登记改了绑定，按最新状态决定是否核销注册码。
+    const current = this.registryDevices.get(payload.deviceId);
+    if (
+      current?.agentIdentityPublicKey &&
+      current.agentIdentityPublicKey !== payload.agentIdentityPublicKey
+    ) {
+      return this.agentIdentityMismatchResponse();
+    }
+    // 已绑定到同一把公钥的设备带码重试（比如没收到上次成功的响应）时不再核销注册码。
+    const enrolling = !current?.agentIdentityPublicKey;
+    if (enrolling) {
+      const failure = codeHash
+        ? this.claimEnrollmentCode(codeHash, now)
+        : 'agent_enrollment_code_required';
+      if (failure) {
+        return this.rejectEnrollment(failure, requestId);
       }
-      if (
-        Math.abs(now - Number(payload.registrationTimestamp)) >
-        SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
-      ) {
-        return this.jsonResponse(
-          {
-            ok: false,
-            error: 'Agent registration request expired.',
-            code: 'agent_registration_expired',
-          },
-          { status: 401 }
-        );
-      }
-      this.pruneUsedRegistrationNonces(now);
-      const nonceKey = `${payload.deviceId}|agent|${payload.registrationNonce}`;
-      if (this.usedRegistrationNonces.has(nonceKey)) {
-        this.logStructured('warn', 'Agent registration replay rejected', {
-          request_id: requestId,
-          security_event: 'agent_registration_replayed',
-          status: 409,
-          do_operation: 'registry_agent_online',
-        });
-        return this.jsonResponse(
-          {
-            ok: false,
-            error: 'Agent registration request was already used.',
-            code: 'agent_registration_replayed',
-          },
-          { status: 409 }
-        );
-      }
-      const transcript = this.buildAgentRegistrationTranscript({
-        deviceId: payload.deviceId,
-        sessionId: payload.sessionId,
-        agentIdentityPublicKey: payload.agentIdentityPublicKey,
-        timestamp: Number(payload.registrationTimestamp),
-        nonce: payload.registrationNonce,
-      });
-      const signatureValid = await this.verifyEd25519Signature(
-        existing.agentIdentityPublicKey,
-        transcript,
-        payload.registrationSignature
-      );
-      if (!signatureValid) {
-        return this.jsonResponse(
-          {
-            ok: false,
-            error: 'Agent registration signature is invalid.',
-            code: 'invalid_agent_registration_signature',
-          },
-          { status: 403 }
-        );
-      }
-      // 过期锚定到所声明时间戳的最晚可接受时间，防止未来时间戳在条目过期后重放。
-      this.usedRegistrationNonces.set(
-        nonceKey,
-        Number(payload.registrationTimestamp) + SESSION_CONSTANTS.AGENT_REGISTRATION_SKEW
-      );
     }
 
     const record: DeviceRegistryRecord = {
-      ...(existing ?? {
+      ...(current ?? {
         deviceId: payload.deviceId,
         lastSeen: payload.lastSeen ?? now,
         connected: false,
@@ -868,19 +928,78 @@ export class SessionManagerDO {
       liveSessionId: payload.sessionId,
       sessionId: payload.sessionId,
       agentIdentityPublicKey: payload.agentIdentityPublicKey,
-      connectedAt: existing?.connectedAt ?? now,
+      connectedAt: current?.connectedAt ?? now,
       lastPing: now,
       lastSeen: payload.lastSeen ?? now,
     };
 
     this.registryDevices.set(payload.deviceId, record);
-    await this.saveRegistryDevices();
+    if (enrolling) {
+      // 绑定和注册码作废放在同一次 put 里写入，不会只落一半。
+      await this.state.storage.put({
+        [SESSION_CONSTANTS.STORAGE_KEYS.DEVICE_REGISTRY]: Array.from(this.registryDevices.values()),
+        [SESSION_CONSTANTS.STORAGE_KEYS.ENROLLMENT_CODES]: this.enrollmentCodes,
+      });
+      this.logStructured('info', 'Agent enrolled with a one-time code', {
+        request_id: requestId,
+        security_event: 'agent_enrolled',
+        do_operation: 'registry_agent_online',
+      });
+    } else {
+      await this.saveRegistryDevices();
+    }
 
     return this.jsonResponse({
       ok: true,
       success: true,
       device: record,
     });
+  }
+
+  private agentIdentityMismatchResponse(): Response {
+    return this.jsonResponse(
+      {
+        ok: false,
+        error: 'Agent identity key does not match first-seen binding.',
+        code: 'agent_identity_mismatch',
+      },
+      { status: 403 }
+    );
+  }
+
+  /** 核对注册码并作废（只改内存，由调用方落盘）；失败时返回具体的错误码。 */
+  private claimEnrollmentCode(codeHash: string, now: number): EnrollmentCodeFailure | null {
+    // 与快捷指令令牌一致：逐条用恒定时间比较哈希。
+    const record = this.enrollmentCodes.find(candidate =>
+      constantTimeStringEqual(candidate.codeHash, codeHash)
+    );
+    if (!record) {
+      return 'agent_enrollment_code_invalid';
+    }
+    if (record.usedAt) {
+      return 'agent_enrollment_code_used';
+    }
+    if (now >= record.expiresAt) {
+      return 'agent_enrollment_code_expired';
+    }
+    record.usedAt = now;
+    return null;
+  }
+
+  private rejectEnrollment(failure: EnrollmentCodeFailure, requestId: string): Response {
+    const { status, error } = ENROLLMENT_CODE_FAILURES[failure];
+    // 没登记的 Mac 会按退避一直重连，缺码是预期状态，不记安全事件；
+    // 码无效、过期或已用才记，便于发现猜码。日志里不放注册码和 deviceId。
+    if (failure !== 'agent_enrollment_code_required') {
+      this.logStructured('warn', 'Agent enrollment rejected', {
+        request_id: requestId,
+        security_event: 'agent_enrollment_rejected',
+        reason: failure,
+        status,
+        do_operation: 'registry_agent_online',
+      });
+    }
+    return this.jsonResponse({ ok: false, error, code: failure }, { status });
   }
 
   private async handleRegistryAgentOffline(request: Request): Promise<Response> {
@@ -1033,7 +1152,7 @@ export class SessionManagerDO {
       );
     }
 
-    const tokenHash = await this.hashShortcutToken(token);
+    const tokenHash = await this.sha256Base64Url(token);
     const record = this.registryDevices.get(deviceId);
     // M9: 使用恒定时间字符串比较替代 ===，避免 tokenHash 比较的时序侧信道。
     const grant = record?.shortcutGrants?.find(
@@ -1118,8 +1237,8 @@ export class SessionManagerDO {
     return copyDurableObjectResponse(response);
   }
 
-  private async hashShortcutToken(token: string): Promise<string> {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  private async sha256Base64Url(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
     return this.base64UrlEncode(new Uint8Array(digest));
   }
 
@@ -1171,15 +1290,21 @@ export class SessionManagerDO {
     agentIdentityPublicKey: string;
     timestamp: number;
     nonce: string;
+    enrollmentCode?: string;
   }): Uint8Array {
-    return this.buildLengthPrefixedTranscript([
-      'cicada-agent-registration-v1',
+    const fields = [
       payload.deviceId,
       payload.sessionId,
       payload.agentIdentityPublicKey,
       String(payload.timestamp),
       payload.nonce,
-    ]);
+    ];
+    // 带注册码的首次登记用 v2：版本标签不同，v1 和 v2 的签名不能互相顶替。
+    return this.buildLengthPrefixedTranscript(
+      payload.enrollmentCode
+        ? ['cicada-agent-registration-v2', ...fields, payload.enrollmentCode]
+        : ['cicada-agent-registration-v1', ...fields]
+    );
   }
 
   private buildLengthPrefixedTranscript(fields: string[]): Uint8Array {
@@ -1241,7 +1366,7 @@ export class SessionManagerDO {
     return copy;
   }
 
-  /// 运维解绑：删除设备的首见身份绑定（TOFU），允许设备以新密钥重新注册。
+  /// 运维解绑：删除设备的身份绑定，之后设备可以用新注册码、以新密钥重新登记。
   /// worker 侧已校验管理员令牌；DO 不对公网暴露，无需二次鉴权。
   private async handleRegistryAdminResetDevice(request: Request): Promise<Response> {
     if (request.method !== 'POST') {
@@ -1271,6 +1396,30 @@ export class SessionManagerDO {
     return this.jsonResponse({ ok: true, deviceId: payload.deviceId, existed });
   }
 
+  /// 签发一次性注册码：注册表只存哈希，明文只在这次响应里返回。
+  /// 与 admin-reset-device 相同，管理员令牌已在 worker 侧校验。
+  private async handleRegistryAdminEnrollmentCode(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return methodNotAllowed(['POST']);
+    }
+
+    const now = Date.now();
+    const expiresAt = now + SESSION_CONSTANTS.ENROLLMENT_CODE_TTL_MS;
+    const enrollmentCode = `cicada_enroll_${this.createRandomToken(16)}`;
+    const codeHash = await this.sha256Base64Url(enrollmentCode);
+    this.enrollmentCodes.push({ codeHash, createdAt: now, expiresAt });
+    this.pruneEnrollmentCodes(now);
+    await this.saveEnrollmentCodes();
+    return this.jsonResponse({ ok: true, enrollmentCode, expiresAt }, { status: 201 });
+  }
+
+  /** 删掉过期超过保留期的记录，并且只留最新的若干条，控制注册表存储大小。 */
+  private pruneEnrollmentCodes(now: number): void {
+    this.enrollmentCodes = this.enrollmentCodes
+      .filter(record => now <= record.expiresAt + SESSION_CONSTANTS.ENROLLMENT_CODE_RETENTION_MS)
+      .slice(-SESSION_CONSTANTS.MAX_ENROLLMENT_CODES);
+  }
+
   private handleRegistryDevices(request: Request): Response {
     if (request.method !== 'GET') {
       return methodNotAllowed(['GET']);
@@ -1278,7 +1427,7 @@ export class SessionManagerDO {
 
     const now = Date.now();
     // H8: 默认从对外响应中移除 ipAddress/userAgent 等敏感字段，仅暴露
-    // deviceId/在线状态/最后心跳时间等非敏感字段。完整鉴权机制后续补齐。
+    // deviceId/在线状态/最后心跳时间等非敏感字段。对外的 /devices 由 worker 校验管理员令牌。
     const devices = Array.from(this.registryDevices.values())
       .sort((left, right) => right.lastSeen - left.lastSeen)
       .map(device => ({
@@ -1330,6 +1479,7 @@ export class SessionManagerDO {
       const result = await this.addRelaySocket(sessionId, server, {
         deviceId: request.headers.get('X-Device-ID') ?? undefined,
         agentIdentityPublicKey: request.headers.get('X-Agent-Identity-Public-Key') ?? undefined,
+        enrollmentCode: request.headers.get('X-Agent-Enrollment-Code') ?? undefined,
         registrationTimestamp: this.parseOptionalNumber(
           request.headers.get('X-Agent-Registration-Timestamp')
         ),
@@ -1347,6 +1497,7 @@ export class SessionManagerDO {
           {
             success: false,
             error: result.error ?? 'Failed to add session',
+            code: result.code,
           },
           { status: 429 }
         );
@@ -1371,7 +1522,10 @@ export class SessionManagerDO {
     // Check if this is a WebSocket upgrade request
     const upgrade = request.headers.get('Upgrade');
     if (upgrade && upgrade.toLowerCase().includes('websocket')) {
-      if (!url.pathname.startsWith('/relay/')) {
+      if (
+        !url.pathname.startsWith('/relay/') ||
+        this.getDeviceId() === SESSION_CONSTANTS.REGISTRY_DO_NAME
+      ) {
         return this.jsonResponse(
           {
             success: false,
@@ -1404,6 +1558,9 @@ export class SessionManagerDO {
           break;
         case '/registry/admin-reset-device':
           response = await this.handleRegistryAdminResetDevice(request);
+          break;
+        case '/registry/admin-enrollment-code':
+          response = await this.handleRegistryAdminEnrollmentCode(request);
           break;
         case '/registry/status':
           response = this.handleRegistryStatus(request);

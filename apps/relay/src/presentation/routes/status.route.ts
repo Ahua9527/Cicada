@@ -4,6 +4,7 @@
  */
 
 import type { MiddlewareContext } from '../../types';
+import { rejectUnlessAdmin } from '../admin-auth';
 import { DeviceController } from '../controllers';
 
 /**
@@ -18,6 +19,6 @@ export async function handleStatusRoute(context: MiddlewareContext): Promise<Res
     return DeviceController.getSystemStatus(context);
   }
 
-  // Return device status
-  return DeviceController.getDeviceStatus(context, deviceId);
+  // 单台设备的状态需要管理员令牌；不带 device_id 的系统状态保持公开
+  return rejectUnlessAdmin(context) ?? DeviceController.getDeviceStatus(context, deviceId);
 }

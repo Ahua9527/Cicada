@@ -27,6 +27,13 @@ describe('API Integration Tests', () => {
     };
   };
 
+  const adminToken = 'test-admin-token';
+  const withAdminToken = (env: Env): Env => ({ ...env, CICADA_ADMIN_TOKEN: adminToken });
+  const authorizedRequest = (path: string, token: string | null = adminToken) =>
+    new Request(`http://localhost${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
   beforeEach(() => {
     // Mock environment
     mockEnv = {
@@ -145,8 +152,11 @@ describe('API Integration Tests', () => {
 
   describe('GET /devices', () => {
     it('should return device list', async () => {
-      const request = new Request('http://localhost/devices', { method: 'GET' });
-      const response = await app.handle(request, mockEnv, mockCtx);
+      const response = await app.handle(
+        authorizedRequest('/devices'),
+        withAdminToken(mockEnv),
+        mockCtx
+      );
       const data = (await response.json()) as any;
 
       expect(response.status).toBe(200);
@@ -177,8 +187,11 @@ describe('API Integration Tests', () => {
       });
       app = new CicadaRelayApp(mockEnv);
 
-      const request = new Request('http://localhost/devices', { method: 'GET' });
-      const response = await app.handle(request, mockEnv, mockCtx);
+      const response = await app.handle(
+        authorizedRequest('/devices'),
+        withAdminToken(mockEnv),
+        mockCtx
+      );
       const data = (await response.json()) as any;
 
       expect(response.status).toBe(200);
@@ -192,6 +205,41 @@ describe('API Integration Tests', () => {
           },
         ],
       });
+    });
+  });
+
+  describe('admin token on device endpoints', () => {
+    for (const path of ['/devices', '/status?device_id=MAC_1234567890ABCDEF1234567890ABCDEF']) {
+      it(`treats ${path} as not found when CICADA_ADMIN_TOKEN is not configured`, async () => {
+        const response = await app.handle(authorizedRequest(path), mockEnv, mockCtx);
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({
+          ok: false,
+          error: 'API endpoint not found',
+          path: new URL(path, 'http://localhost').pathname,
+        });
+      });
+
+      it(`returns 401 for ${path} with a wrong or missing bearer token`, async () => {
+        const env = withAdminToken(mockEnv);
+
+        const wrong = await app.handle(authorizedRequest(path, 'wrong-token'), env, mockCtx);
+        const missing = await app.handle(authorizedRequest(path, null), env, mockCtx);
+
+        expect(wrong.status).toBe(401);
+        expect(await wrong.json()).toMatchObject({ code: 'unauthorized' });
+        expect(missing.status).toBe(401);
+      });
+    }
+
+    it('keeps /health and /status without device_id public', async () => {
+      const env = withAdminToken(mockEnv);
+
+      for (const path of ['/health', '/status']) {
+        const response = await app.handle(authorizedRequest(path, null), env, mockCtx);
+        expect(response.status).toBe(200);
+      }
     });
   });
 
@@ -217,8 +265,8 @@ describe('API Integration Tests', () => {
           app = new CicadaRelayApp(mockEnv);
 
           const response = await app.handle(
-            new Request(`http://localhost${path}`),
-            mockEnv,
+            authorizedRequest(path),
+            withAdminToken(mockEnv),
             mockCtx
           );
           const data = (await response.json()) as any;
@@ -237,8 +285,8 @@ describe('API Integration Tests', () => {
     it('reports an unknown device as offline only after a successful registry read', async () => {
       const deviceId = 'MAC_1234567890ABCDEF1234567890ABCDEF';
       const response = await app.handle(
-        new Request(`http://localhost/status?device_id=${deviceId}`),
-        mockEnv,
+        authorizedRequest(`/status?device_id=${deviceId}`),
+        withAdminToken(mockEnv),
         mockCtx
       );
 
@@ -295,6 +343,9 @@ describe('API Integration Tests', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://browser.example');
       expect(response.headers.get('Access-Control-Allow-Headers')).not.toContain('X-Role');
+      expect(response.headers.get('Access-Control-Allow-Headers')).toContain(
+        'X-Agent-Enrollment-Code'
+      );
       expect(response.headers.get('Access-Control-Allow-Headers')).toContain(
         'X-Agent-Identity-Public-Key'
       );
@@ -538,6 +589,50 @@ describe('API Integration Tests', () => {
       expect(data.ok).toBe(true);
       expect(data.existed).toBe(true);
       expect(hitPath).toBe('/registry/admin-reset-device');
+    });
+  });
+
+  describe('POST /v1/admin/enrollment-codes', () => {
+    const issueRequest = (token?: string) =>
+      new Request('http://localhost/v1/admin/enrollment-codes', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+    it('returns 404 when CICADA_ADMIN_TOKEN is not configured', async () => {
+      const response = await app.handle(issueRequest(adminToken), mockEnv, mockCtx);
+      expect(response.status).toBe(404);
+    });
+
+    it('returns 401 for a wrong or missing bearer token', async () => {
+      const env = withAdminToken(mockEnv);
+
+      expect((await app.handle(issueRequest('wrong-token'), env, mockCtx)).status).toBe(401);
+      expect((await app.handle(issueRequest(), env, mockCtx)).status).toBe(401);
+    });
+
+    it('returns the registry-issued code and forbids caching it', async () => {
+      let hitPath = '';
+      const env = withAdminToken(
+        withRegistry(url => {
+          hitPath = url.pathname;
+          return Response.json(
+            { ok: true, enrollmentCode: 'cicada_enroll_test', expiresAt: 1704067800000 },
+            { status: 201 }
+          );
+        })
+      );
+
+      const response = await app.handle(issueRequest(adminToken), env, mockCtx);
+
+      expect(response.status).toBe(201);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(await response.json()).toEqual({
+        ok: true,
+        enrollmentCode: 'cicada_enroll_test',
+        expiresAt: 1704067800000,
+      });
+      expect(hitPath).toBe('/registry/admin-enrollment-code');
     });
   });
 });
