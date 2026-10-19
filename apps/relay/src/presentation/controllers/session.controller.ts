@@ -70,6 +70,18 @@ export class SessionController {
       );
     }
 
+    // 注册表 DO 只供内部调用，不能作为设备房间被直连。
+    if (target === SESSION_CONSTANTS.REGISTRY_DO_NAME) {
+      return Response.json(
+        {
+          ok: false,
+          error: 'Invalid relay target',
+          code: 'invalid_relay_connection',
+        },
+        { status: 400 }
+      );
+    }
+
     // M10: 在转发到 DO 前复用 shared 校验，避免非法 deviceId/sessionId 进入 DO 存储。
     if (target.length > MAX_SESSION_ID_LENGTH) {
       return Response.json(

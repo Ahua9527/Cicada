@@ -1522,7 +1522,10 @@ export class SessionManagerDO {
     // Check if this is a WebSocket upgrade request
     const upgrade = request.headers.get('Upgrade');
     if (upgrade && upgrade.toLowerCase().includes('websocket')) {
-      if (!url.pathname.startsWith('/relay/')) {
+      if (
+        !url.pathname.startsWith('/relay/') ||
+        this.getDeviceId() === SESSION_CONSTANTS.REGISTRY_DO_NAME
+      ) {
         return this.jsonResponse(
           {
             success: false,

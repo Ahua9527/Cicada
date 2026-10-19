@@ -318,6 +318,27 @@ describe('Shortcuts-only relay transport', () => {
     expect(wsResponse.status).toBe(101);
   });
 
+  it('rejects agent relay sockets addressed to the registry room', async () => {
+    const registry = new SessionManagerDO(
+      createMockState(SESSION_CONSTANTS.REGISTRY_DO_NAME),
+      {} as Env
+    );
+    const env = createEnv(registry);
+    const app = new CicadaRelayApp(env);
+    const ctx = { waitUntil: jest.fn(), passThroughOnException: jest.fn() } as any;
+    const request = new Request(`http://localhost/relay/${SESSION_CONSTANTS.REGISTRY_DO_NAME}`, {
+      method: 'GET',
+      headers: {
+        Upgrade: 'websocket',
+        'x-device-id': deviceId,
+        'x-agent-identity-public-key': 'agent-public-key',
+      },
+    });
+
+    expect((await app.handle(request, env, ctx)).status).toBe(400);
+    expect((await registry.fetch(request)).status).toBe(404);
+  });
+
   it('executes a valid Shortcuts token through the online agent session', async () => {
     const rooms = new Map<string, SessionManagerDO>();
     const registryRef: { current?: SessionManagerDO } = {};
