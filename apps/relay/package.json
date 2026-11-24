@@ -5,19 +5,14 @@
   "main": "src/index.ts",
   "scripts": {
     "deploy": "wrangler deploy",
-    "deploy:preview": "wrangler deploy",
-    "deploy:production": "wrangler deploy",
     "build": "bun run --cwd ../../packages/shared build && tsc --noEmit",
     "test": "bun test --timeout 10000",
     "test:watch": "bun run test --watch",
     "test:coverage": "rm -rf coverage && bun run test --coverage && bun scripts/check-coverage.mjs 0.7",
-    "test:ci": "bun run test:coverage",
-    "test:debug": "DEBUG_MODE=true bun run test",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\" \"*.json\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.md\" \"*.json\"",
-    "type-check": "bun run --cwd ../../packages/shared build && tsc --noEmit",
     "clean": "rm -rf coverage dist",
     "debug:integration": "bun scripts/lib/debug-integration.js",
     "diagnostic": "bun scripts/lib/debug-diagnostic.js"
@@ -29,7 +24,7 @@
   },
   "keywords": ["cicada", "remote-control", "cloudflare-workers"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/Ahua9527/Cicada/issues"

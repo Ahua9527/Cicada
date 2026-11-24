@@ -1022,7 +1022,6 @@ final class SentryStabilityTests: XCTestCase {
             showNotifications: false,
             enableAutoReconnect: false,
             reconnectInterval: 7000,
-            maxReconnectAttempts: 3,
             heartbeatInterval: 45000,
             connectionTimeout: 12000
         )
@@ -1038,7 +1037,6 @@ final class SentryStabilityTests: XCTestCase {
         XCTAssertEqual(saved.showNotifications, existing.showNotifications)
         XCTAssertEqual(saved.enableAutoReconnect, existing.enableAutoReconnect)
         XCTAssertEqual(saved.reconnectInterval, existing.reconnectInterval)
-        XCTAssertEqual(saved.maxReconnectAttempts, existing.maxReconnectAttempts)
         XCTAssertEqual(saved.heartbeatInterval, existing.heartbeatInterval)
         XCTAssertEqual(saved.connectionTimeout, existing.connectionTimeout)
     }

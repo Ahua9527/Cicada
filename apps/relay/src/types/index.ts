@@ -13,9 +13,6 @@ export * from './models';
 // API相关类型
 export * from './api';
 
-// 会话相关类型
-export * from './session';
-
 // 中间件类型（从infrastructure/middleware模块导出）
 export type {
   MiddlewareContext,
@@ -28,22 +25,10 @@ export type {
   // 环境和基础类型
   Env,
   ApiResponse,
-  WebSocketInfo,
-  HealthStatus,
 } from './common';
 
 // 从 api.ts 导出 API 类型
-export type {
-  CommandRequest,
-  WebSocketMessage,
-  DeviceStatus,
-  CommandResponse,
-  SystemStatusResponse,
-  DeviceListResponse,
-} from './api';
-
-// 从 session.ts 导出会话类型
-export type { EnhancedSessionInfo } from './session';
+export type { CommandRequest, DeviceStatus, SystemStatusResponse, DeviceListResponse } from './api';
 
 // 日志类型
 export type { LogEntry } from '../utils/logger';
@@ -53,14 +38,7 @@ export type { LogLevel } from './models';
 export { ErrorType, DeviceConnectionStatus, DeviceCapability } from './models';
 
 // 重新导出类型
-export type {
-  SessionInfo,
-  WSMessage,
-  CommandResult,
-  DeviceMetadata,
-  SessionStats,
-  RateLimitConfig,
-} from './models';
+export type { SessionInfo, DeviceMetadata } from './models';
 
 export type { DeviceId, SessionId, Timestamp, JsonValue, JsonObject, JsonArray } from './common';
 

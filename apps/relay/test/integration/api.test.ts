@@ -372,6 +372,25 @@ describe('API Integration Tests', () => {
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
     });
 
+    it('should add CORS and security headers to routed responses', async () => {
+      mockEnv = {
+        ...mockEnv,
+        ENABLE_CORS: 'true',
+        ALLOWED_ORIGINS: 'https://browser.example',
+      };
+      app = new CicadaRelayApp(mockEnv);
+
+      const request = new Request('http://localhost/', {
+        method: 'GET',
+        headers: { Origin: 'https://browser.example' },
+      });
+
+      const response = await app.handle(request, mockEnv, mockCtx);
+
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://browser.example');
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    });
+
     it('should handle OPTIONS preflight requests', async () => {
       const request = new Request('http://localhost/v1/shortcuts/command', {
         method: 'OPTIONS',

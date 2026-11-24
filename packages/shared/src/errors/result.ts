@@ -16,13 +16,3 @@ export const Result = {
     return !result.success;
   },
 };
-
-export async function resultify<T>(fn: () => Promise<T>): Promise<Result<T>> {
-  try {
-    const data = await fn();
-    return Result.ok(data);
-  } catch (error) {
-    return Result.err(error as Error);
-  }
-}
-

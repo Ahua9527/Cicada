@@ -3,7 +3,7 @@
  */
 
 import type { Middleware, MiddlewareResult } from './types';
-import { extractResponse, isWebSocketUpgradeResponse } from './types';
+import { extractResponse, isControlResult, isWebSocketUpgradeResponse } from './types';
 import { sanitizeRequestUrl } from '../../presentation/request-url-sanitizer';
 
 /**
@@ -31,7 +31,7 @@ export function securityHeadersMiddleware(): Middleware {
       'Content-Security-Policy': "default-src 'self'",
     };
 
-    return addSecurityHeaders(result, securityHeaders);
+    return addSecurityHeaders(result, response, securityHeaders);
   };
 }
 
@@ -149,30 +149,25 @@ export function requestSizeLimitMiddleware(options: { maxSize?: number } = {}): 
 }
 
 /**
- * 添加安全头到响应
+ * 添加安全头到响应。路由返回的是 { continue: false, response } 包装，
+ * 不是裸 Response，两种形式都要加头并保持原来的形式返回。
  */
 function addSecurityHeaders(
   result: MiddlewareResult,
+  response: Response,
   headers: Record<string, string>
 ): MiddlewareResult {
-  if (result instanceof Response) {
-    // WebSocket 升级响应头部不可变且不可重建，原样透传（同 CORS 中间件）。
-    if (isWebSocketUpgradeResponse(result)) {
-      return result;
+  const newHeaders = new Headers(response.headers);
+  Object.entries(headers).forEach(([key, value]) => {
+    if (!newHeaders.has(key)) {
+      newHeaders.set(key, value);
     }
-    const newHeaders = new Headers(result.headers);
-    Object.entries(headers).forEach(([key, value]) => {
-      if (!newHeaders.has(key)) {
-        newHeaders.set(key, value);
-      }
-    });
+  });
 
-    return new Response(result.body, {
-      status: result.status,
-      statusText: result.statusText,
-      headers: newHeaders,
-    });
-  }
-
-  return result;
+  const decorated = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+  return isControlResult(result) ? { ...result, response: decorated } : decorated;
 }

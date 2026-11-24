@@ -94,7 +94,8 @@ bun run --cwd apps/relay wrangler secret delete CICADA_ADMIN_TOKEN
 
 After a reset the device ID is unbound: its old key no longer connects, and the
 Mac must enroll again with a new enrollment code. Without a valid code no other
-agent can claim the device ID.
+agent can claim the device ID. The Mac agent cannot send enrollment codes yet (see
+[Enrolling a new Mac](#enrolling-a-new-mac)), so for now a reset device cannot reconnect at all.
 
 Use placeholder values only in saved examples; replace the token and device ID
 for the actual request:

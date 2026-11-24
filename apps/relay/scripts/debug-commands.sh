@@ -36,6 +36,9 @@ WHITELIST="${1:-}"
 run() {  # run <cmd> [params-json]
   if [ -z "$WHITELIST" ] || [[ ",$WHITELIST," == *",$1,"* ]]; then fire "$1" "${2:-}"; fi
 }
+run_explicit() {  # 危险命令：白名单为空时不执行，只有显式列入才执行
+  if [[ ",$WHITELIST," == *",$1,"* ]]; then fire "$1"; fi
+}
 
 echo "== A. 只读/无害"
 run ping; run status; run bt_status; run app_list; run sentry_status; run screenshot; run wake
@@ -58,8 +61,8 @@ run sentry_start; run sentry_status; run sentry_open; run sentry_unlock; run sen
 echo "== F. 会话级（最后执行；sleep/restart/shutdown 需显式白名单）"
 run sleep_displays
 run lock
-run sleep
-run restart
-run shutdown
+run_explicit sleep
+run_explicit restart
+run_explicit shutdown
 
 echo "== 遍历完成"

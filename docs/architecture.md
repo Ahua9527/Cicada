@@ -46,10 +46,10 @@ flowchart LR
 | --- | --- | --- |
 | 入口 | `src/index.ts` | 创建应用实例（同一 isolate 内复用以保留限流计数），导出 DO 类 |
 | 中间件管线 | `src/presentation/app.ts`、`src/infrastructure/middleware/` | 依次为 requestId、日志、安全响应头、请求体大小限制（10 KB）、CORS（按 `ALLOWED_ORIGINS` 配置）、限流，最后是路由 |
-| 路由 | `src/presentation/router.ts`、`routes/` | `GET /relay/:liveSession`（daemon WebSocket）、`POST /v1/shortcuts/command`、`POST /v1/admin/device-reset`、`GET /status`、`GET /devices`、`GET /health`、`GET /` |
+| 路由 | `src/presentation/router.ts`、`routes/` | `GET /relay/:liveSession`（daemon WebSocket）、`POST /v1/shortcuts/command`、`POST /v1/admin/device-reset`、`POST /v1/admin/enrollment-codes`、`GET /status`、`GET /devices`、`GET /health`、`GET /` |
 | 控制器 | `src/presentation/controllers/` | 校验 daemon 连接头（设备 ID、身份公钥、登记签名相关头），转发到对应 DO 实例；查询注册表状态 |
-| SessionManagerDO | `src/infrastructure/persistence/durable-objects/session-manager.do.ts` | 注册表：设备记录、身份公钥首见绑定、登记签名校验与防重放、快捷指令授权记录、命令授权检查与路由。房间：持有 daemon 的 WebSocket、转发命令、等待结果 |
-| 持久化 | 同上 | 用 DO 自带存储（`state.storage`）保存会话、已用 nonce 和注册表记录；没有使用 KV 或 R2（`wrangler.toml` 中均为注释） |
+| SessionManagerDO | `src/infrastructure/persistence/durable-objects/session-manager.do.ts` | 注册表：设备记录、一次性注册码的签发与核销、身份公钥绑定、登记签名校验与防重放、快捷指令授权记录、命令授权检查与路由。房间：持有 daemon 的 WebSocket、转发命令、等待结果 |
+| 持久化 | 同上 | 用 DO 自带存储（`state.storage`）保存注册表记录（含快捷指令授权）、一次性注册码和会话列表；已用 nonce 只放在内存里（`usedRegistrationNonces`），不落盘；没有使用 KV 或 R2（`wrangler.toml` 中均为注释） |
 
 relay 不执行任何系统操作，也不签发快捷指令 token。
 
@@ -63,6 +63,7 @@ relay 不执行任何系统操作，也不签发快捷指令 token。
 - 跨语言样例：`packages/shared/protocol/fixtures/*.json`（`shortcut_command`、`shortcut_result_*`、`shortcut_grant_update*`），
   relay 侧由 `apps/relay/test/integration/transport-neutral.test.ts` 使用，Swift 侧由
   `apps/agent/swift/Tests/CicadaRelayClientTests/RelayTransportFixtureTests.swift` 使用，保证两边编解码一致。
+  `agent_enrollment.json`（首次登记样例）目前只有 relay 侧的 `apps/relay/test/integration/session-manager-do.test.ts` 使用，Swift 侧还没有对应实现。
 - Swift 侧没有代码生成，命令清单在 `apps/agent/swift/Sources/CicadaCore/Models.swift` 手工维护；改协议时要同时改这里和 `CicadaSystem/MacOSCommandGateway.swift`。
 
 ### 2.3 Mac 端（`apps/agent`）
@@ -113,22 +114,24 @@ daemon 收到的是 relay 转来的 `grantId` 而不是 token，所以 Mac 端�
 不能独立确认请求确实来自持有 token 的快捷指令。
 
 - **设备身份**：daemon 首次运行时生成 Ed25519 签名密钥对，保存在 `~/.cicada/agent.identity.json`（文件权限 0600，`IdentityStore.swift`）。
-- **首次登记（首见绑定）**：daemon 连接时带上设备 ID 和身份公钥。注册表第一次见到某个设备 ID 时直接记录它的公钥；
-  之后同一设备 ID 只接受同一公钥，并要求带时间戳、nonce 和签名的登记请求，注册表校验签名、时间窗和 nonce 是否已用过
-  （`session-manager.do.ts` 的 `handleRegistryAgentOnline`）。
+- **首次登记（一次性注册码）**：daemon 连接时带上设备 ID、身份公钥，以及带时间戳、nonce 和签名的登记请求，
+  注册表每次都校验签名、时间窗和 nonce 是否已用过。还没有绑定公钥的设备 ID 必须同时带上管理员签发的一次性注册码
+  （`POST /v1/admin/enrollment-codes`，10 分钟内有效，只能用一次，注册表只存哈希），核销后才记录它的公钥；
+  之后同一设备 ID 只接受同一公钥，不再需要注册码（`session-manager.do.ts` 的 `handleRegistryAgentOnline`、`claimEnrollmentCode`）。
+  Mac 端目前还不会发送注册码（`CicadaRelayClient/RelayProtocol.swift` 只发 v1 登记头），所以现在只有已绑定的设备能连上。
 - **快捷指令 token 与授权（grant）**：由 Mac 本地签发。`cicada` 通过 daemon 创建授权，本地只存 token 的哈希、预览、允许的命令和过期时间
   （`~/.cicada/shortcut-grants.json`，`ShortcutGrant.swift`）；daemon 通过 `shortcut_grant_update` 把这些元数据同步给注册表，
   注册表只能在设备在线时接受更新（`handleRegistryShortcutGrantUpdate`）。relay 和 Mac 都只保存哈希和预览，不保存完整 token。
 - **双重检查**：relay 注册表检查一次（第 1 节第 2 步），daemon 本地再检查一次（第 4 步），两边的规则相同：未撤销、未过期、命令在允许范围内。
-- **管理员令牌**：`CICADA_ADMIN_TOKEN` 是部署时配置的 Worker 机密，只用于 `POST /v1/admin/device-reset`，
-  作用是解除某个设备 ID 的首见公钥绑定，让密钥丢失或更换的设备能重新登记（`apps/relay/src/presentation/routes/admin.route.ts`）。
-  未配置时该端点返回 404。
+- **管理员令牌**：`CICADA_ADMIN_TOKEN` 是部署时配置的 Worker 机密，保护四个入口：`POST /v1/admin/enrollment-codes`（签发一次性注册码）、
+  `POST /v1/admin/device-reset`（解除某个设备 ID 的公钥绑定，让密钥丢失或更换的设备能凭新注册码重新登记）、
+  `GET /devices` 和带 `device_id` 的 `GET /status`（`apps/relay/src/presentation/admin-auth.ts`、`routes/admin.route.ts`）。
+  未配置时这些入口返回 404。
 
 ## 4. 已知结构问题与升级方向（计划中）
 
 当前一个全局注册表实例同时承担身份绑定、授权存储和命令路由，所有快捷指令请求都要经过它，职责集中、也是单点。
-首次登记只相信第一次见到的公钥，
-计划改为由管理员签发一次性注册码，设备凭码完成首次登记。中转协议目前没有运行时版本协商
-（`constants.ts` 里的 `VERSION`/`API_VERSION` 只是常量，传输消息里没有版本字段），两端靠同时升级和跨语言样例保持一致。
+一次性注册码在 relay 侧已经实现，Mac 端发送注册码的支持还没有做。中转协议目前没有运行时版本协商
+（`constants.ts` 里的 `VERSION` 只是常量，传输消息里没有版本字段），两端靠同时升级和跨语言样例保持一致。
 长期目标是“一台设备一个 DeviceDO”：身份、授权和会话都归到按设备寻址的实例，去掉全局注册表。
 以上都是计划，没有排期。

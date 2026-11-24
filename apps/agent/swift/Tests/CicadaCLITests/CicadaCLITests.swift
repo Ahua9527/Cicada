@@ -345,6 +345,16 @@ final class CicadaCLITests: XCTestCase {
         )
     }
 
+    /// 回归：Relay URL 以 `/` 结尾时，打印给 iOS 快捷指令的地址不能出现 `//v1`。
+    func testShortcutCreatePrintsURLWithoutDoubleSlash() {
+        let fixture = CLIFixture()
+        XCTAssertEqual(fixture.cli.run(arguments: ["setup", "--relay-url", "https://relay.example.com/"]).exitCode, 0)
+
+        let result = fixture.cli.run(arguments: ["shortcut", "create"])
+
+        XCTAssertTrue(result.stdout.contains("URL: https://relay.example.com/v1/shortcuts/command"))
+    }
+
     func testRunPingExecutesLocalCommand() {
         let fixture = CLIFixture()
 

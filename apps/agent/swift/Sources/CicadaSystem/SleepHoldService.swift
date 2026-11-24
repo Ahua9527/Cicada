@@ -245,11 +245,7 @@ public final class SleepHoldServiceManager: SleepHoldManaging {
     }
 
     /// 安装前准备（无需提权）：建好目录、确认 helper 已随 App 安装、把 launchd plist
-    /// 写入 runDir，返回待拷贝的 plist 源路径。
-    ///
-    /// `install()`（CLI sudo 路径）与 GUI 的提权安装共用此准备步骤；GUI 调用方随后
-    /// 自行以 root 身份把该 plist 拷到 `RuntimePaths.sleepHoldPlistPath` 并装载
-    /// （本层不允许直接调用外部提权二进制，见 CommandExecutionDependencyTests）。
+    /// 写入 runDir，返回待拷贝的 plist 源路径。目前只有 `install()`（CLI sudo 路径）调用。
     public func prepareInstall() throws -> String {
         let context = try SleepHoldInstallContext.resolve()
         try fm.createDirectory(atPath: context.cicadaHome, withIntermediateDirectories: true)

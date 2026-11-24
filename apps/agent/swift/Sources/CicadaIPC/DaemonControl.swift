@@ -176,13 +176,18 @@ public final class UdsDaemonControlClient {
             throw DaemonControlError.unavailable("daemon control send failed")
         }
 
+        // 回包以换行结束，可能超过一次 recv 的大小（授权记录多时），读到换行为止。
+        var received = Data()
         var buffer = [UInt8](repeating: 0, count: 8192)
-        let readSize = recv(fd, &buffer, buffer.count, 0)
-        guard readSize > 0 else {
-            throw DaemonControlError.unavailable("daemon control timeout")
+        while !received.contains(0x0A) {
+            let readSize = recv(fd, &buffer, buffer.count, 0)
+            guard readSize > 0 else {
+                throw DaemonControlError.unavailable("daemon control timeout")
+            }
+            received.append(contentsOf: buffer.prefix(readSize))
         }
 
-        let raw = String(decoding: buffer.prefix(Int(readSize)), as: UTF8.self)
+        let raw = String(decoding: received, as: UTF8.self)
         let line = raw.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: true).first.map(String.init) ?? ""
         guard let data = line.data(using: .utf8) else {
             throw DaemonControlError.invalidPayload
@@ -251,6 +256,9 @@ public final class UdsDaemonControlServer {
             if clientFd < 0 {
                 continue
             }
+            // 客户端可能等不到回包先断开；不设这个选项，回包时的 SIGPIPE 会杀掉整个进程。
+            var noSigPipe: Int32 = 1
+            _ = setsockopt(clientFd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
             handleClient(clientFd, handler: handler)
             close(clientFd)
         }

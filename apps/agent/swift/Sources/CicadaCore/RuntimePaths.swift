@@ -13,7 +13,6 @@ public enum RuntimePaths {
     public static let cicadaHome = home + "/.cicada"
     public static let runDir = cicadaHome + "/run"
     public static let binDir = cicadaHome + "/bin"
-    public static let daemonDir = cicadaHome + "/daemon"
     public static let applicationsDir = "/Applications"
 
     public static let cliBinaryName = "cicada"
@@ -34,7 +33,6 @@ public enum RuntimePaths {
     public static let bundledCLIHelperPath = sentinelHelpersDir + "/" + cliBinaryName
     public static let bundledDaemonHelperPath = sentinelHelpersDir + "/" + daemonBinaryName
     public static let bundledSleepHoldHelperPath = sentinelHelpersDir + "/" + sleepHoldBinaryName
-    public static let cliBinaryPath = bundledCLIHelperPath
     public static let daemonBinaryPath = bundledDaemonHelperPath
     public static let sleepHoldStagingBinaryPath = bundledSleepHoldHelperPath
     public static let sleepHoldSocketPath = runDir + "/sleephold.sock"
@@ -54,8 +52,6 @@ public enum RuntimePaths {
     public static let daemonStatePath = cicadaHome + "/daemon.state.json"
     public static let sentinelStdoutPath = cicadaHome + "/sentinel.stdout.log"
     public static let sentinelStderrPath = cicadaHome + "/sentinel.stderr.log"
-    public static let sleepHoldStdoutPath = cicadaHome + "/sleephold.stdout.log"
-    public static let sleepHoldStderrPath = cicadaHome + "/sleephold.stderr.log"
 
     public static func helperPath(name: String, inApp appPath: String = sentinelAppPath) -> String {
         appPath + "/Contents/Helpers/" + name

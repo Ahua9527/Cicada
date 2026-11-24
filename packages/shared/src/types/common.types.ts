@@ -31,28 +31,6 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * Pagination metadata shared by list endpoints.
- */
-export interface PaginatedResponse<T = unknown> extends ApiResponse<T> {
-  pagination?: {
-    page: number;
-    pageSize: number;
-    total: number;
-    hasMore: boolean;
-  };
-}
-
-/**
- * Structured error detail payload for validation/command failures.
- */
-export interface ErrorDetail {
-  code: string;
-  message: string;
-  field?: string;
-  details?: JsonValue;
-}
-
-/**
  * Runtime configuration exposed to Cloudflare Workers environment bindings.
  */
 export interface Env {
@@ -61,80 +39,11 @@ export interface Env {
   NODE_ENV?: string;
   LOG_LEVEL?: string;
   ENABLE_CORS?: string;
-  MAX_CONCURRENT_SESSIONS?: string;
   RATE_LIMIT_ENABLED?: string;
-  SESSION_TIMEOUT?: string;
   DEBUG_MODE?: string;
-  ENABLE_CONSOLE_LOG?: string;
-  ENABLE_STRUCTURED_LOG?: string;
-  WS_PING_INTERVAL?: string;
-  WS_PONG_TIMEOUT?: string;
-  ENABLE_METRICS?: string;
-  ENABLE_HEALTH_CHECKS?: string;
-  ENABLE_COMPRESSION?: string;
-  ENABLE_CACHING?: string;
   ALLOWED_ORIGINS?: string;
-  USE_DDD_ARCHITECTURE?: string;
   /** 运维管理端点令牌（/v1/admin/*）。未配置时管理端点关闭（404）。 */
   CICADA_ADMIN_TOKEN?: string;
-}
-
-/**
- * Worker socket level metadata tracked by CicadaRelay.
- */
-export interface WebSocketInfo {
-  deviceId: DeviceId;
-  connectedAt: number;
-  lastPing: number;
-  isActive: boolean;
-  userAgent?: string;
-  ipAddress?: string;
-}
-
-export interface HealthStatus {
-  status: 'healthy' | 'unhealthy' | 'degraded';
-  version: string;
-  uptime: number;
-  timestamp: number;
-  checks: {
-    durable_objects: boolean;
-    memory_usage: boolean;
-    active_sessions: number;
-  };
-  metrics?: {
-    total_requests: number;
-    error_rate: number;
-    avg_response_time: number;
-  };
-}
-
-export interface CicadaAgentConfig {
-  relayURL: string;
-  deviceId: string;
-  autoConnect: boolean;
-  showNotifications: boolean;
-  enableAutoReconnect?: boolean;
-  reconnectInterval?: number;
-  maxReconnectAttempts?: number;
-  heartbeatInterval?: number;
-  connectionTimeout?: number;
-}
-
-export interface ConnectionQuality {
-  isConnected: boolean;
-  errorCount: number;
-  reconnectAttempts: number;
-  lastError?: string;
-  lastErrorTime?: number;
-  averageErrorInterval: number;
-}
-
-export interface PerformanceMetrics {
-  renderCount: number;
-  averageRenderTime: number;
-  memoryUsage: number;
-  lastRenderTime: number;
-  componentRerenders: Record<string, number>;
 }
 
 export type Timer = ReturnType<typeof setTimeout>;

@@ -1,4 +1,4 @@
-import type { JsonValue, DeviceId, Timestamp } from './common.types';
+import type { JsonValue, DeviceId } from './common.types';
 import { COMMANDS } from '../protocol/commands.js';
 
 /**
@@ -14,29 +14,9 @@ import { COMMANDS } from '../protocol/commands.js';
  */
 export type CommandType = (typeof COMMANDS)[number];
 
-export interface CommandParams {
-  timeout?: number;
-  priority?: 'low' | 'normal' | 'high';
-  retryCount?: number;
-  silent?: boolean;
-  [key: string]: JsonValue | undefined;
-}
-
 export interface CommandRequest {
   device_id: DeviceId;
   command: CommandType | string;
   request_id?: string;
   params?: Record<string, JsonValue>;
-}
-
-export interface CommandResult<T = JsonValue> {
-  success: boolean;
-  message: string;
-  commandId?: string;
-  deviceId?: DeviceId;
-  command?: CommandType | string;
-  timestamp: Timestamp;
-  executionTime?: number;
-  error?: string;
-  data?: T;
 }

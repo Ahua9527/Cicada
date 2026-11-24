@@ -42,15 +42,6 @@ public final class ConfigStore {
         try fm.moveItem(atPath: tempPath, toPath: path)
     }
 
-    public func initializeDefault() throws -> CicadaConfig {
-        if exists() {
-            return try load()
-        }
-        let config = CicadaConfig.defaultConfig()
-        try save(config)
-        return config
-    }
-
     public func set(key: String, value: String) throws {
         var config = try load()
         switch key {
@@ -66,8 +57,6 @@ public final class ConfigStore {
             config.enableAutoReconnect = try parseBool(value, key: key)
         case "reconnectInterval":
             config.reconnectInterval = try parseInt(value, key: key)
-        case "maxReconnectAttempts":
-            config.maxReconnectAttempts = try parseInt(value, key: key)
         case "heartbeatInterval":
             config.heartbeatInterval = try parseInt(value, key: key)
         case "connectionTimeout":
@@ -93,8 +82,6 @@ public final class ConfigStore {
             return String(config.enableAutoReconnect)
         case "reconnectInterval":
             return String(config.reconnectInterval)
-        case "maxReconnectAttempts":
-            return String(config.maxReconnectAttempts)
         case "heartbeatInterval":
             return String(config.heartbeatInterval)
         case "connectionTimeout":

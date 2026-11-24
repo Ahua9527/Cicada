@@ -81,7 +81,6 @@ export class CicadaRelayApp {
           allowedHeaders: [
             'Content-Type',
             'Authorization',
-            'mcp-session-id',
             'X-Request-ID',
             'X-Device-ID',
             'X-Agent-Identity-Public-Key',

@@ -9,6 +9,11 @@ served by the Sentinel app over the existing Unix socket contract.
 The vendored Sentinel UI lives in `native/sentinel-app` and is built from the
 Sentry macOS project. Agent scripts include it in local validation:
 
+```bash
+bun run lint:agent
+bun run test:agent
+```
+
 The Sentry source baseline is `Ahua9527/Sentry` at
 `7961a0365f39d1e72ba4e587c79f6ef147fd613e`; local Cicada adaptations are
 recorded in `native/sentinel-app/ThirdParty/Sentry/VENDOR.md`.
@@ -17,11 +22,6 @@ Run `bun run vendor:audit` from the repository root to validate the Sentry and
 NotchDrop provenance, license, source mapping, and pinned upstream revisions.
 The quarterly update workflow is documented in
 `docs/maintenance/dependency-and-vendor-updates.md`.
-
-```bash
-bun run lint:agent
-bun run test:agent
-```
 
 `scripts/build.sh` builds release artifacts without installing them into the
 local runtime. The delivered app root is `/Applications/Cicada.app`; its CLI,

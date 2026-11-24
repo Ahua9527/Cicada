@@ -1488,11 +1488,7 @@ export class SessionManagerDO {
       });
 
       if (!result.success) {
-        const closeCode =
-          result.error === 'Agent session not available'
-            ? RELAY_CLOSE_CODES.AGENT_UNAVAILABLE
-            : 1013;
-        server.close(closeCode, result.error ?? 'Session limit reached');
+        server.close(1013, result.error);
         return this.jsonResponse(
           {
             success: false,

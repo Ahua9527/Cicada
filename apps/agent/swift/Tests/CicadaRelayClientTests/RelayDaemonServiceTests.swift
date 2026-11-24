@@ -67,39 +67,13 @@ final class RelayDaemonServiceTests: XCTestCase {
         )
     }
 
-    func testReconnectPolicyPreservesAttemptLimitsAndDelayBounds() {
-        XCTAssertEqual(
-            RelayConnectionLifecycle.reconnectDecision(
-                currentAttempts: 0,
-                maxAttempts: 10,
-                reconnectIntervalMs: 500
-            ),
-            .reconnect(attempt: 1, delayMs: 1_000)
-        )
-        XCTAssertEqual(
-            RelayConnectionLifecycle.reconnectDecision(
-                currentAttempts: 2,
-                maxAttempts: 0,
-                reconnectIntervalMs: 5_000
-            ),
-            .reconnect(attempt: 3, delayMs: 15_000)
-        )
-        XCTAssertEqual(
-            RelayConnectionLifecycle.reconnectDecision(
-                currentAttempts: 10,
-                maxAttempts: 10,
-                reconnectIntervalMs: 5_000
-            ),
-            .stop(attempt: 11)
-        )
-        XCTAssertEqual(
-            RelayConnectionLifecycle.reconnectDecision(
-                currentAttempts: 9,
-                maxAttempts: 0,
-                reconnectIntervalMs: 10_000
-            ),
-            .reconnect(attempt: 10, delayMs: 60_000)
-        )
+    func testReconnectDelayGrowsPerAttemptAndCapsAtOneMinute() {
+        XCTAssertEqual(RelayConnectionLifecycle.reconnectDelayMs(attempt: 1, reconnectIntervalMs: 500), 1_000)
+        XCTAssertEqual(RelayConnectionLifecycle.reconnectDelayMs(attempt: 3, reconnectIntervalMs: 5_000), 15_000)
+        XCTAssertEqual(RelayConnectionLifecycle.reconnectDelayMs(attempt: 10, reconnectIntervalMs: 10_000), 60_000)
+        // 旧实现第 11 次即放弃重连；现在不设上限，等待时间封顶 60 秒。
+        XCTAssertEqual(RelayConnectionLifecycle.reconnectDelayMs(attempt: 11, reconnectIntervalMs: 5_000), 55_000)
+        XCTAssertEqual(RelayConnectionLifecycle.reconnectDelayMs(attempt: 1_000, reconnectIntervalMs: 5_000), 60_000)
     }
 
     func testPongTimeoutPolicyPreservesStrictThreshold() {
@@ -366,7 +340,6 @@ final class RelayDaemonServiceTests: XCTestCase {
             showNotifications: showNotifications,
             enableAutoReconnect: enableAutoReconnect,
             reconnectInterval: reconnectInterval,
-            maxReconnectAttempts: 10,
             heartbeatInterval: 30000,
             connectionTimeout: connectionTimeout
         )

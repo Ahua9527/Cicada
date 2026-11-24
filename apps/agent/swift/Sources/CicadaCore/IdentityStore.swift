@@ -2,13 +2,10 @@ import CryptoKit
 import Foundation
 
 public enum RelayIdentityError: Error, CustomStringConvertible {
-    case invalidBase64(String)
     case invalidStoredIdentity
 
     public var description: String {
         switch self {
-        case let .invalidBase64(field):
-            return "invalid base64: \(field)"
         case .invalidStoredIdentity:
             return "invalid stored relay identity"
         }

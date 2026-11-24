@@ -7,7 +7,7 @@ Shared TypeScript contracts for Cicada Relay transport, Shortcuts gateway, comma
 `@cicada/shared` is the TypeScript source of truth for:
 
 1. Relay agent transport and Shortcuts envelopes: `src/types/relay-transport.types.ts`
-2. Command names and command request types: `src/types/command.types.ts`
+2. Command names: `src/protocol/commands.ts`; command request types: `src/types/command.types.ts`
 3. Command validation: `src/validators/command.validator.ts`
 4. Shared API envelopes and errors.
 5. Agent registration headers and signed transcript (v1/v2): [`COMMANDS.md`](./COMMANDS.md#agent-registration) and `protocol/fixtures/agent_enrollment.json`.

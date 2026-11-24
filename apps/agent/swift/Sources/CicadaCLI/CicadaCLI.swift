@@ -164,7 +164,7 @@ public final class CicadaCLI {
           cicada restart
           cicada status [--json]
           cicada shortcut create|list|revoke
-          cicada run <command>
+          cicada run <command> [key=value ...]
 
         Troubleshooting:
           cicada advanced --help
@@ -628,7 +628,8 @@ public final class CicadaCLI {
     }
 
     private func shortcutCreateText(token: String, grant: ShortcutGrant) -> String {
-        let relayURL = (try? configStore.load().relayURL) ?? "https://relay.example.com"
+        let relayURL = ((try? configStore.load().relayURL) ?? "https://relay.example.com")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return """
         Shortcuts token:
         \(token)
@@ -666,7 +667,6 @@ public final class CicadaCLI {
             "showNotifications": config.showNotifications,
             "enableAutoReconnect": config.enableAutoReconnect,
             "reconnectInterval": config.reconnectInterval,
-            "maxReconnectAttempts": config.maxReconnectAttempts,
             "heartbeatInterval": config.heartbeatInterval,
             "connectionTimeout": config.connectionTimeout,
         ]
