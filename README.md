@@ -44,6 +44,6 @@ bun run test
 ## 包边界
 
 - `apps/relay` 负责 Worker、Durable Object、Wrangler 配置和 Relay 测试。
-- `apps/agent` 负责 Swift CLI、LaunchAgent daemon、notifier 与安装脚本。
+- `apps/agent` 负责 Swift CLI、LaunchAgent daemon、notifier 与构建、签名脚本。
 - `packages/shared` 是命令契约唯一来源，Relay 通过 `@cicada/shared` workspace 依赖使用它。
 - 本仓库只保留一个根 `.git`，不使用 submodule，也不继续维护双仓库发布链路。

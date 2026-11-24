@@ -63,8 +63,10 @@ public final class DaemonManager {
         }
     }
 
+    // plist 设了 KeepAlive，`launchctl stop` 只杀进程，launchd 会马上拉起；要卸载任务才真正停下。
+    // plist 仍留在 LaunchAgents，start() 会重新 load，下次登录也会照常自启。
     public func stop() {
-        _ = runner.run("/bin/launchctl", args: ["stop", RuntimePaths.daemonLabel], timeoutMs: 5_000)
+        _ = runner.run("/bin/launchctl", args: ["unload", RuntimePaths.daemonPlistPath], timeoutMs: 5_000)
     }
 
     public func restart() throws {

@@ -134,7 +134,6 @@ public struct CicadaConfig: Codable {
     public var showNotifications: Bool
     public var enableAutoReconnect: Bool
     public var reconnectInterval: Int
-    public var maxReconnectAttempts: Int
     public var heartbeatInterval: Int
     public var connectionTimeout: Int
 
@@ -145,7 +144,6 @@ public struct CicadaConfig: Codable {
         showNotifications: Bool,
         enableAutoReconnect: Bool,
         reconnectInterval: Int,
-        maxReconnectAttempts: Int,
         heartbeatInterval: Int,
         connectionTimeout: Int
     ) {
@@ -155,7 +153,6 @@ public struct CicadaConfig: Codable {
         self.showNotifications = showNotifications
         self.enableAutoReconnect = enableAutoReconnect
         self.reconnectInterval = reconnectInterval
-        self.maxReconnectAttempts = maxReconnectAttempts
         self.heartbeatInterval = heartbeatInterval
         self.connectionTimeout = connectionTimeout
     }
@@ -168,7 +165,6 @@ public struct CicadaConfig: Codable {
             showNotifications: true,
             enableAutoReconnect: true,
             reconnectInterval: 5000,
-            maxReconnectAttempts: 10,
             heartbeatInterval: 30000,
             connectionTimeout: 10000
         )
@@ -192,9 +188,6 @@ public struct CicadaConfig: Codable {
         }
         guard reconnectInterval > 0 else {
             throw CicadaError.validation("reconnectInterval 必须大于 0")
-        }
-        guard maxReconnectAttempts >= 0 else {
-            throw CicadaError.validation("maxReconnectAttempts 不能小于 0")
         }
         guard heartbeatInterval > 0 else {
             throw CicadaError.validation("heartbeatInterval 必须大于 0")

@@ -38,10 +38,6 @@ public struct ShortcutGrant: Codable, Equatable {
         self.updatedAt = updatedAt
     }
 
-    public var active: Bool {
-        revokedAt == nil && expiresAt > Int64(Date().timeIntervalSince1970 * 1000)
-    }
-
     public func revoked(now: Int64) -> ShortcutGrant {
         ShortcutGrant(
             grantId: grantId,

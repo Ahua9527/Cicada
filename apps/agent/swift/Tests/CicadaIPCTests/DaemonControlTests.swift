@@ -33,6 +33,53 @@ final class DaemonControlTests: XCTestCase {
         XCTAssertThrowsError(try client.sentryStart())
     }
 
+    /// 回归：客户端等不到回包先断开后，服务端再回包不能让整个进程被 SIGPIPE 杀掉。
+    func testServerSurvivesClientThatLeftBeforeTheReply() throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cicada-ctl-\(UUID().uuidString.prefix(8)).sock")
+            .path
+        let server = UdsDaemonControlServer(socketPath: path)
+        try server.start { _ in
+            Thread.sleep(forTimeInterval: 0.3)
+            return DaemonControlResponse(ok: true)
+        }
+        defer { server.stop() }
+
+        let impatient = UdsDaemonControlClient(socketPath: path, timeoutMs: 100)
+        XCTAssertThrowsError(try impatient.shortcutGrantList())
+
+        // 服务端按顺序处理连接：这次请求拿到回包，说明上一次向已断开连接的回包已经发生过。
+        let patient = UdsDaemonControlClient(socketPath: path, timeoutMs: 2000)
+        XCTAssertTrue(try patient.shortcutGrantList().ok)
+    }
+
+    /// 回归：授权记录多了以后回包超过一次读取的大小（8192 字节），客户端必须读完整。
+    func testClientReadsReplyLargerThanOneBuffer() throws {
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cicada-ctl-\(UUID().uuidString.prefix(8)).sock")
+            .path
+        let grants = (0..<40).map { index in
+            ShortcutGrant(
+                grantId: "grant-\(index)",
+                deviceId: "MAC_0123456789ABCDEF0123456789ABCDEF",
+                name: "Phone",
+                tokenHash: String(repeating: "h", count: 64),
+                tokenPreview: "preview",
+                allowedCommands: RemoteCommand.allCases.map(\.rawValue),
+                expiresAt: 2,
+                createdAt: 1,
+                updatedAt: 1
+            )
+        }
+        let server = UdsDaemonControlServer(socketPath: path)
+        try server.start { _ in DaemonControlResponse(ok: true, shortcutGrants: grants) }
+        defer { server.stop() }
+
+        let response = try UdsDaemonControlClient(socketPath: path).shortcutGrantList()
+
+        XCTAssertEqual(response.shortcutGrants?.count, 40)
+    }
+
     func testShortcutGrantControlPayloadsRoundTrip() throws {
         let request = DaemonControlRequest(
             action: .shortcutGrantCreate,

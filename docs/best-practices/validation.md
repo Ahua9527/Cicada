@@ -8,7 +8,6 @@
   transcript ([Agent Registration](../../packages/shared/COMMANDS.md#agent-registration)).
 - Enrollment codes are valid for 10 minutes, work once, and are stored only as SHA-256 hashes.
 - Re-registering an already-bound agent identity requires signature, timestamp, and nonce.
-- Shortcuts use `Authorization: Bearer cicada_sc_<token>`.
 - Relay and agent store only shortcut token hashes and previews.
 - Keep real secrets in Wrangler or local shell-managed config, never in repo files.
 
@@ -23,7 +22,7 @@ Never log:
 - shortcut token hashes
 - nonces or signatures
 - shortcut command payloads when they include user parameters
-- full `/relay/:session_or_token` path segments
+- full `/relay/:liveSession` path segments
 
 Operational logs should use request id, route shape, status, grant preview, and
 redacted device/session summaries.

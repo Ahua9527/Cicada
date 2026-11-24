@@ -11,7 +11,6 @@ final class RelayURLBuilderTests: XCTestCase {
             showNotifications: true,
             enableAutoReconnect: true,
             reconnectInterval: 5000,
-            maxReconnectAttempts: 10,
             heartbeatInterval: 30000,
             connectionTimeout: 10000
         )
@@ -31,7 +30,6 @@ final class RelayURLBuilderTests: XCTestCase {
             showNotifications: true,
             enableAutoReconnect: true,
             reconnectInterval: 5000,
-            maxReconnectAttempts: 10,
             heartbeatInterval: 30000,
             connectionTimeout: 10000
         )

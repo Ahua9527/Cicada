@@ -1,4 +1,4 @@
-import type { CommandRequest, CommandType } from '../types/command.types.js';
+import type { CommandRequest } from '../types/command.types.js';
 import type { JsonValue } from '../types/common.types.js';
 import { COMMANDS } from '../protocol/commands.js';
 import { BaseValidator } from './base.validator.js';
@@ -215,23 +215,4 @@ export function validateCommandRequest(payload: CommandRequest): {
     errors: validator.getErrors(),
     formattedError: validator.getFormattedErrors(),
   };
-}
-
-/**
- * 检查命令是否被支持
- *
- * @param cmd - 命令字符串
- * @returns 命令是否在支持列表中
- */
-export function isCommandSupported(cmd: string): cmd is CommandType {
-  return SUPPORTED_COMMANDS.has(cmd);
-}
-
-/**
- * 获取所有支持的命令列表
- *
- * @returns 支持的命令数组
- */
-export function getSupportedCommands(): CommandType[] {
-  return [...COMMANDS];
 }

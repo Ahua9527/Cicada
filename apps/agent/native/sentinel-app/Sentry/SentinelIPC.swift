@@ -118,6 +118,9 @@ final class SentinelIPCServer {
                 if !running { break }
                 continue
             }
+            // 客户端可能等不到回包先断开；不设这个选项，回包时的 SIGPIPE 会杀掉整个进程。
+            var noSigPipe: Int32 = 1
+            _ = setsockopt(clientFd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
             handleClient(clientFd)
             close(clientFd)
         }

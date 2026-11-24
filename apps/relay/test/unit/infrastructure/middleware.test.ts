@@ -286,14 +286,15 @@ describe('Middleware', () => {
       }
     });
 
-    it('calls the next middleware', async () => {
-      const response = new Response('test');
+    it('adds security headers to routed responses and keeps the result shape', async () => {
       const result = await securityHeadersMiddleware()(createContext(), async () => ({
         continue: false,
-        response,
+        response: new Response('test'),
       }));
 
-      expect((result as { response: Response }).response).toBe(response);
+      const { response } = result as { response: Response };
+      expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+      expect(await response.text()).toBe('test');
     });
   });
 

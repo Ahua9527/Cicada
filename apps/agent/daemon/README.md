@@ -24,7 +24,6 @@
   "showNotifications": true,
   "enableAutoReconnect": true,
   "reconnectInterval": 5000,
-  "maxReconnectAttempts": 10,
   "heartbeatInterval": 30000,
   "connectionTimeout": 10000
 }
@@ -46,11 +45,11 @@ cicada run ping
 |---|---|
 | `cicada setup [--relay-url <url>]` | 创建或更新 `~/.cicada/config.json`，生成 `deviceId`，写入 Relay URL；不启动 daemon。 |
 | `cicada start` | 安装缺失的 daemon/Sentinel 并启动本机 agent 服务；daemon 自动连接 Relay。 |
-| `cicada stop` / `cicada restart` | 停止或重启 daemon/Sentinel。 |
+| `cicada stop` / `cicada restart` | 停止或重启 daemon/Sentinel；停止的 daemon 在下次登录时会照常自启。 |
 | `cicada status [--json]` | 合并 config、daemon、Sentinel、runtime snapshot 和原生权限/能力摘要；不是完整端到端网络 smoke。 |
 | `cicada shortcut create [--name <name>] [--commands <csv|all>] [--ttl <duration>]` | 创建 iOS Shortcuts token，默认授权 `ping,status`、30 天；`all` 不含高风险命令；完整 token 只显示一次。 |
 | `cicada shortcut list` / `cicada shortcut revoke <id>` | 查看或撤销 Shortcuts token；通过 `~/.cicada/run/daemon.sock` 请求 daemon，daemon 不运行时失败。 |
-| `cicada run <command>` | 本机直接执行 9 个 Mac 命令，用于测试和手动操作；绕过 Relay 与 Shortcuts token。 |
+| `cicada run <command> [key=value ...]` | 本机直接执行[命令表](../../../packages/shared/COMMANDS.md#current-commands)中的任意 Mac 命令，用于测试和手动操作；绕过 Relay 与 Shortcuts token。 |
 
 排障入口集中在 `advanced` 下：
 
@@ -62,6 +61,8 @@ cicada advanced doctor --json
 ```
 
 ## Mac 命令边界
+
+下表只说明部分命令的实现边界，完整命令见[命令表](../../../packages/shared/COMMANDS.md#current-commands)。
 
 | 命令 | 能力边界 |
 |---|---|
@@ -75,7 +76,7 @@ cicada advanced doctor --json
 | `decaffeinate` | daemon 释放自身 IOPM no-sleep assertion，并终止自身持有的 SleepHold session；不终止同用户其他进程。 |
 | `status` | 返回 uptime、电量、蓝牙状态；蓝牙权限或 bridge 不可用时蓝牙显示“未知”。 |
 
-Mac 命令执行层不依赖外部二进制；不要求安装 Homebrew、MacPorts、`blueutil`、shell 脚本或系统命令包装器。Bluetooth power 切换源码桥参考 `toy/blueutil` 的 MIT 许可实现，源码随 agent 编译。合盖防睡眠能力参考 `Lakr233/SleepHoldService` 的 MIT 许可实现，源码随 agent 编译为 `cicada-sleephold`。`lock` 和 `bt_toggle` 受 macOS TCC 权限控制，权限不足时按 fail-closed 返回明确错误。
+Mac 命令执行层不要求安装 Homebrew、MacPorts、`blueutil` 等第三方工具，也不靠 shell 脚本；少数命令调用 macOS 自带程序：`screenshot` 用 `/usr/sbin/screencapture`，`daemon_exit` 用 `/bin/launchctl`，打开 Cicada.app 用 `/usr/bin/open`。Bluetooth power 切换源码桥参考 `toy/blueutil` 的 MIT 许可实现，源码随 agent 编译。合盖防睡眠能力参考 `Lakr233/SleepHoldService` 的 MIT 许可实现，源码随 agent 编译为 `cicada-sleephold`。`lock` 和 `bt_toggle` 受 macOS TCC 权限控制，权限不足时按 fail-closed 返回明确错误。
 
 ## SleepHold Helper
 
@@ -120,16 +121,21 @@ cicada shortcut create --name iPhone --commands ping,status --ttl 30d
 
 输出包含完整 token，且只显示这一次：
 
-```json
-{
-  "ok": true,
-  "shortcutToken": "cicada_sc_xxx",
-  "shortcutGrant": {
-    "grantId": "grant-...",
-    "tokenPreview": "cicada_sc_xx...1234",
-    "allowedCommands": ["ping", "status"]
-  }
-}
+```text
+Shortcuts token:
+cicada_sc_<token>
+
+Grant:
+  id: grant-...
+  commands: ping,status
+  token preview: cicada_sc_abcd...wxyz
+
+iOS Shortcuts:
+  URL: https://relay.example.com/v1/shortcuts/command
+  Method: POST
+  Header: Authorization: Bearer cicada_sc_<token>
+  Header: Content-Type: application/json
+  Body: {"device_id":"MAC_...","command":"ping","request_id":"shortcut-ping"}
 ```
 
 完整 token 不写入 `daemon.log`、stdout/stderr 持久日志、`daemon.state.json`

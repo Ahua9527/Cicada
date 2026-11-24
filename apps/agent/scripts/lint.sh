@@ -16,4 +16,5 @@ xcodebuild \
   -configuration Debug \
   -destination "platform=macOS" \
   CODE_SIGNING_ALLOWED=NO \
-  build >/dev/null
+  -quiet \
+  build

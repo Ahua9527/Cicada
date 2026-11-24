@@ -5,11 +5,6 @@ enum RelayDisconnectionAction: Equatable {
     case reconnect
 }
 
-enum RelayReconnectDecision: Equatable {
-    case reconnect(attempt: Int, delayMs: Int)
-    case stop(attempt: Int)
-}
-
 enum RelayConnectionLifecycle {
     static func disconnectionAction(
         isStopping: Bool,
@@ -22,18 +17,11 @@ enum RelayConnectionLifecycle {
         return .reconnect
     }
 
-    static func reconnectDecision(
-        currentAttempts: Int,
-        maxAttempts: Int,
-        reconnectIntervalMs: Int
-    ) -> RelayReconnectDecision {
-        let attempt = currentAttempts + 1
-        if maxAttempts > 0 && attempt > maxAttempts {
-            return .stop(attempt: attempt)
-        }
-
+    /// 第 attempt 次重连前的等待时间：逐次拉长，最长 60 秒。
+    /// 重连不设次数上限——断网或 Relay 故障恢复后，守护进程要能自己连回来。
+    static func reconnectDelayMs(attempt: Int, reconnectIntervalMs: Int) -> Int {
         let baseDelay = max(1_000, reconnectIntervalMs)
-        return .reconnect(attempt: attempt, delayMs: min(baseDelay * attempt, 60_000))
+        return min(baseDelay * attempt, 60_000)
     }
 
     /// 心跳超时判定：只在有已发出但未应答的 ping 时才可能超时。

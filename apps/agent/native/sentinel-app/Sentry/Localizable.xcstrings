@@ -2265,22 +2265,6 @@
         }
       }
     },
-    "Maximum reconnect attempts cannot be negative.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Maximum reconnect attempts cannot be negative."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最大重连次数不能为负数。"
-          }
-        }
-      }
-    },
     "Needs alarm and notification": {
       "localizations": {
         "zh-Hans": {

@@ -14,7 +14,7 @@ echo "  $ROOT_DIR/swift/.build/release/cicada"
 echo "  $ROOT_DIR/swift/.build/release/cicada-agent"
 echo "  $ROOT_DIR/swift/.build/release/cicada-sleephold"
 
-echo "[build] building sentinel app (if xcodebuild is available)..."
+echo "[build] building sentinel app..."
 CICADA_HELPERS_SOURCE_DIR="$ROOT_DIR/swift/.build/release" bash "$ROOT_DIR/native/sentinel-app/scripts/build.sh"
 
 echo "[build] sentinel app artifact:"

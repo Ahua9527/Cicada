@@ -38,7 +38,6 @@ private struct DaemonRuntimeEffectiveConfig: Codable {
     let showNotifications: Bool
     let enableAutoReconnect: Bool
     let reconnectInterval: Int
-    let maxReconnectAttempts: Int
     let heartbeatInterval: Int
     let connectionTimeout: Int
 }
@@ -60,13 +59,10 @@ public final class RelayDaemonService: NSObject {
 
     private var session: URLSession?
     private var task: URLSessionWebSocketTask?
-    private var identity: RelayIdentity?
-    private var liveSessionId: String?
     private var pingTimer: DispatchSourceTimer?
     private var healthTimer: DispatchSourceTimer?
     private var reconnectWorkItem: DispatchWorkItem?
     private var reconnectAttempts = 0
-    private var lastPongAt = Date.distantPast
     /// 已发出但未收到 pong 的 ping 时刻；nil 表示无未完成心跳。
     private var awaitingPongSince: Date?
     private var isStopping = false
@@ -155,7 +151,6 @@ public final class RelayDaemonService: NSObject {
         let identity: RelayIdentity
         do {
             identity = try identityStore.loadOrCreate(identityId: config.deviceId)
-            self.identity = identity
         } catch {
             Logger.error("RelayDaemon", "identity load failed", data: ["error": String(describing: error)])
             scheduleReconnect(reason: "identity_load_failed")
@@ -163,7 +158,6 @@ public final class RelayDaemonService: NSObject {
         }
 
         let liveSessionId = "live-\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
-        self.liveSessionId = liveSessionId
 
         guard let request = RelayURLBuilder.buildAgentWebSocketRequest(
             config: config,
@@ -223,7 +217,6 @@ public final class RelayDaemonService: NSObject {
 
     private func processRawMessage(_ raw: String) {
         if RelayMessageCodec.isPong(raw) {
-            lastPongAt = Date()
             awaitingPongSince = nil
             return
         }
@@ -347,7 +340,6 @@ public final class RelayDaemonService: NSObject {
 
     private func handleConnected() {
         reconnectAttempts = 0
-        lastPongAt = Date()
         awaitingPongSince = nil
         startPingLoop()
         startHealthLoop()
@@ -402,26 +394,19 @@ public final class RelayDaemonService: NSObject {
     private func scheduleReconnect(reason: String) {
         guard !isStopping else { return }
         reconnectWorkItem?.cancel()
-        switch RelayConnectionLifecycle.reconnectDecision(
-            currentAttempts: reconnectAttempts,
-            maxAttempts: config.maxReconnectAttempts,
+        reconnectAttempts += 1
+        let delayMs = RelayConnectionLifecycle.reconnectDelayMs(
+            attempt: reconnectAttempts,
             reconnectIntervalMs: config.reconnectInterval
-        ) {
-        case let .stop(attempt):
-            reconnectAttempts = attempt
-            Logger.error("RelayDaemon", "reconnect attempts exceeded", data: ["attempts": String(attempt)])
-            transition(to: .stopped, reason: "reconnect_attempts_exceeded")
-        case let .reconnect(attempt, delayMs):
-            reconnectAttempts = attempt
-            transition(to: .reconnectWait, reason: reason)
-            Logger.warn("RelayDaemon", "schedule reconnect", data: ["delayMs": String(delayMs), "attempt": String(attempt)])
+        )
+        transition(to: .reconnectWait, reason: reason)
+        Logger.warn("RelayDaemon", "schedule reconnect", data: ["delayMs": String(delayMs), "attempt": String(reconnectAttempts)])
 
-            let workItem = DispatchWorkItem { [weak self] in
-                self?.connect()
-            }
-            reconnectWorkItem = workItem
-            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(delayMs), execute: workItem)
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.connect()
         }
+        reconnectWorkItem = workItem
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(delayMs), execute: workItem)
     }
 
     private func startPingLoop() {
@@ -526,7 +511,6 @@ public final class RelayDaemonService: NSObject {
                 showNotifications: config.showNotifications,
                 enableAutoReconnect: config.enableAutoReconnect,
                 reconnectInterval: config.reconnectInterval,
-                maxReconnectAttempts: config.maxReconnectAttempts,
                 heartbeatInterval: config.heartbeatInterval,
                 connectionTimeout: config.connectionTimeout
             ),

@@ -8,7 +8,6 @@ struct CicadaRelayConfig: Codable, Equatable {
     var showNotifications: Bool
     var enableAutoReconnect: Bool
     var reconnectInterval: Int
-    var maxReconnectAttempts: Int
     var heartbeatInterval: Int
     var connectionTimeout: Int
 
@@ -20,7 +19,6 @@ struct CicadaRelayConfig: Codable, Equatable {
             showNotifications: true,
             enableAutoReconnect: true,
             reconnectInterval: 5000,
-            maxReconnectAttempts: 10,
             heartbeatInterval: 30000,
             connectionTimeout: 10000
         )
@@ -37,7 +35,6 @@ final class CicadaRelayConfigStore {
         case invalidRelayURL
         case invalidDeviceId
         case invalidReconnectInterval
-        case invalidMaxReconnectAttempts
         case invalidHeartbeatInterval
         case invalidConnectionTimeout
 
@@ -51,8 +48,6 @@ final class CicadaRelayConfigStore {
                 return String(localized: "Device ID must match MAC_ followed by 32 hexadecimal characters.")
             case .invalidReconnectInterval:
                 return String(localized: "Reconnect interval must be greater than 0.")
-            case .invalidMaxReconnectAttempts:
-                return String(localized: "Maximum reconnect attempts cannot be negative.")
             case .invalidHeartbeatInterval:
                 return String(localized: "Heartbeat interval must be greater than 0.")
             case .invalidConnectionTimeout:
@@ -136,9 +131,6 @@ final class CicadaRelayConfigStore {
         }
         guard config.reconnectInterval > 0 else {
             throw StoreError.invalidReconnectInterval
-        }
-        guard config.maxReconnectAttempts >= 0 else {
-            throw StoreError.invalidMaxReconnectAttempts
         }
         guard config.heartbeatInterval > 0 else {
             throw StoreError.invalidHeartbeatInterval

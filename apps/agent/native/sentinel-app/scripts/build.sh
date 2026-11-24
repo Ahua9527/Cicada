@@ -6,7 +6,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/.build"
 CONFIGURATION="${CONFIGURATION:-Release}"
 APP_NAME="${CICADA_APP_NAME:-Cicada}"
-LEGACY_APP_NAME="Sentry"
 HELPERS_SOURCE_DIR="${CICADA_HELPERS_SOURCE_DIR:-$ROOT_DIR/../../swift/.build/release}"
 REQUIRE_HELPERS=0
 if [ -n "${CICADA_HELPERS_SOURCE_DIR:-}" ]; then

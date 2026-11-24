@@ -3,7 +3,6 @@
  */
 
 import type { Env } from '@/types';
-import type { CommandRequest } from '@cicada/shared';
 import type { Logger } from '../logger';
 
 /**
@@ -19,7 +18,6 @@ export interface MiddlewareContext {
   method: string;
   headers: Record<string, string>;
   executionContext?: ExecutionContext;
-  validatedRequest?: CommandRequest;
 }
 
 /**

@@ -53,22 +53,6 @@ public final class ProcessRunner {
         return ProcessResult(stdout: stdout.trimmingCharacters(in: .whitespacesAndNewlines), stderr: stderr.trimmingCharacters(in: .whitespacesAndNewlines), code: process.terminationStatus)
     }
 
-    public func runDetached(_ command: String, args: [String] = []) -> Result<Int32, CicadaError> {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: command)
-        process.arguments = args
-        process.standardInput = nil
-        process.standardOutput = nil
-        process.standardError = nil
-
-        do {
-            try process.run()
-            return .success(process.processIdentifier)
-        } catch {
-            return .failure(.command("后台命令启动失败: \(error.localizedDescription)"))
-        }
-    }
-
     public func commandExists(_ name: String) -> Bool {
         let result = run("/usr/bin/which", args: [name], timeoutMs: 2_000)
         return result.code == 0 && !result.stdout.isEmpty
